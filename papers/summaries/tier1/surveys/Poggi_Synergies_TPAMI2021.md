@@ -57,7 +57,7 @@ Before end-to-end models, researchers replaced **individual steps** of the Schar
 
 **Key equation — correlation layer:**
 
-$$c(x_1, x_2) = \sum_{o \in [-k,k] \times [-k,k]} \langle f_1(x_1 + o), \ f_2(x_2 + o) \rangle \tag{1}$$
+$$c(x_1, x_2) = \sum_{o \in [-k,k] \times [-k,k]} \langle f_1(x_1 + o), \ f_2(x_2 + o) \rangle \quad \text{(1)}$$
 
 - **$c(x_1, x_2)$** = correlation (similarity score) between position $x_1$ in left image and $x_2$ in right image
 - **$f_1, f_2$** = learned feature maps from a shared-weight (Siamese) CNN encoder

@@ -24,7 +24,7 @@ The stereo matching field in the mid-2000s had a fundamental dilemma:
 
 Recall from Scharstein & Szeliski that global methods minimize an energy function:
 
-$$E(D) = \sum_{p} C(p, D_p) + \sum_{q \in N_p} P \cdot T[|D_p - D_q| \geq 1] \tag{1}$$
+$$E(D) = \sum_{p} C(p, D_p) + \sum_{q \in N_p} P \cdot T[|D_p - D_q| \geq 1] \quad \text{(1)}$$
 
 Let's break this down completely:
 
@@ -56,7 +56,7 @@ SGM's brilliant solution: instead of solving one 2D problem or many independent 
 
 SGM uses a refined version of Eq. 1 with **two penalty levels** to handle both slanted surfaces and true discontinuities:
 
-$$E(D) = \sum_{p} C(p, D_p) + \sum_{q \in N_p} P_1 \cdot T[|D_p - D_q| = 1] + \sum_{q \in N_p} P_2 \cdot T[|D_p - D_q| > 1] \tag{2}$$
+$$E(D) = \sum_{p} C(p, D_p) + \sum_{q \in N_p} P_1 \cdot T[|D_p - D_q| = 1] + \sum_{q \in N_p} P_2 \cdot T[|D_p - D_q| > 1] \quad \text{(2)}$$
 
 Every element explained:
 

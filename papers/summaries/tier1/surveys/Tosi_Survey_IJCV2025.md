@@ -39,7 +39,7 @@ The survey groups these into **2D** and **3D** architectures:
 - Faster than 3D but don't explicitly reason about geometry along the disparity dimension
 - **Key equation for 2D correlation volume:**
 
-$$c(x_1, x_2) = \sum_{o \in [-k,k] \times [-k,k]} \langle f_1(x_1 + o), \ f_2(x_2 + o) \rangle \tag{Appendix Eq. 2}$$
+$$c(x_1, x_2) = \sum_{o \in [-k,k] \times [-k,k]} \langle f_1(x_1 + o), \ f_2(x_2 + o) \rangle \quad \text{(Appendix Eq. 2)}$$
 
 - **$c(x_1, x_2)$** = correlation score between position $x_1$ in the left image and $x_2$ in the right image
 - **$f_1, f_2$** = learned feature maps from the left and right images respectively
@@ -52,7 +52,7 @@ $$c(x_1, x_2) = \sum_{o \in [-k,k] \times [-k,k]} \langle f_1(x_1 + o), \ f_2(x_
 - Process with **3D convolutions** that explicitly encode geometry along the disparity dimension
 - Final disparity via **soft argmin:**
 
-$$\text{soft-argmin} = \sum_{d=0}^{D} d \cdot \sigma(-c_d) \tag{Appendix Eq. 3}$$
+$$\text{soft-argmin} = \sum_{d=0}^{D} d \cdot \sigma(-c_d) \quad \text{(Appendix Eq. 3)}$$
 
 - **$d$** = disparity level (integer from 0 to $D$)
 - **$c_d$** = predicted cost at disparity level $d$ (from the cost volume)
@@ -79,7 +79,7 @@ The survey identifies this as the **game-changing paradigm** of the 2020s:
 - Constructs a **correlation pyramid** (not a full 4D cost volume) — efficient, no 3D convolutions needed
 - **Correlation volume construction:**
 
-$$\mathbf{C}_{ijk} = \sum_h \mathbf{f}_{ijh} \cdot \mathbf{g}_{ikh}, \quad \mathbf{C} \in \mathbb{R}^{H \times W \times W} \tag{Eq. 1}$$
+$$\mathbf{C}_{ijk} = \sum_h \mathbf{f}_{ijh} \cdot \mathbf{g}_{ikh}, \quad \mathbf{C} \in \mathbb{R}^{H \times W \times W} \quad \text{(Eq. 1)}$$
 
 - **$\mathbf{C}_{ijk}$** = correlation between pixel $(i, j)$ in the left image and pixel $(i, k)$ in the right image
 - **$\mathbf{f}_{ijh}$** = feature vector at position $(i, j)$ in the left feature map, at channel $h$
@@ -251,7 +251,7 @@ The metrics every stereo paper reports, defined precisely:
 
 **End-Point Error (EPE):**
 
-$$\text{EPE} = \frac{1}{N} \sum_p |D_p - D_p^{gt}| \tag{Eq. 4}$$
+$$\text{EPE} = \frac{1}{N} \sum_p |D_p - D_p^{gt}| \quad \text{(Eq. 4)}$$
 
 - **$D_p$** = predicted disparity at pixel $p$
 - **$D_p^{gt}$** = ground-truth disparity at pixel $p$
@@ -260,13 +260,13 @@ $$\text{EPE} = \frac{1}{N} \sum_p |D_p - D_p^{gt}| \tag{Eq. 4}$$
 
 **Root Mean Squared Error (RMSE):**
 
-$$\text{RMSE} = \sqrt{\frac{1}{N} \sum_p (D_p - D_p^{gt})^2} \tag{Eq. 5}$$
+$$\text{RMSE} = \sqrt{\frac{1}{N} \sum_p (D_p - D_p^{gt})^2} \quad \text{(Eq. 5)}$$
 
 - Same variables as EPE, but uses squared error — penalizes large errors more heavily
 
 **Bad-$\tau$ (percentage of bad pixels):**
 
-$$\text{bad-}\tau = \frac{1}{N} \sum_p \delta(|D_p - D_p^{gt}| > \tau) \tag{Eq. 6}$$
+$$\text{bad-}\tau = \frac{1}{N} \sum_p \delta(|D_p - D_p^{gt}| > \tau) \quad \text{(Eq. 6)}$$
 
 - **$\tau$** = error threshold in pixels (commonly $\tau = 1.0$ for Middlebury, $\tau = 2.0$ for Booster)
 - **$\delta(\cdot)$** = indicator function (1 if true, 0 if false)
@@ -274,7 +274,7 @@ $$\text{bad-}\tau = \frac{1}{N} \sum_p \delta(|D_p - D_p^{gt}| > \tau) \tag{Eq. 
 
 **D1 metric (KITTI 2015):**
 
-$$\text{D1} = \frac{1}{N} \sum_p \delta(|D_p - D_p^{gt}| > 3 \wedge |D_p - D_p^{gt}| > 0.05 \cdot D_p^{gt}) \tag{Eq. 7}$$
+$$\text{D1} = \frac{1}{N} \sum_p \delta(|D_p - D_p^{gt}| > 3 \wedge |D_p - D_p^{gt}| > 0.05 \cdot D_p^{gt}) \quad \text{(Eq. 7)}$$
 
 - A pixel is "bad" if its error exceeds **both** 3 pixels **and** 5% of the ground-truth disparity
 - **$\wedge$** = logical AND — both conditions must be satisfied

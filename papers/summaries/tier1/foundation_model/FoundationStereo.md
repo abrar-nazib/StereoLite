@@ -38,7 +38,7 @@ Despite strong benchmark performance, stereo networks fail to generalize zero-sh
 $$d_0 = \sum_{d=0}^{D-1} d \cdot \text{Softmax}(V'_C)(d)$$
 
 **Loss function:**
-$$\mathcal{L} = |d_0 - \bar{d}|_{smooth} + \sum_{k=1}^{K} \gamma^{K-k} \|d_k - \bar{d}\|_1$$
+$$\mathcal{L} = |d_0 - \bar{d}|_{smooth} + \sum_{k=1}^{K} \gamma^{K-k} \Vert d_k - \bar{d}\Vert _1$$
 
 - **$|d_0 - \bar{d}|_{smooth}$** = smooth L1 loss on initial disparity (from cost volume)
 - **$d_k$** = disparity at GRU iteration $k$; **$\bar{d}$** = ground truth

@@ -27,7 +27,7 @@ $$(\mathbf{V}_M)_{ijk} = \sum_h (\nabla_L)_{hij} \cdot (\nabla_R)_{hik}$$
 
 ### Differentiable Monocular Scaling
 
-$$\hat{s}, \hat{t} = \arg\min_{s,t} \sum_{L,R} \|\sqrt{\hat{C}} \odot [(s \cdot M + t) - \hat{D}]\|_F$$
+$$\hat{s}, \hat{t} = \arg\min_{s,t} \sum_{L,R} \Vert \sqrt{\hat{C}} \odot [(s \cdot M + t) - \hat{D}]\Vert _F$$
 - **$\hat{s}, \hat{t}$** = global scale and shift aligning mono depth to stereo disparity
 - **$\hat{C}$** = confidence map from entropy of the mono correlation volume (sqrt for weighting)
 - **$\hat{D}$** = coarse disparity from softargmax on $V_M$

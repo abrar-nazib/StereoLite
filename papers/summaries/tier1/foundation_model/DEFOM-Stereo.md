@@ -65,7 +65,7 @@ The pipeline has two stages:
 
 **Correlation Pyramid Construction:**
 
-$$\mathbf{C}^1_{ijk} = \sum_h \mathbf{f}^l_{hij} \cdot \mathbf{f}^r_{hik}, \quad \mathbf{C}^1 \in \mathbb{R}^{h \times w \times w} \tag{1}$$
+$$\mathbf{C}^1_{ijk} = \sum_h \mathbf{f}^l_{hij} \cdot \mathbf{f}^r_{hik}, \quad \mathbf{C}^1 \in \mathbb{R}^{h \times w \times w} \quad \text{(1)}$$
 
 - **$\mathbf{C}^1_{ijk}$** = correlation between pixel $(i,j)$ in the left image and pixel $(i,k)$ in the right image
 - **$\mathbf{f}^l_{hij}$** = left combined feature at position $(i,j)$, channel $h$
@@ -83,7 +83,7 @@ This is the core innovation. RAFT-Stereo uses a single update step per iteration
 
 Instead of starting from zero disparity (like RAFT-Stereo), DEFOM-Stereo initializes disparity from the DEFOM depth prediction:
 
-$$\mathbf{d}_0 = \frac{\eta w \ast \mathbf{z}}{\max(\mathbf{z})} + \epsilon \tag{4}$$
+$$\mathbf{d}_0 = \frac{\eta w \ast \mathbf{z}}{\max(\mathbf{z})} + \epsilon \quad \text{(4)}$$
 
 Every element:
 - **$\mathbf{d}_0$** = the initial disparity map used to start the iterative refinement
@@ -101,7 +101,7 @@ Every element:
 
 The DEFOM depth initialization has the right *structure* (correct relative depth ordering) but wrong *scale* (unknown mapping from relative depth to metric disparity). The Scale Update module corrects this:
 
-$$\mathbf{d}_n = s \cdot \mathbf{d}_{n-1} \tag{5}$$
+$$\mathbf{d}_n = s \cdot \mathbf{d}_{n-1} \quad \text{(5)}$$
 
 - **$\mathbf{d}_{n-1}$** = disparity map from the previous iteration
 - **$s$** = a **dense scale map** (per-pixel scale factor) predicted by a ConvGRU
@@ -122,7 +122,7 @@ Given disparity $\mathbf{d}_n$ and a set of scale factors $s^m$:
 
 After scale correction, the standard RAFT-Stereo delta update runs:
 
-$$\mathbf{d}_n = \mathbf{d}_{n-1} + \Delta\mathbf{d} \tag{2}$$
+$$\mathbf{d}_n = \mathbf{d}_{n-1} + \Delta\mathbf{d} \quad \text{(2)}$$
 
 - **$\mathbf{d}_{n-1}$** = disparity from previous iteration (after scale update)
 - **$\Delta\mathbf{d}$** = residual disparity update predicted by the ConvGRU
@@ -137,7 +137,7 @@ $$x_n = [\text{Encoder}_c(\mathbf{c}), \text{Encoder}_d(\mathbf{d}_{n-1}), \text
 
 $$z_n = \sigma(\text{Conv}([h_{n-1}, x_n], W_z) + c_z)$$
 
-$$r_n = \sigma(\text{Conv}([h_{n-1}, x_n], W_r) + c_r) \tag{3}$$
+$$r_n = \sigma(\text{Conv}([h_{n-1}, x_n], W_r) + c_r) \quad \text{(3)}$$
 
 $$\bar{h}_n = \tanh(\text{Conv}([r_n \odot h_{n-1}, x_n], W_h) + c_h)$$
 
@@ -161,7 +161,7 @@ Every element:
 
 ### Training Loss
 
-$$\mathcal{L} = \sum_{i=n}^{N} \gamma^{N-n} ||\mathbf{d}_{gt} - \mathbf{d}_n||_1, \quad \text{where } \gamma = 0.9 \tag{6}$$
+$$\mathcal{L} = \sum_{i=n}^{N} \gamma^{N-n} ||\mathbf{d}_{gt} - \mathbf{d}_n||_1, \quad \text{where } \gamma = 0.9 \quad \text{(6)}$$
 
 - **$\mathcal{L}$** = total training loss
 - **$N$** = total number of update iterations (18 in training, 32 in evaluation)

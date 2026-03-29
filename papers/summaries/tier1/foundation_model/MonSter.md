@@ -31,7 +31,7 @@ $$s_G, t_G = \arg\min_{s_G, t_G} \sum_{i \in \Omega} (s_G \cdot D_M(i) + t_G - D
 - **$s_G, t_G$** = global scale and shift — solved via least squares
 
 **Step 2 — Stereo Guided Alignment (SGA):** Iteratively refines monocular disparity using stereo cues. A confidence-based flow residual map measures matching reliability:
-$$F_S^j(x,y) = \|F_3^L(x,y) - F_3^R(x - D_S^j, y)\|_1$$
+$$F_S^j(x,y) = \Vert F_3^L(x,y) - F_3^R(x - D_S^j, y)\Vert _1$$
 - **$F_S^j$** = flow residual — low values = high confidence in stereo match
 - Condition-guided ConvGRU predicts per-pixel residual shift $\Delta t$ to update monocular disparity
 

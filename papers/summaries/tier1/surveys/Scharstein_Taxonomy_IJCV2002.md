@@ -39,7 +39,7 @@ The output of a stereo algorithm is a **disparity map** $d(x, y)$ — a single-c
 
 The paper formalizes how pixels correspond between the two images. For a pixel at position $(x, y)$ in the reference image, its corresponding pixel in the matching image is at:
 
-$$x' = x + s \cdot d(x,y), \quad y' = y \tag{1}$$
+$$x' = x + s \cdot d(x,y), \quad y' = y \quad \text{(1)}$$
 
 - **$(x, y)$** = pixel coordinates in the reference (left) image
 - **$(x', y')$** = corresponding pixel coordinates in the matching (right) image
@@ -101,7 +101,7 @@ Step 4: Disparity Refinement         "Clean up and improve"
 | Cost Function | Formula | Properties |
 |---------------|---------|------------|
 | **Squared Difference (SD)** | $(I_L(x,y) - I_R(x+d, y))^2$ | Simple, sensitive to illumination changes |
-| **Absolute Difference (AD)** | $\|I_L(x,y) - I_R(x+d, y)\|$ | More robust to outliers than SD |
+| **Absolute Difference (AD)** | $\Vert I_L(x,y) - I_R(x+d, y)\Vert $ | More robust to outliers than SD |
 | **Truncated costs** | $\min(|I_L - I_R|, T)$ | Caps maximum cost at threshold $T$, robust to occlusions |
 | **Normalized Cross-Correlation** | $\frac{\sum (I_L - \bar{I}_L)(I_R - \bar{I}_R)}{\sigma_L \cdot \sigma_R}$ | Insensitive to camera gain and bias |
 | **Rank / Census transform** | Compare relative orderings of pixel intensities | Non-parametric, very robust to illumination |
@@ -113,7 +113,7 @@ Step 4: Disparity Refinement         "Clean up and improve"
 
 **Purpose:** The raw per-pixel matching cost is noisy. Aggregation smooths it by combining evidence from neighboring pixels, implicitly assuming that nearby pixels have similar disparities.
 
-$$C(x, y, d) = w(x, y, d) * C_0(x, y, d) \tag{2}$$
+$$C(x, y, d) = w(x, y, d) * C_0(x, y, d) \quad \text{(2)}$$
 
 - **$C_0(x, y, d)$** = raw (unaggregated) matching cost from Step 1
 - **$w(x, y, d)$** = aggregation kernel / support weight (defines which neighbors contribute)
@@ -152,7 +152,7 @@ $$d(x,y) = \arg\min_d C(x, y, d)$$
 
 Global methods formulate stereo as finding the disparity map $d$ that minimizes a global energy function:
 
-$$E(d) = E_{data}(d) + \lambda \cdot E_{smooth}(d) \tag{3}$$
+$$E(d) = E_{data}(d) + \lambda \cdot E_{smooth}(d) \quad \text{(3)}$$
 
 - **$E(d)$** = total energy of disparity map $d$ — lower is better
 - **$E_{data}(d)$** = data term — how well the disparity map agrees with the observed matching costs (fidelity to the images)
@@ -161,7 +161,7 @@ $$E(d) = E_{data}(d) + \lambda \cdot E_{smooth}(d) \tag{3}$$
 
 **Data term (Eq. 4):**
 
-$$E_{data}(d) = \sum_{(x,y)} C(x, y, d(x,y)) \tag{4}$$
+$$E_{data}(d) = \sum_{(x,y)} C(x, y, d(x,y)) \quad \text{(4)}$$
 
 - Sum the matching cost at each pixel's chosen disparity
 - This just says: "the total data cost is the sum of how well each pixel matches at its assigned disparity"
@@ -169,7 +169,7 @@ $$E_{data}(d) = \sum_{(x,y)} C(x, y, d(x,y)) \tag{4}$$
 
 **Smoothness term (Eq. 5):**
 
-$$E_{smooth}(d) = \sum_{(x,y)} \rho(d(x,y) - d(x+1,y)) + \rho(d(x,y) - d(x,y+1)) \tag{5}$$
+$$E_{smooth}(d) = \sum_{(x,y)} \rho(d(x,y) - d(x+1,y)) + \rho(d(x,y) - d(x,y+1)) \quad \text{(5)}$$
 
 - **$d(x,y) - d(x+1,y)$** = disparity difference between horizontally adjacent pixels
 - **$d(x,y) - d(x,y+1)$** = disparity difference between vertically adjacent pixels
@@ -186,11 +186,11 @@ The choice of $\rho$ is critical:
 
 **Gradient-dependent smoothness (Eq. 6):**
 
-$$\rho_d(d(x,y) - d(x+1,y)) \cdot \rho_I(\|I(x,y) - I(x+1,y)\|) \tag{6}$$
+$$\rho_d(d(x,y) - d(x+1,y)) \cdot \rho_I(\Vert I(x,y) - I(x+1,y)\Vert ) \quad \text{(6)}$$
 
 - **$\rho_d(\cdot)$** = disparity penalty function (same as $\rho$ above)
 - **$\rho_I(\cdot)$** = intensity-dependent modulation — a monotonically **decreasing** function of image gradient magnitude
-- **$\|I(x,y) - I(x+1,y)\|$** = intensity difference between neighboring pixels (image edge strength)
+- **$\Vert I(x,y) - I(x+1,y)\Vert $** = intensity difference between neighboring pixels (image edge strength)
 
 **Key idea:** Where the image has a strong edge (large intensity difference), $\rho_I$ is small, which *lowers* the smoothness penalty. This encourages depth discontinuities to align with image edges — a physically sensible prior because object boundaries typically create both intensity edges and depth jumps simultaneously.
 

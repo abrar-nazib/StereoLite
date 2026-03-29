@@ -40,7 +40,7 @@ $$\min_E \sum_{i=1}^{N} (\Delta m_i)^T e_i, \quad \text{s.t.} \sum_{i=1}^{N} (\D
 - Three stereo-specific pruning constraints (fixed output channels, joint input/output pruning, fixed motion encoder inputs)
 - First-order Taylor expansion ranks parameter importance; prune at ratio $\alpha$
 - **Retraining loss:**
-$$\mathcal{L} = \sum_{k=1}^{K} \gamma^{K-k} \|d_k - \bar{d}\|_1 + \lambda \sum_{i=1}^{L} \|x_i - \bar{x}_i\|_2^2$$
+$$\mathcal{L} = \sum_{k=1}^{K} \gamma^{K-k} \Vert d_k - \bar{d}\Vert _1 + \lambda \sum_{i=1}^{L} \Vert x_i - \bar{x}_i\Vert _2^2$$
 - **$\lambda = 0.1$** = weight for feature distillation from teacher's per-layer activations
 - **Sweet spot:** Pruning ratio 0.6 — aggressive enough for speedup, recoverable with retraining. 8 iterations needed.
 
