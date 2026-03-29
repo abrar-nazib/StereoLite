@@ -1,0 +1,77 @@
+\documentclass[journal]{IEEEtran}
+
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{cite}
+
+\title{From Pixels to Depth: A Comprehensive Survey of Deep Stereo Matching \\
+\large From Classical Foundations to Foundation-Model Era}
+
+\author{
+% Authors TBD
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+% TODO: Write after completing paper analysis
+% This survey provides a comprehensive overview of stereo matching,
+% tracing the evolution from classical hand-crafted approaches through
+% deep learning to the foundation-model era. We cover fundamentals,
+% architecture paradigms, efficiency techniques, and deployment considerations.
+\end{abstract}
+
+% Section outline:
+% 1. Introduction
+% 2. Background & Fundamentals
+%    2.1 Stereo geometry and epipolar constraints
+%    2.2 Classical pipeline: cost computation -> aggregation -> optimization -> refinement
+%    2.3 Evaluation metrics and benchmarks
+% 3. Learning Components for Stereo Pipeline
+%    3.1 Learned matching costs (MC-CNN era)
+%    3.2 Learned optimization (SGM-Nets)
+%    3.3 Learned refinement (NDR)
+% 4. End-to-End Deep Stereo Matching
+%    4.1 2D architectures (DispNet, AANet)
+%    4.2 3D cost volume architectures (GC-Net, PSMNet, GA-Net)
+%    4.3 Neural architecture search (LEAStereo)
+% 5. Iterative Optimization-Based Architectures
+%    5.1 RAFT-Stereo and the iterative paradigm
+%    5.2 Evolution: CREStereo, IGEV, Selective-Stereo
+%    5.3 Analysis of convergence and iteration count
+% 6. Transformer and Alternative Architectures
+%    6.1 Attention-based stereo (STTR, CroCo)
+%    6.2 MRF-based approaches (NMRF)
+%    6.3 Unified architectures (GMStereo/UniMatch)
+% 7. Foundation-Model Era
+%    7.1 Monocular depth priors (Depth Anything V2)
+%    7.2 DEFOM-Stereo: scale correction paradigm
+%    7.3 FoundationStereo: zero-shot matching
+%    7.4 MonSter, Stereo Anywhere: robustness through fusion
+% 8. Efficient and Edge-Oriented Architectures
+%    8.1 Cost volume efficiency (BGNet, DeepPruner)
+%    8.2 Lightweight network design (MobileStereoNet, HITNet)
+%    8.3 Knowledge distillation and pruning
+%    8.4 Deployment: ONNX, TensorRT, edge accelerators
+% 9. Challenges and Solutions
+%    9.1 Domain shift and generalization
+%    9.2 Self-supervised and proxy supervision
+%    9.3 Adverse conditions and transparent surfaces
+%    9.4 Temporal consistency
+% 10. Datasets and Benchmarks
+% 11. Discussion and Future Directions
+% 12. Conclusion
+
+\input{sections/01_introduction}
+% \input{sections/02_background}
+% ... additional sections
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}
