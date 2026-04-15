@@ -1,0 +1,72 @@
+\section{Cross-Domain Generalization for Compressed Models}
+\label{sec:generalization}
+
+A compressed stereo model is most useful when it generalizes from a synthetic-data training distribution to the target domain in which it will be deployed. This section reviews the body of work on cross-domain stereo, with a specific focus on techniques that compose with any backbone, that is, techniques that survive backbone substitution, distillation, and the other compression interventions of Section~\ref{sec:taxonomy}.
+
+\subsection{Why Generalization Matters Specifically for Edge Stereo}
+
+Three observations motivate the focus of this section.
+
+First, all foundation-era methods report substantially better zero-shot generalization than their pre-foundation peers. DEFOM-Stereo~\cite{jiang2025defom} reports Middlebury bad-2 of 4.84\% (zero-shot from Scene Flow), versus 11--14\% for the IGEV-Stereo~\cite{xu2023igev} family at the same training budget. A compressed model that fails to inherit this generalization is of limited practical value, since the target deployment domain is rarely identical to the training distribution.
+
+Second, the cross-domain accuracy collapse for non-iterative real-time methods is severe. Pip-Stereo~\cite{zheng2026pipstereo} reports that on the DrivingStereo~\cite{yang2019drivingstereo} weather subsets, HITNet~\cite{tankovich2021hitnet} achieves 93.52\% D1-all (essentially complete failure), whereas iterative methods retain D1-all below 10\%. This is the single strongest published evidence that iterative refinement is non-negotiable for cross-domain robustness, and it shapes the design space of compressed stereo: any compression that destroys the iterative loop simultaneously destroys cross-domain accuracy.
+
+Third, fine-tuning a synthetic-pretrained model on a small target-domain set (the natural workflow when deploying to a new site) is known to cause catastrophic forgetting on the synthetic distribution. DKT-Stereo~\cite{zhang2024dkt} reports that naive fine-tuning of an IGEV-Stereo backbone on KITTI degrades Middlebury bad-2 from 7.11\% to 12.23\% and ETH3D bad-1 from 3.64\% to 23.88\%. In other words, fine-tuning loses the cross-domain generalization that synthetic pretraining provided. A practical edge deployment must mitigate this.
+
+\subsection{Architecture-Level Generalization Techniques}
+
+The earliest cross-domain stereo work targeted the architecture. \textbf{DSM-Net}~\cite{zhang2020dsmnet} introduced two layers that have become standard in cross-domain backbones:
+
+\textbf{Domain Normalization (DN)} replaces every BatchNorm or InstanceNorm layer in the feature extractor with a two-stage normalization that simultaneously cancels image-level style shifts (instance normalization across the spatial axes) and per-pixel feature-norm shifts (L2 normalization along the channel axis). Concretely, given a feature map $F \in \mathbb{R}^{C \times H \times W}$:
+\begin{equation}
+F_{\mathrm{IN}}(c, u, v) = \frac{F(c, u, v) - \mu_c}{\sigma_c}
+\label{eq:in}
+\end{equation}
+\begin{equation}
+F_{\mathrm{DN}}(c, u, v) = \frac{F_{\mathrm{IN}}(c, u, v)}{\sqrt{\sum_{c'} F_{\mathrm{IN}}(c', u, v)^2}}
+\label{eq:dn}
+\end{equation}
+where $\mu_c, \sigma_c$ are the per-channel spatial mean and standard deviation. Eq.~\eqref{eq:dn} projects each per-pixel feature vector onto the unit sphere, removing the residual per-pixel norm variation that batch-style normalization leaves behind. The cost is essentially zero parameters and negligible compute. DSM-Net reports a reduction in zero-shot KITTI 2015 D1 from 11.7\% (GA-Net baseline) to 6.5\% (with DN alone) on a Scene Flow-trained model.
+
+\textbf{Structure-preserving Graph-based Filter (SGF)} performs non-local feature aggregation along an 8-connected pixel graph whose edge weights are learned cosine similarities between feature vectors. SGF generalizes both the SGA aggregation of GA-Net~\cite{zhang2019ganet} and the affinity propagation of standard non-local nets; the proof in~\cite{zhang2020dsmnet} that both are special cases of SGF is the strongest theoretical argument for the technique.
+
+DN is essentially a free upgrade for any backbone (including a compressed one); the generalization improvement composes with other interventions. SGF is more expensive ($\sim$linear in the number of pixels per layer) but still tractable at edge resolutions.
+
+\subsection{Training-Recipe Generalization Techniques}
+
+A second school of work observes that the training recipe matters more than the architecture. Three techniques are particularly important.
+
+\textbf{Hierarchical Visual Transformation (HVT)}~\cite{chang2023hvt} is a learnable training-time augmentation in which a discriminator is trained to distinguish ``transformed'' from ``original'' stereo pairs across three scales (global brightness/contrast/hue, patch-level local variation, per-pixel noise). The augmentation transformations are learned (their strength parameters are sigmoid-bounded variables in the optimizer) so the network sees the hardest augmentation that the discriminator and the matching loss can co-tolerate. HVT is architecture-agnostic and adds zero inference cost, since it acts only at training time.
+
+\textbf{Dual Knowledge Transfer (DKT-Stereo)}~\cite{zhang2024dkt} addresses the catastrophic-forgetting problem of fine-tuning. DKT runs three networks during fine-tuning: a frozen Teacher (preserving the synthetic-pretrained knowledge), an EMA Teacher (an exponential moving average of the Student, tracking the learning trajectory), and the Student itself. A Filter-and-Ensemble module removes ground-truth labels in regions where the Frozen Teacher and EMA Teacher disagree (signaling a noisy or out-of-distribution pixel), and re-introduces ensemble pseudo-labels in regions where they agree. The reported reduction in Middlebury cross-domain error is 42\% relative to naive fine-tuning, with no architectural cost.
+
+\textbf{NeRF-Supervised Stereo}~\cite{tosi2023nerfsupervised} addresses target-domain adaptation when no labeled stereo data exists at the target site. The recipe: capture monocular video at the target site, fit Instant-NGP NeRFs, render synthetic stereo pairs at multiple virtual baselines, and use a trinocular photometric loss (per-pixel minimum of left-center and right-center reconstruction errors) to finetune. The technique extends naturally to compressed students because the foundation features are not required at the target site, only at NeRF-rendering time.
+
+The composite picture is that DN, HVT, and DKT-Stereo can be applied to essentially any compressed model, and they account for most of the cross-domain accuracy gap between a compressed student and its foundation teacher.
+
+\subsection{The StereoAnything Training Data Recipe}
+
+A separate strand of work addresses generalization by enlarging the training data rather than changing the algorithm. The StereoAnything~\cite{guo2024stereoanything} recipe combines:
+
+\begin{itemize}
+\item Scene Flow~\cite{mayer2016sceneflow} (35\,K pairs, dense GT, broad object diversity).
+\item TartanAir~\cite{wang2020tartanair} ($\sim$1\,M pairs, photo-realistic environmental diversity).
+\item A CREStereo synthetic set ($\sim$200\,K pairs, adversarially difficult cases).
+\item Pseudo-stereo pairs generated from monocular images by Depth Anything V2~\cite{yang2024dav2} plus an inpainting model ($\sim$53\,M pairs).
+\end{itemize}
+
+The principal contribution is the pseudo-stereo set, which dwarfs every other training corpus by roughly 3 orders of magnitude. The technique is architecture-agnostic: the same data can be used to train DEFOM-Stereo, IGEV-Stereo, BANet, or any custom backbone. Pip-Stereo~\cite{zheng2026pipstereo} and Fast-FoundationStereo~\cite{wen2026fastfoundationstereo} both adopt the StereoAnything mix as their training data.
+
+\subsection{What Combination Should a Compressed Edge Model Use?}
+
+Synthesizing this section's evidence, the natural training pipeline for a foundation-derived compressed stereo model is the following:
+
+\begin{enumerate}
+\item Pretrain on the StereoAnything mix~\cite{guo2024stereoanything} (Scene Flow + TartanAir + CREStereo synth + DepthAnythingV2 pseudo-stereo).
+\item Use DN~\cite{zhang2020dsmnet} as the in-network normalization (replacing BatchNorm).
+\item Apply HVT~\cite{chang2023hvt} as the training-time augmentation.
+\item For each target deployment domain, fine-tune using the DKT-Stereo~\cite{zhang2024dkt} protocol on whatever labeled target data is available.
+\item For unlabeled target domains, supplement with NeRF-Supervised~\cite{tosi2023nerfsupervised} adaptation.
+\end{enumerate}
+
+This recipe, as best we can infer from the published ablations, accounts for most of the cross-domain accuracy reported by contemporary foundation-distilled efficient models. A controlled study that isolates the contribution of each ingredient is not, to our knowledge, available in the current literature.

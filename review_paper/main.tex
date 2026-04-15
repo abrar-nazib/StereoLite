@@ -7,22 +7,36 @@
 \usepackage{multirow}
 \usepackage{hyperref}
 \usepackage{cite}
-\usepackage{xcolor}
+\usepackage[dvipsnames]{xcolor}
 \usepackage{url}
 \usepackage{array}
 \usepackage{tabularx}
 \usepackage{caption}
 \usepackage{subcaption}
+\usepackage{placeins}           % allow floats to drift across sections
+\usepackage{float}              % allows [H] strict placement
+\usepackage{tikz}               % native LaTeX diagrams (taxonomy figure)
+\usetikzlibrary{positioning,arrows.meta,calc,fit,backgrounds}
+% Tweak float parameters so pages fill more of their body before pushing floats
+\renewcommand{\topfraction}{0.90}
+\renewcommand{\bottomfraction}{0.75}
+\renewcommand{\textfraction}{0.10}
+\renewcommand{\floatpagefraction}{0.80}
+\setcounter{topnumber}{3}
+\setcounter{bottomnumber}{2}
+\setcounter{totalnumber}{5}
 
 % A few helper macros
 \newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
 \newcommand{\citeneeded}{\textcolor{red}{[CITE]}}
 
-\title{Compression Techniques for Deep Stereo Matching: \\
-\large From Foundation Models to Edge Devices --- \\
-A Focused Survey}
+\title{Compression Techniques for Deep Stereo Matching}
 
-\author{Abrar~Nazib%
+\author{
+\parbox{\linewidth}{\centering
+Nazib~Abrar, Md~Raihanul~Haque~Rahi, and Md~Zunaid~Hossen \\[2pt]
+\small Department of Mechatronics Engineering \\
+Rajshahi University of Engineering \& Technology, Rajshahi, Bangladesh}%
 \thanks{Manuscript prepared April 2026.}%
 }
 
@@ -31,9 +45,9 @@ A Focused Survey}
 \maketitle
 
 \begin{abstract}
-Deep stereo matching has, in less than a decade, evolved from learned matching costs (MC-CNN, 2016) through end-to-end 3D cost-volume regression (PSMNet, GA-Net) and iterative refinement (RAFT-Stereo, IGEV), and most recently into the foundation-model era (DEFOM-Stereo, FoundationStereo, MonSter), where monocular depth foundations such as Depth Anything V2 are fused with stereo matchers to deliver substantial zero-shot cross-domain accuracy. These foundation-quality models, however, exceed practical edge-deployment budgets by an order of magnitude or more.
+Deep stereo matching has progressed through three paradigms in under a decade: learned matching costs, end-to-end 3D cost-volume regression, and, most recently, the integration of monocular depth foundation models such as Depth Anything V2. The foundation-model era delivers state-of-the-art zero-shot accuracy, but at parameter counts and inference latencies that typically exceed embedded-accelerator budgets by an order of magnitude or more.
 
-This survey focuses specifically on the body of work concerned with bringing foundation-quality stereo accuracy to real-time edge deployment. We review the field through the lens of \emph{compression}: we identify seven distinct families of compression techniques --- backbone substitution, cost-volume compression, iterative-loop compression, knowledge distillation, architectural compression, adaptive compute, and neural architecture search --- and survey representative methods within each family. We further examine cross-domain generalization techniques that are particularly relevant when fine-tuning a compressed model on limited target-domain data, and we summarize the limited but growing body of edge-hardware validation. Finally, we identify a clear open gap: there is, to date, no published deep stereo model that achieves foundation-model zero-shot accuracy at the latency budgets of contemporary embedded accelerators such as the NVIDIA Jetson Orin Nano. We close with a roadmap describing the architectural and training-recipe combinations most likely to fill this gap.
+This survey catalogues the techniques that published methods have employed to deploy deep stereo matchers on edge hardware, organising them into seven compression families: backbone substitution, cost-volume compression, iterative-loop compression, knowledge distillation, architectural compression, adaptive compute, and neural architecture search. For each family we describe the underlying mechanism, review representative methods, and report the accuracy and latency trade-offs claimed in the original publications. We further review cross-domain generalisation techniques relevant to compressed models, and the limited but growing body of edge-hardware validation. The goal is descriptive: to map which compression strategies have been explored in the literature, how each compares to the accuracy envelope set by contemporary foundation-model stereo, and what aspects of edge deployment remain under-reported. We leave synthesis for a specific deployment scenario to the reader.
 \end{abstract}
 
 \begin{IEEEkeywords}

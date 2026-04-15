@@ -1,0 +1,32 @@
+\section{Observations on Under-Reported Aspects of Edge Stereo}
+\label{sec:roadmap}
+
+The body of work surveyed in Sections~\ref{sec:foundation}--\ref{sec:edge_hardware} is substantial in absolute terms, but several aspects of edge deployment remain thinly covered in the published record. This section catalogues the gaps that recurred while compiling the survey. We describe them here only to inform readers of the boundaries of the available evidence, not to prescribe new research directions.
+
+\subsection{Incomplete Reporting Around the Four Constraints That Matter for Deployment}
+
+Edge deployment is typically constrained by four quantities simultaneously: source-domain accuracy, cross-domain generalisation, real-time latency on the target accelerator, and peak memory. The surveyed literature rarely reports all four on the same method. KITTI 2015 and Scene Flow are near-universal; Middlebury and ETH3D zero-shot numbers are common in foundation-era papers but absent from most pre-2023 efficient methods; DrivingStereo weather subsets appear only in a handful of 2024--2026 papers~\cite{zheng2026pipstereo,jing2025liteanystereo}; and embedded-accelerator latency numbers are reported by only a small minority (AnyNet~\cite{wang2019anynet} on Jetson TX2, Pip-Stereo~\cite{zheng2026pipstereo} on Jetson Orin NX, HITNet~\cite{tankovich2021hitnet} on a TPU-Edge derivative). Peak memory usage is almost never reported. As a consequence, when comparing two papers' claims one frequently finds that each has reported a different subset of the four quantities, which makes cross-paper comparison at the deployment level difficult.
+
+\subsection{Compositional Behaviour of Compression Families}
+
+Section~\ref{ssec:composition} noted that the seven compression families are largely orthogonal and that the 2024--2026 wave has produced several methods that compose two families (Pip-Stereo: iterative-loop compression plus distillation; DTP: distillation plus structural pruning; Fast-FoundationStereo: distillation plus backbone substitution). Published ablations on the \emph{interaction} between families are scarce. For example, there is no published study of whether ADStereo-style adaptive downsampling~\cite{wang2023adstereo} composes with iterative-loop compression without additional accuracy loss, nor whether BGNet-style bilateral-grid cost volumes~\cite{xu2021bgnet} compose with foundation distillation. The empirical claim that family compositions are sub-additive is plausible given the results of Pip-Stereo and DTP, but it has not been isolated experimentally.
+
+\subsection{Distillation Loss Design for Stereo Specifically}
+
+The current state of the art in foundation-to-edge distillation uses feature-matching losses (roughly, $\ell_2$ distances between teacher and student feature maps) at a small number of resolutions. Whether more specialised losses such as attention transfer, contrastive distillation, or those tailored to the cost-volume rather than to image features would be more effective for stereo specifically is not established in the surveyed literature. The foundation-distillation paradigm has appeared in stereo only since 2024, and systematic ablations of the distillation loss are yet to be published.
+
+\subsection{Iteration-Count Selection for a Target Budget}
+
+The Pip-Stereo paper~\cite{zheng2026pipstereo} demonstrates that the iteration count can be reduced far more aggressively than a naive truncation would suggest (one iteration at reasonable accuracy, versus a typical starting point of thirty-two). This is a specific empirical result, not a methodology: no published method selects the iteration count automatically for a target latency or accuracy budget. Existing work treats the count as a manual hyperparameter, which constrains the practical applicability of iterative-loop compression.
+
+\subsection{Online Adaptation in the Foundation Era}
+
+MADNet~\cite{tonioni2019madnet} demonstrated in 2019 that online, self-supervised adaptation during deployment was practical and improved target-domain accuracy by 8--12\% after minutes of operation. The technique has not, to our knowledge, been combined with foundation-distilled students or with on-device NeRF-Supervised~\cite{tosi2023nerfsupervised} pseudo-data generation, both of which became available after 2022. Whether online adaptation continues to help when the student already carries a strong monocular prior is an open empirical question.
+
+\subsection{Beyond-RGB Stereo}
+
+Event-camera stereo~\cite{ghosh2025eventstereo} is a parallel modality with $\mu$s latency and very low power consumption, surveyed separately by Ghosh and Gallego~\cite{ghosh2025eventstereo}. We do not cover it in this review, but note that event stereo and RGB stereo are likely to coexist in different deployment niches rather than compete directly. Thermal, polarimetric, and multispectral stereo appear sporadically in the literature but have not accumulated enough mass to support a compression-focused sub-survey.
+
+\subsection{Edge-Validation Standardisation}
+
+Section~\ref{sec:edge_hardware} observed that the stereo literature has no standard edge-evaluation protocol. A stable reference platform (Jetson Orin Nano at FP16 is the natural candidate) and a fixed cross-domain evaluation set (KITTI 2015, Middlebury zero-shot, ETH3D zero-shot, DrivingStereo weather subsets) would materially improve cross-paper comparability. This is a procedural observation rather than a research gap; none of the methods surveyed in this paper required any new technique that does not already exist.

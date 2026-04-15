@@ -1,2 +1,535 @@
-% Bibliography for Stereo Matching Survey
-% Entries will be added as papers are analyzed
+% =========================================================================
+% Bibliography for: Compression Techniques for Deep Stereo Matching
+% Verified entries: every paper below has been read and its PDF is in
+% papers/raw/. Venue/year cross-checked against PDF first page.
+% =========================================================================
+
+% ===== SURVEYS =====
+@article{scharstein2002taxonomy,
+  author = {Scharstein, Daniel and Szeliski, Richard},
+  title = {A Taxonomy and Evaluation of Dense Two-Frame Stereo Correspondence Algorithms},
+  journal = {International Journal of Computer Vision},
+  volume = {47},
+  number = {1--3},
+  pages = {7--42},
+  year = {2002}
+}
+
+@article{hirschmuller2008sgm,
+  author = {Hirschm\"{u}ller, Heiko},
+  title = {Stereo Processing by Semiglobal Matching and Mutual Information},
+  journal = {IEEE Transactions on Pattern Analysis and Machine Intelligence},
+  volume = {30},
+  number = {2},
+  pages = {328--341},
+  year = {2008}
+}
+
+@article{poggi2021synergies,
+  author = {Poggi, Matteo and Tosi, Fabio and Batsos, Konstantinos and Mordohai, Philippos and Mattoccia, Stefano},
+  title = {On the Synergies between Machine Learning and Binocular Stereo for Depth Estimation from Images: a Survey},
+  journal = {IEEE Transactions on Pattern Analysis and Machine Intelligence},
+  volume = {44},
+  number = {9},
+  pages = {5314--5334},
+  year = {2021}
+}
+
+@article{tosi2025survey,
+  author = {Tosi, Fabio and Bartolomei, Luca and Poggi, Matteo},
+  title = {A Survey on Deep Stereo Matching in the Twenties},
+  journal = {International Journal of Computer Vision},
+  year = {2025}
+}
+
+@article{laga2020survey,
+  author = {Laga, Hamid and Jospin, Laurent Valentin and Boussaid, Farid and Bennamoun, Mohammed},
+  title = {A Survey on Deep Learning Techniques for Stereo-based Depth Estimation},
+  journal = {IEEE Transactions on Pattern Analysis and Machine Intelligence},
+  volume = {44},
+  number = {4},
+  pages = {1738--1764},
+  year = {2022}
+}
+
+% ===== FOUNDATIONAL DEEP STEREO =====
+@article{zbontar2016mccnn,
+  author = {{\v{Z}}bontar, Jure and LeCun, Yann},
+  title = {Stereo Matching by Training a Convolutional Neural Network to Compare Image Patches},
+  journal = {Journal of Machine Learning Research},
+  volume = {17},
+  number = {65},
+  pages = {1--32},
+  year = {2016}
+}
+
+@inproceedings{mayer2016sceneflow,
+  author = {Mayer, Nikolaus and Ilg, Eddy and H\"{a}usser, Philip and Fischer, Philipp and Cremers, Daniel and Dosovitskiy, Alexey and Brox, Thomas},
+  title = {A Large Dataset to Train Convolutional Networks for Disparity, Optical Flow, and Scene Flow Estimation},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2016}
+}
+
+@inproceedings{kendall2017gcnet,
+  author = {Kendall, Alex and Martirosyan, Hayk and Dasgupta, Saumitro and Henry, Peter and Kennedy, Ryan and Bachrach, Abraham and Bry, Adam},
+  title = {End-to-End Learning of Geometry and Context for Deep Stereo Regression},
+  booktitle = {IEEE International Conference on Computer Vision (ICCV)},
+  year = {2017}
+}
+
+@inproceedings{chang2018psmnet,
+  author = {Chang, Jia-Ren and Chen, Yong-Sheng},
+  title = {Pyramid Stereo Matching Network},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2018}
+}
+
+@inproceedings{zhang2019ganet,
+  author = {Zhang, Feihu and Prisacariu, Victor and Yang, Ruigang and Torr, Philip H. S.},
+  title = {GA-Net: Guided Aggregation Net for End-to-end Stereo Matching},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2019}
+}
+
+@inproceedings{guo2019gwcnet,
+  author = {Guo, Xiaoyang and Yang, Kai and Yang, Wukui and Wang, Xiaogang and Li, Hongsheng},
+  title = {Group-wise Correlation Stereo Network},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2019}
+}
+
+@inproceedings{xu2020aanet,
+  author = {Xu, Haofei and Zhang, Juyong},
+  title = {AANet: Adaptive Aggregation Network for Efficient Stereo Matching},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2020}
+}
+
+@inproceedings{xu2022acvnet,
+  author = {Xu, Gangwei and Cheng, Junda and Guo, Peng and Yang, Xin},
+  title = {Attention Concatenation Volume for Accurate and Efficient Stereo Matching},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2022}
+}
+
+@inproceedings{shen2021cfnet,
+  author = {Shen, Zhelun and Dai, Yuchao and Rao, Zhibo},
+  title = {CFNet: Cascade and Fused Cost Volume for Robust Stereo Matching},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2021}
+}
+
+% ===== ITERATIVE =====
+@inproceedings{lipson2021raftstereo,
+  author = {Lipson, Lahav and Teed, Zachary and Deng, Jia},
+  title = {RAFT-Stereo: Multilevel Recurrent Field Transforms for Stereo Matching},
+  booktitle = {International Conference on 3D Vision (3DV)},
+  year = {2021}
+}
+
+@inproceedings{li2022crestereo,
+  author = {Li, Jiankun and Wang, Peisen and Xiong, Pengfei and Cai, Tao and Yan, Ziwei and Yang, Lei and Liu, Jiangyu and Fan, Haoqiang and Liu, Shuaicheng},
+  title = {Practical Stereo Matching via Cascaded Recurrent Network with Adaptive Correlation},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2022}
+}
+
+@inproceedings{xu2023igev,
+  author = {Xu, Gangwei and Wang, Xianqi and Ding, Xiaohuan and Yang, Xin},
+  title = {Iterative Geometry Encoding Volume for Stereo Matching},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2023}
+}
+
+@article{xu2025igevpp,
+  author = {Xu, Gangwei and Wang, Xianqi and Zhang, Zhaoxing and Cheng, Junda and Liao, Chunyuan and Yang, Xin},
+  title = {IGEV++: Iterative Multi-range Geometry Encoding Volumes for Stereo Matching},
+  journal = {IEEE Transactions on Pattern Analysis and Machine Intelligence},
+  year = {2025}
+}
+
+@inproceedings{wang2024selective,
+  author = {Wang, Xianqi and Xu, Gangwei and Jia, Hao and Yang, Xin},
+  title = {Selective-Stereo: Adaptive Frequency Information Selection for Stereo Matching},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2024}
+}
+
+% ===== FOUNDATION-MODEL ERA =====
+@inproceedings{jiang2025defom,
+  author = {Jiang, Hualie and Lou, Zhiqiang and Ding, Laiyan and Xu, Rui and Tan, Minglang and Jiang, Wenjie and Huang, Rui},
+  title = {DEFOM-Stereo: Depth Foundation Model Based Stereo Matching},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2025}
+}
+
+@inproceedings{wen2025foundationstereo,
+  author = {Wen, Bowen and Trepte, Matthew and Aribido, Joseph and Kautz, Jan and Gallo, Orazio and Birchfield, Stan},
+  title = {FoundationStereo: Zero-Shot Stereo Matching},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2025}
+}
+
+@inproceedings{cheng2025monster,
+  author = {Cheng, Junda and Liu, Longliang and Xu, Gangwei and Wang, Xianqi and Zhang, Zhaoxing and Deng, Yong and Zang, Jinliang and Chen, Yurui and Cai, Zhipeng and Yang, Xin},
+  title = {MonSter: Marry Monodepth to Stereo Unleashes Power},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2025}
+}
+
+@inproceedings{bartolomei2025stereoanywhere,
+  author = {Bartolomei, Luca and Tosi, Fabio and Poggi, Matteo and Mattoccia, Stefano},
+  title = {Stereo Anywhere: Robust Zero-Shot Deep Stereo Matching Even Where Either Stereo or Mono Fail},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2025}
+}
+
+% ===== EFFICIENT (TIER 1 NEW) =====
+@inproceedings{bangunharcana2021coex,
+  author = {Bangunharcana, Antyanta and Cho, Jae Won and Lee, Seokju and Kweon, In So and Kim, Kyung-Soo and Kim, Soohyun},
+  title = {Correlate-and-Excite: Real-Time Stereo Matching via Guided Cost Volume Excitation},
+  booktitle = {IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)},
+  year = {2021}
+}
+
+@inproceedings{yin2019hd3,
+  author = {Yin, Zhichao and Darrell, Trevor and Yu, Fisher},
+  title = {Hierarchical Discrete Distribution Decomposition for Match Density Estimation},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2019}
+}
+
+@inproceedings{gu2020cascade,
+  author = {Gu, Xiaodong and Fan, Zhiwen and Zhu, Siyu and Dai, Zuozhuo and Tan, Feitong and Tan, Ping},
+  title = {Cascade Cost Volume for High-Resolution Multi-View Stereo and Stereo Matching},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2020}
+}
+
+@inproceedings{saikia2019autodispnet,
+  author = {Saikia, Tonmoy and Marrakchi, Yassine and Zela, Arber and Hutter, Frank and Brox, Thomas},
+  title = {AutoDispNet: Improving Disparity Estimation With AutoML},
+  booktitle = {IEEE International Conference on Computer Vision (ICCV)},
+  year = {2019}
+}
+
+@inproceedings{chabra2019stereodrnet,
+  author = {Chabra, Rohan and Straub, Julian and Sweeney, Christopher and Newcombe, Richard and Fuchs, Henry},
+  title = {StereoDRNet: Dilated Residual Stereo Net},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2019}
+}
+
+@inproceedings{song2018edgestereo,
+  author = {Song, Xiao and Zhao, Xu and Hu, Hanwen and Fang, Liangji},
+  title = {EdgeStereo: A Context Integrated Residual Pyramid Network for Stereo Matching},
+  booktitle = {Asian Conference on Computer Vision (ACCV)},
+  year = {2018}
+}
+
+@article{xu2023cgistereo,
+  author = {Xu, Gangwei and Zhou, Huan and Yang, Xin},
+  title = {CGI-Stereo: Accurate and Real-Time Stereo Matching via Context and Geometry Interaction},
+  journal = {arXiv preprint arXiv:2301.02789},
+  year = {2023}
+}
+
+@article{wang2020fadnet,
+  author = {Wang, Qiang and Shi, Shaohuai and Zheng, Shizhen and Zhao, Kaiyong and Chu, Xiaowen},
+  title = {FADNet: A Fast and Accurate Network for Disparity Estimation},
+  journal = {arXiv preprint arXiv:2003.10758},
+  year = {2020}
+}
+
+@inproceedings{tonioni2019madnet,
+  author = {Tonioni, Alessio and Tosi, Fabio and Poggi, Matteo and Mattoccia, Stefano and Di Stefano, Luigi},
+  title = {Real-Time Self-Adaptive Deep Stereo},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2019}
+}
+
+% ===== EFFICIENT (TIER 1 ORIGINAL) =====
+@inproceedings{xu2021bgnet,
+  author = {Xu, Bin and Xu, Yuhua and Yang, Xiaoli and Jia, Wei and Guo, Yulan},
+  title = {Bilateral Grid Learning for Stereo Matching Networks},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2021}
+}
+
+@inproceedings{guo2025lightstereo,
+  author = {Guo, Xianda and Zhang, Chenming and Lu, Youmin and Lan, Dujun and Wang, Yiqi and Wang, Long and Chen, Long},
+  title = {LightStereo: Channel Boost Is All You Need for Efficient 2D Cost Aggregation},
+  booktitle = {IEEE International Conference on Robotics and Automation (ICRA)},
+  year = {2025}
+}
+
+@inproceedings{xu2025banet,
+  author = {Xu, Gangwei and Wang, Xianqi and Yang, Xin},
+  title = {BANet: Bilateral Aggregation Network for Mobile Stereo Matching},
+  booktitle = {IEEE/CVF International Conference on Computer Vision (ICCV)},
+  year = {2025}
+}
+
+@article{rahim2021separable,
+  author = {Rahim, Rafia and Wo{\l}czyk, Maciej and Drozdzal, Michal and Romero, Adriana},
+  title = {Separable Stereo Matching},
+  journal = {IEEE International Conference on Image Processing (ICIP)},
+  year = {2021}
+}
+
+@inproceedings{pan2024dtp,
+  author = {Pan, Yiwen and Pi, Wenrui and Hou, Xinyi and Wei, Xueying and Liu, Xueming},
+  title = {Distill-then-Prune: An Efficient Compression Framework for Real-Time Stereo Matching Network on Edge Devices},
+  booktitle = {IEEE International Conference on Robotics and Automation (ICRA)},
+  year = {2024}
+}
+
+@article{zheng2026pipstereo,
+  author = {Zheng, Jintu and Liu, Qizhe and Xu, HuangXin and Chen, Zhuojie},
+  title = {Pip-Stereo: Progressive Iterations Pruner for Iterative Optimization-based Stereo Matching},
+  journal = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2026}
+}
+
+% ===== EFFICIENT (TIER 3) =====
+@inproceedings{khamis2018stereonet,
+  author = {Khamis, Sameh and Fanello, Sean and Rhemann, Christoph and Kowdle, Adarsh and Valentin, Julien and Izadi, Shahram},
+  title = {StereoNet: Guided Hierarchical Refinement for Real-Time Edge-Aware Depth Prediction},
+  booktitle = {European Conference on Computer Vision (ECCV)},
+  year = {2018}
+}
+
+@inproceedings{wang2019anynet,
+  author = {Wang, Yan and Lai, Zihang and Huang, Gao and Wang, Brian H. and van der Maaten, Laurens and Campbell, Mark and Weinberger, Kilian Q.},
+  title = {Anytime Stereo Image Depth Estimation on Mobile Devices},
+  booktitle = {IEEE International Conference on Robotics and Automation (ICRA)},
+  year = {2019}
+}
+
+@inproceedings{duggal2019deeppruner,
+  author = {Duggal, Shivam and Wang, Shenlong and Ma, Wei-Chiu and Hu, Rui and Urtasun, Raquel},
+  title = {DeepPruner: Learning Efficient Stereo Matching via Differentiable PatchMatch},
+  booktitle = {IEEE International Conference on Computer Vision (ICCV)},
+  year = {2019}
+}
+
+@inproceedings{smolyanskiy2018nvstereonet,
+  author = {Smolyanskiy, Nikolai and Kamenev, Alexey and Birchfield, Stan},
+  title = {On the Importance of Stereo for Accurate Depth Estimation: An Efficient Semi-Supervised Deep Neural Network Approach},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition Workshops (CVPRW)},
+  year = {2018}
+}
+
+@inproceedings{tankovich2021hitnet,
+  author = {Tankovich, Vladimir and H\"{a}ne, Christian and Zhang, Yinda and Kowdle, Adarsh and Fanello, Sean and Bouaziz, Sofien},
+  title = {HITNet: Hierarchical Iterative Tile Refinement Network for Real-time Stereo Matching},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2021}
+}
+
+@inproceedings{shamsafar2022mobilestereonet,
+  author = {Shamsafar, Faranak and Woerz, Samuel and Rahim, Rafia and Zell, Andreas},
+  title = {MobileStereoNet: Towards Lightweight Deep Networks for Stereo Matching},
+  booktitle = {IEEE/CVF Winter Conference on Applications of Computer Vision (WACV)},
+  year = {2022}
+}
+
+@inproceedings{xing2020mabnet,
+  author = {Xing, Jiaxi and Qi, Zenghui and Dong, Jingyu and Cai, Jianke and Liu, Hong},
+  title = {MABNet: A Lightweight Stereo Network Based on Multibranch Adjustable Bottleneck Module},
+  booktitle = {European Conference on Computer Vision (ECCV)},
+  year = {2020}
+}
+
+@inproceedings{yao2021decnet,
+  author = {Yao, Chengtang and Jia, Yunde and Di, Huijun and Li, Pengfei and Wu, Yuwei},
+  title = {A Decomposition Model for Stereo Matching},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2021}
+}
+
+@article{wang2023adstereo,
+  author = {Wang, Yun and Wang, Longguang and Zhang, Kunhong and Li, Junjie and Zhang, Yulan and Lin, Zhengfa},
+  title = {ADStereo: Learning Stereo Matching with Adaptive Downsampling and Disparity Alignment},
+  journal = {IEEE Transactions on Image Processing},
+  year = {2023}
+}
+
+@inproceedings{zeng2023pcvnet,
+  author = {Zeng, Jiaxi and Yao, Chengtang and Yu, Lidong and Wu, Yuwei and Jia, Yunde},
+  title = {Parameterized Cost Volume for Stereo Matching},
+  booktitle = {IEEE/CVF International Conference on Computer Vision (ICCV)},
+  year = {2023}
+}
+
+% ===== DOMAIN GENERALIZATION =====
+@inproceedings{zhang2020dsmnet,
+  author = {Zhang, Feihu and Qi, Xiaojuan and Yang, Ruigang and Prisacariu, Victor and Wah, Benjamin and Torr, Philip},
+  title = {Domain-Invariant Stereo Matching Networks},
+  booktitle = {European Conference on Computer Vision (ECCV)},
+  year = {2020}
+}
+
+@inproceedings{zhang2024dkt,
+  author = {Zhang, Jiawei and Li, Jiahe and Huang, Lei and Yu, Xiaohan and Gu, Lin and Zheng, Jin and Bai, Xiao},
+  title = {Robust Synthetic-to-Real Transfer for Stereo Matching},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2024}
+}
+
+@inproceedings{chang2023hvt,
+  author = {Chang, Tianyu and Yang, Xun and Zhang, Tianzhu and Wang, Meng},
+  title = {Domain Generalized Stereo Matching via Hierarchical Visual Transformation},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2023}
+}
+
+% ===== DATASETS =====
+@inproceedings{geiger2012kitti,
+  author = {Geiger, Andreas and Lenz, Philip and Urtasun, Raquel},
+  title = {Are We Ready for Autonomous Driving? The KITTI Vision Benchmark Suite},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2012}
+}
+
+@inproceedings{menze2015kitti,
+  author = {Menze, Moritz and Geiger, Andreas},
+  title = {Object Scene Flow for Autonomous Vehicles},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2015}
+}
+
+@inproceedings{scharstein2014middlebury,
+  author = {Scharstein, Daniel and Hirschm\"{u}ller, Heiko and Kitajima, York and Krathwohl, Greg and Ne{\v{s}}i\'{c}, Nera and Wang, Xi and Westling, Porter},
+  title = {High-resolution Stereo Datasets with Subpixel-accurate Ground Truth},
+  booktitle = {German Conference on Pattern Recognition (GCPR)},
+  year = {2014}
+}
+
+@inproceedings{schops2017eth3d,
+  author = {Sch\"{o}ps, Thomas and Sch\"{o}nberger, Johannes L. and Galliani, Silvano and Sattler, Torsten and Schindler, Konrad and Pollefeys, Marc and Geiger, Andreas},
+  title = {A Multi-View Stereo Benchmark with High-Resolution Images and Multi-Camera Videos},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2017}
+}
+
+@inproceedings{yang2019drivingstereo,
+  author = {Yang, Guorun and Song, Xiao and Huang, Chaoqin and Deng, Zhidong and Shi, Jianping and Zhou, Bolei},
+  title = {DrivingStereo: A Large-Scale Dataset for Stereo Matching in Autonomous Driving Scenarios},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2019}
+}
+
+@inproceedings{ramirez2022booster,
+  author = {Ramirez, Pierluigi Zama and Tosi, Fabio and Di Stefano, Luigi and Timofte, Radu and Tonioni, Alessio and Poggi, Matteo and Salti, Samuele and Mattoccia, Stefano},
+  title = {Open Challenges in Deep Stereo: The Booster Dataset},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2022}
+}
+
+@inproceedings{mehl2023spring,
+  author = {Mehl, Lukas and Schmalfuss, Jenny and Jahedi, Azin and Nalivayko, Yaroslava and Bruhn, Andr\'{e}s},
+  title = {Spring: A High-Resolution High-Detail Dataset and Benchmark for Scene Flow, Optical Flow and Stereo},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2023}
+}
+
+@inproceedings{wang2020tartanair,
+  author = {Wang, Wenshan and Zhu, Delong and Wang, Xiangwei and Hu, Yaoyu and Qiu, Yuheng and Wang, Chen and Hu, Yafei and Kapoor, Ashish and Scherer, Sebastian},
+  title = {TartanAir: A Dataset to Push the Limits of Visual SLAM},
+  booktitle = {IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)},
+  year = {2020}
+}
+
+% ===== DEPTH FOUNDATION MODELS =====
+@inproceedings{yang2024dav2,
+  author = {Yang, Lihe and Kang, Bingyi and Huang, Zilong and Zhao, Zhen and Xu, Xiaogang and Feng, Jiashi and Zhao, Hengshuang},
+  title = {Depth Anything V2},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  year = {2024}
+}
+
+% ===== SUPPORTING WORKS =====
+@inproceedings{kendall2018multitask,
+  author = {Kendall, Alex and Gal, Yarin and Cipolla, Roberto},
+  title = {Multi-Task Learning Using Uncertainty to Weigh Losses for Scene Geometry and Semantics},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2018}
+}
+
+@inproceedings{godard2017monodepth,
+  author = {Godard, Cl\'{e}ment and Mac Aodha, Oisin and Brostow, Gabriel J.},
+  title = {Unsupervised Monocular Depth Estimation with Left-Right Consistency},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2017}
+}
+
+@inproceedings{tosi2023nerfsupervised,
+  author = {Tosi, Fabio and Tonioni, Alessio and De Gregorio, Daniele and Poggi, Matteo},
+  title = {NeRF-Supervised Deep Stereo},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2023}
+}
+
+@inproceedings{guo2024stereoanything,
+  author = {Guo, Xianda and Zhang, Chenming and Nie, Dujun and Zheng, Wenzhao and Zhang, Youmin and Chen, Long},
+  title = {Stereo Anything: Unifying Stereo Matching with Large-Scale Mixed Data},
+  booktitle = {arXiv:2411.14053},
+  year = {2024}
+}
+
+@inproceedings{liu2026ggev,
+  author = {Liu, Qizhe and Xu, HuangXin and Chen, Zhuojie and Zheng, Jintu},
+  title = {GGEV: Geometry-Guided Encoding Volume for Real-Time Stereo Matching},
+  booktitle = {AAAI Conference on Artificial Intelligence},
+  year = {2026}
+}
+
+@article{jing2025liteanystereo,
+  author = {Jing, Junpeng and Mao, Weixun and Wang, Yu and Cao, Yu and Yu, Bei and Mai, Long},
+  title = {LiteAnyStereo: Real-Time Cross-Domain Stereo Matching with Foundation Knowledge},
+  journal = {arXiv preprint},
+  year = {2025}
+}
+
+@inproceedings{wen2026fastfoundationstereo,
+  author = {Wen, Bowen and Li, Junyuan and Trepte, Matthew and Aribido, Joseph and Birchfield, Stan},
+  title = {Fast FoundationStereo: Real-time Zero-shot Stereo Matching},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2026}
+}
+
+@inproceedings{wang2026promptstereo,
+  author = {Wang, Xianqi and Xu, Gangwei and Cheng, Junda and Yang, Xin},
+  title = {PromptStereo: Universal Stereo Matching via Prompting},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2026}
+}
+
+@inproceedings{cheng2020leastereo,
+  author = {Cheng, Xuelian and Zhong, Yiran and Harandi, Mehrtash and Dai, Yuchao and Chang, Xiaojun and Drummond, Tom and Li, Hongdong and Ge, Zongyuan},
+  title = {Hierarchical Neural Architecture Search for Deep Stereo Matching},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  year = {2020}
+}
+
+@inproceedings{wang2022easnet,
+  author = {Wang, Yan and Yang, Junjie and Yu, Xiaohan and Xu, Yong and Yang, Xin},
+  title = {EASNet: Searching Elastic and Accurate Network Architecture for Stereo Matching},
+  booktitle = {European Conference on Computer Vision (ECCV)},
+  year = {2022}
+}
+
+@article{ghosh2025eventstereo,
+  author = {Ghosh, Suman and Gallego, Guillermo},
+  title = {Event Stereo Vision: A Survey},
+  journal = {IEEE Transactions on Pattern Analysis and Machine Intelligence},
+  year = {2025}
+}
+
+@inproceedings{li2024iinet,
+  author = {Li, Ximeng and Zhang, Chen and Su, Wanjuan and Tao, Wenbing},
+  title = {IINet: Implicit Intra-inter Information Fusion for Real-Time Stereo Matching},
+  booktitle = {AAAI Conference on Artificial Intelligence},
+  year = {2024}
+}

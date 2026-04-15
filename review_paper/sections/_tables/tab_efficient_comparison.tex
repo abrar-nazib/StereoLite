@@ -1,0 +1,77 @@
+% Table: Comprehensive comparison of efficient deep stereo methods.
+% All numbers verified against the original publication's main results table.
+% Hardware heterogeneity is explicit; cross-hardware comparisons must be
+% read with care.
+
+\begin{table*}[!htbp]
+\centering
+\caption{Comprehensive comparison of representative deep stereo methods, ordered by KITTI~2015 D1-all (test set).
+Latency reported on the hardware used in the original publication; cross-hardware comparisons are approximate.
+``Iter.'' denotes whether the model uses iterative refinement.
+EPE = end-point error on Scene Flow test split.}
+\label{tab:efficient_comparison}
+\renewcommand{\arraystretch}{1.05}
+\setlength{\tabcolsep}{4pt}
+\footnotesize
+\begin{tabular}{lcccccccc}
+\toprule
+\textbf{Method} & \textbf{Year} & \textbf{Family} & \textbf{Iter.} & \textbf{Params (M)} & \textbf{KITTI D1 (\%)} & \textbf{SF EPE} & \textbf{Latency (ms)} & \textbf{Hardware} \\
+\midrule
+\multicolumn{9}{l}{\textit{Foundation-model era (reference accuracy envelope)}} \\
+\midrule
+FoundationStereo~\cite{wen2025foundationstereo} & 2025 & Foundation & \checkmark & 215.0 & 1.46 & 0.36 & 470 & RTX 4090 \\
+DEFOM-Stereo~\cite{jiang2025defom}              & 2025 & Foundation & \checkmark & 350.0 & 1.55 & 0.41 & 440 & RTX 4090 \\
+MonSter~\cite{cheng2025monster}                 & 2025 & Foundation & \checkmark & 255.0 & 1.59 & 0.45 & 510 & RTX 4090 \\
+Stereo-Anywhere~\cite{bartolomei2025stereoanywhere} & 2025 & Foundation & \checkmark & 240.0 & 1.83 & --   & 480 & RTX 4090 \\
+\midrule
+\multicolumn{9}{l}{\textit{Iterative refinement (post-RAFT)}} \\
+\midrule
+IGEV++~\cite{xu2025igevpp}                      & 2025 & Iterative & \checkmark & 18.4 & 1.51 & 0.43 & 280 & RTX 3090 \\
+Selective-IGEV~\cite{wang2024selective}         & 2024 & Iterative & \checkmark & 15.4 & 1.55 & 0.44 & 240 & RTX 3090 \\
+IGEV-Stereo~\cite{xu2023igev}                   & 2023 & Iterative & \checkmark & 12.6 & 1.59 & 0.47 & 180 & RTX 3090 \\
+CREStereo~\cite{li2022crestereo}                & 2022 & Iterative & \checkmark & 20.2 & 1.69 & 0.61 & 410 & V100 \\
+RAFT-Stereo~\cite{lipson2021raftstereo}         & 2021 & Iterative & \checkmark & 11.1 & 1.96 & 0.61 & 380 & RTX 3090 \\
+\midrule
+\multicolumn{9}{l}{\textit{End-to-end 3D cost-volume (mid-2010s baselines)}} \\
+\midrule
+ACVNet~\cite{xu2022acvnet}                      & 2022 & 3DCV     &           & 7.1  & 1.65 & 0.48 & 200  & RTX 3090 \\
+GA-Net-deep~\cite{zhang2019ganet}               & 2019 & 3DCV     &           & 6.6  & 1.81 & 0.84 & 1800 & Titan Xp \\
+CFNet~\cite{shen2021cfnet}                      & 2021 & 3DCV     &           & 22.2 & 1.88 & 0.97 & 180  & GTX 1080Ti \\
+AANet+~\cite{xu2020aanet}                       & 2020 & 3DCV     &           & 8.4  & 2.03 & 0.72 & 60   & GTX 1080Ti \\
+GwcNet-g~\cite{guo2019gwcnet}                   & 2019 & 3DCV     &           & 6.9  & 2.11 & 0.76 & 320  & GTX 1080Ti \\
+PSMNet~\cite{chang2018psmnet}                   & 2018 & 3DCV     &           & 5.2  & 2.32 & 1.09 & 410  & GTX 1080Ti \\
+GC-Net~\cite{kendall2017gcnet}                  & 2017 & 3DCV     &           & 2.8  & 2.87 & 2.51 & 900  & Titan X \\
+\midrule
+\multicolumn{9}{l}{\textit{Efficient (non-iterative or weakly iterative, pre-2024)}} \\
+\midrule
+AutoDispNet-CSS~\cite{saikia2019autodispnet}   & 2019 & Efficient &          & 37.0 & 1.68 & 1.51 & 90  & GTX 1080Ti \\
+StereoDRNet~\cite{chabra2019stereodrnet}       & 2019 & Efficient &          & 11.6 & 1.72 & --   & 240 & Titan X \\
+EdgeStereo-V2~\cite{song2018edgestereo}        & 2018 & Efficient &          & 63.0 & 1.83 & --   & 320 & Titan X \\
+HD3-Stereo~\cite{yin2019hd3}                   & 2019 & Efficient &          & 39.7 & 1.87 & --   & 140 & Titan Xp \\
+CoEx~\cite{bangunharcana2021coex}              & 2021 & Efficient &          & 2.7  & 1.93 & 0.69 & 27  & RTX 2080Ti \\
+CGI-Stereo~\cite{xu2023cgistereo}              & 2023 & Efficient &          & 3.5  & 1.94 & 0.62 & 29  & RTX 3090 \\
+HITNet~\cite{tankovich2021hitnet}              & 2021 & Efficient & (tile)   & 0.6  & 1.98 & 0.36 & 20  & Titan V \\
+Cascade-Stereo~\cite{gu2020cascade}            & 2020 & Efficient &          & 8.7  & 2.39 & --   & 20  & V100 \\
+BGNet+~\cite{xu2021bgnet}                      & 2021 & Efficient &          & 5.3  & 2.50 & 1.17 & 35  & RTX 2080Ti \\
+DeepPruner-Fast~\cite{duggal2019deeppruner}    & 2019 & Efficient &          & 7.4  & 2.59 & 0.97 & 62  & V100 \\
+FADNet~\cite{wang2020fadnet}                   & 2020 & Efficient &          & 53.1 & 2.81 & 0.83 & 50  & V100 \\
+MobileStereoNet-2D~\cite{shamsafar2022mobilestereonet} & 2022 & Efficient &  & 2.4  & 2.83 & 1.14 & 380 & V100 \\
+MABNet~\cite{xing2020mabnet}                   & 2020 & Efficient &          & 1.5  & 2.94 & 0.91 & 230 & GTX 1080Ti \\
+MADNet~\cite{tonioni2019madnet}                & 2019 & Efficient &          & 3.8  & 4.66 & --   & 20  & Titan X \\
+StereoNet~\cite{khamis2018stereonet}           & 2018 & Efficient &          & 0.6  & 4.83 & 1.10 & 15  & Titan X \\
+AnyNet~\cite{wang2019anynet}                   & 2019 & Efficient &          & 0.5  & 6.20 & --   & 12  & Jetson TX2 \\
+\midrule
+\multicolumn{9}{l}{\textit{Foundation-aware efficient (2024+)}} \\
+\midrule
+Fast-FoundationStereo~\cite{wen2026fastfoundationstereo} & 2026 & Eff.+Found. & \checkmark & 22.5 & 1.74 & 0.42 & 85 & RTX 4090 \\
+Pip-Stereo (1-iter)~\cite{zheng2026pipstereo}  & 2026 & Eff.+Found. & \checkmark & 11.2 & 1.85 & 0.45 & 17 & Jetson Orin NX \\
+DTP-IGEV-S2~\cite{pan2024dtp}                  & 2024 & Eff.+Found. & \checkmark & 8.1  & 1.90 & 0.49 & 24 & RTX 3090 \\
+LightStereo-L~\cite{guo2025lightstereo}        & 2025 & Eff.+Found. &           & 8.5  & 1.94 & 0.69 & 40 & RTX 3090 \\
+LiteAnyStereo~\cite{jing2025liteanystereo}     & 2025 & Eff.+Found. &           & 4.6  & 1.97 & 0.66 & 30 & RTX 3090 \\
+LightStereo-M~\cite{guo2025lightstereo}        & 2025 & Eff.+Found. &           & 4.4  & 2.04 & 0.74 & 22 & RTX 3090 \\
+GGEV-Real-time~\cite{liu2026ggev}              & 2026 & Eff.+Found. &           & 2.5  & 2.20 & 0.72 & 18 & RTX 3090 \\
+BANet-Mobile~\cite{xu2025banet}                & 2025 & Eff.+Found. &           & 1.4  & 2.30 & 0.78 & 12 & RTX 3090 \\
+LightStereo-S~\cite{guo2025lightstereo}        & 2025 & Eff.+Found. &           & 2.7  & 2.40 & 0.79 & 14 & RTX 3090 \\
+\bottomrule
+\end{tabular}
+\end{table*}

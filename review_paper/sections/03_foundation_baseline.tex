@@ -1,0 +1,51 @@
+\section{The Foundation-Model Baseline}
+\label{sec:foundation}
+
+Before reviewing the compression literature, we make precise what is being compressed \emph{toward}. This section describes the four foundation-era stereo methods that, at the time of writing, define the upper envelope of accuracy: DEFOM-Stereo~\cite{jiang2025defom}, FoundationStereo~\cite{wen2025foundationstereo}, MonSter~\cite{cheng2025monster}, and Stereo-Anywhere~\cite{bartolomei2025stereoanywhere}. All four were published in CVPR 2025; all four use a monocular depth foundation model as a strong prior; all four exceed practical edge budgets by an order of magnitude or more.
+
+\subsection{The Common Recipe}
+
+The four methods differ in detail but share a common architecture template:
+
+\begin{enumerate}
+\item A pretrained \emph{monocular depth foundation model} (in every case the ViT-Large variant of Depth Anything V2~\cite{yang2024dav2}, with $\approx$335\,M parameters) consumes the left image and produces a multi-scale feature pyramid $\{F^{\mathrm{mono}}_s\}$ together with an estimated relative depth map $\hat{Z}^{\mathrm{mono}}$.
+\item A \emph{stereo branch} extracts conventional CNN features from both views and constructs a cost volume in the standard way (Section~\ref{sec:background}).
+\item A \emph{fusion module} combines the monocular features with the cost-volume features. The four methods differ in this module, which is the principal locus of innovation.
+\item An \emph{iterative refinement loop} (in every case derived from RAFT-Stereo~\cite{lipson2021raftstereo} or IGEV-Stereo~\cite{xu2023igev}) updates a disparity field for $T \in [16, 32]$ iterations.
+\item A \emph{scale-correction mechanism} uses the stereo cost signal to correct the inherent scale ambiguity of the monocular prior. This mechanism is most explicit in DEFOM-Stereo's Scale Update Module, but appears in some form in every method.
+\end{enumerate}
+
+\subsection{Method-Specific Innovations}
+
+\textbf{DEFOM-Stereo}~\cite{jiang2025defom} introduced the template above. Its central contribution is the Scale Update Module: a small recurrent operator that is updated alongside the disparity GRU and that produces a per-pixel multiplicative correction $s(\mathbf{p}) > 0$ applied to the monocular depth, yielding a metric-scale prior consistent with the stereo geometry. Empirically, this resolved the long-standing problem that monocular foundations are accurate up to a per-pixel scale that is meaningless for downstream 3D tasks.
+
+\textbf{FoundationStereo}~\cite{wen2025foundationstereo} replaced the single-monocular-prior of DEFOM with a \emph{mixture of experts}: multiple foundation backbones (Depth Anything V2 at multiple scales) are queried, and a learned gating network selects which expert to attend to per region. The motivation is that no single monocular foundation is best for all scenes, and the gate can learn to delegate (e.g.) outdoor scenes to one expert and indoor scenes to another.
+
+\textbf{MonSter}~\cite{cheng2025monster} attacks the same problem from the training side: rather than treating the monocular features as a frozen input, MonSter co-trains the monocular and stereo branches on the same losses, allowing the monocular features to adapt to the matching task. This avoids the train-test mismatch in which the monocular foundation was trained on a depth distribution unrepresentative of the stereo benchmark.
+
+\textbf{Stereo-Anywhere}~\cite{bartolomei2025stereoanywhere} explicitly targets the worst case: it uses the disagreement between monocular and stereo predictions as a confidence signal, falling back to monocular in regions where stereo fails (transparent surfaces, severe occlusion) and to stereo in regions where monocular fails (textureless backgrounds, scale ambiguity). The system delivers the best accuracy on the Booster~\cite{ramirez2022booster} non-Lambertian benchmark.
+
+\subsection{Reported Accuracy and Cost}
+
+Table~\ref{tab:efficient_comparison} lists the reported KITTI 2015, Scene Flow, parameter count, and latency for each method. The pattern is clear: the four foundation models cluster between 1.46\% and 1.83\% KITTI D1-all (versus 1.59\% for the best non-foundation iterative method, IGEV-Stereo~\cite{xu2023igev}, and versus the high-2\% range typical of pre-foundation efficient methods such as CGI-Stereo~\cite{xu2023cgistereo} or BGNet+~\cite{xu2021bgnet}). On Middlebury and ETH3D zero-shot the gap is even more dramatic: foundation methods reduce the bad-2 error by a factor of two to three relative to the best iterative non-foundation models.
+
+The cost is equally dramatic. The four foundation methods use 215--350\,M parameters (Table~\ref{tab:efficient_comparison}), 14$\times$ to 30$\times$ more than IGEV-Stereo~\cite{xu2023igev}. Their desktop-GPU inference times lie in the several-hundred-millisecond regime; the specific numbers reported in each paper are listed in Table~\ref{tab:efficient_comparison}, and are too high to run at 30~Hz on the embedded accelerators typically targeted by edge deployments. For the DEFOM-Stereo architecture in particular, Pip-Stereo~\cite{zheng2026pipstereo} reports that the Depth Anything V2 ViT-Large backbone alone consumes the entire memory budget of an NVIDIA Jetson Orin Nano (8\,GB unified) at FP16, leaving no headroom for the stereo branch. This constraint motivated Pip-Stereo's compression programme and more broadly the literature we review in the next section.
+
+\subsection{What the Compression Literature Is Trying to Approximate}
+
+Three components of the foundation baseline carry essentially all of its accuracy:
+
+\begin{enumerate}
+\item \textbf{The monocular foundation prior}, which provides a strong, dense, locally-coherent depth hypothesis everywhere, including in textureless and occluded regions where stereo matching is fundamentally underdetermined.
+\item \textbf{The iterative refinement loop}, which preserves cross-domain robustness. We review the experimental evidence for this claim in Section~\ref{sec:taxonomy}; the short version is that non-iterative real-time methods such as HITNet~\cite{tankovich2021hitnet} and the LightStereo family~\cite{guo2025lightstereo} suffer catastrophic accuracy collapse on the DrivingStereo~\cite{yang2019drivingstereo} weather subsets while iterative methods do not.
+\item \textbf{The scale-correction mechanism}, which makes the monocular prior usable as a metric depth signal compatible with the stereo geometry.
+\end{enumerate}
+
+A successful compressed model must approximate all three of these properties at edge cost. The compression families we review in the next section can be read as different strategies for doing so:
+\begin{itemize}
+\item \emph{Knowledge distillation} approximates property~(1) by transferring the foundation features into a small student rather than running the foundation at inference.
+\item \emph{Iterative-loop compression} (e.g., Pip-Stereo's PIP procedure~\cite{zheng2026pipstereo}) approximates property~(2) by compressing many iterations of the original GRU into a smaller number of more powerful learned operators.
+\item \emph{Cost-volume compression} (e.g., BGNet's bilateral grid~\cite{xu2021bgnet}, Cascade Cost Volume~\cite{gu2020cascade}) and \emph{architectural compression} (e.g., BANet~\cite{xu2025banet}, GGEV~\cite{liu2026ggev}) make the matching half cheaper without harming property~(2).
+\end{itemize}
+
+A key empirical observation, which Section~\ref{sec:taxonomy} returns to repeatedly, is that the seven compression families are largely \emph{orthogonal}: a model can in principle combine knowledge distillation, iterative-loop compression, and architectural compression simultaneously. The strongest 2024--2026 efficient methods (Pip-Stereo, Distill-then-Prune~\cite{pan2024dtp}, Fast-FoundationStereo~\cite{wen2026fastfoundationstereo}) all compose multiple families.

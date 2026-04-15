@@ -1,0 +1,142 @@
+\section{A Taxonomy of Compression Techniques for Deep Stereo}
+\label{sec:taxonomy}
+
+This section is the technical core of the survey. We organize the compression literature into seven families. Fig.~\ref{fig:taxonomy} summarizes the families visually; Table~\ref{tab:compression_families} lists representative methods, the cost axis each family attacks, the mechanism, and the typical effect on cross-domain generalization. Sections~\ref{ssec:backbone}--\ref{ssec:nas} discuss each family in turn.
+
+\begin{figure*}[!htbp]
+\centering
+\input{figures/fig_taxonomy_tikz}
+\caption{Taxonomy of compression techniques for deep stereo matching. Seven families are identified; representative methods are listed at the leaves. Many methods belong to multiple families simultaneously: for example, Pip-Stereo~\cite{zheng2026pipstereo} performs both iterative-loop compression and knowledge distillation, and DTP~\cite{pan2024dtp} performs distillation followed by structural pruning.}
+\label{fig:taxonomy}
+\end{figure*}
+
+\input{sections/_tables/tab_compression_families}
+
+\subsection{Backbone Substitution}
+\label{ssec:backbone}
+
+The simplest form of compression is to replace the feature-extraction backbone with a smaller alternative. The standard choice in pre-2020 stereo work was a ResNet-50 or modified UNet, contributing 5--10\,M parameters and a substantial fraction of the inference time. The mobile-vision community produced two natural replacements (depthwise-separable MobileNet variants~\cite{shamsafar2022mobilestereonet} and the more recent EfficientViT family), both of which trade representational capacity for FLOPs.
+
+\textbf{MobileStereoNet}~\cite{shamsafar2022mobilestereonet} is the canonical example: it ports the PSMNet~\cite{chang2018psmnet} 3D-cost-volume design to a MobileNetV2 backbone, producing a $\sim$2.4\,M-parameter network at the cost of $\sim$0.7\% additional KITTI D1 error. \textbf{Separable-Stereo}~\cite{rahim2021separable} extends this idea to the 3D-convolutional regularizer: it replaces full 3D convolutions with depthwise-separable factorizations $(D \times H \times W) \to (D \times 1 \times 1) \times (1 \times H \times W)$, reducing 3D-conv FLOPs by roughly $1/k$ for a $k \times k \times k$ kernel. \textbf{MABNet}~\cite{xing2020mabnet} introduces multi-branch adjustable bottleneck blocks that allow accuracy/efficiency tuning post-training by selecting which branch is active.
+
+The trade-off is well understood: a smaller backbone produces less expressive features, and the cost-volume regularizer must compensate. Empirically, accuracy on the source-domain benchmark (KITTI 2015) typically degrades by $\sim$0.5--1.0\% D1, while latency drops by 2--5$\times$. The cross-domain generalization penalty is typically modest, particularly when training augmentation (HVT~\cite{chang2023hvt}) is applied; we discuss this in Section~\ref{sec:generalization}.
+
+\subsection{Cost-Volume Compression}
+\label{ssec:costvol}
+
+The cost volume is the most expensive single tensor in nearly every stereo network: at quarter resolution and a maximum disparity of 192, a concatenation cost volume contains $192 \times H/4 \times W/4 \times 2C$ floats, easily exceeding 1\,GB at typical resolutions. Three families of compression target this tensor.
+
+\subsubsection{Resolution Pyramid (Cascade)}
+
+The first technique builds the cost volume at a low resolution, then refines a narrower disparity range at progressively higher resolutions. Cascade Cost Volume~\cite{gu2020cascade} formalizes this for both stereo and multi-view stereo. At stage $k$, the disparity hypothesis range is
+\begin{equation}
+R_{k+1} \;=\; R_k \cdot w_k, \qquad I_{k+1} \;=\; I_k \cdot p_k
+\label{eq:cascade}
+\end{equation}
+where $R_k$ is the disparity-range width at stage $k$, $I_k$ is the disparity sampling interval (resolution), $w_k \in (0, 1]$ is a learned narrowing factor, and $p_k$ is a refinement factor. Each cost volume has a fixed $D \approx 48$ disparity bins regardless of stage; after $K = 3$ stages, the system has covered the full $192$-disparity range while only ever materializing a 48-bin volume. Empirically, this reduces 3D-conv FLOPs by 30--50$\times$ relative to a single-stage volume at the same final resolution. CFNet~\cite{shen2021cfnet} extends Cascade Cost Volume with cross-stage feature fusion; ACVNet~\cite{xu2022acvnet} replaces the cascade with an attention-based confidence weighting that achieves a similar effect.
+
+\subsubsection{Bilateral Grid (BGNet)}
+
+A complementary technique is to construct the cost volume in a low-dimensional bilateral grid rather than a full 4D tensor. BGNet~\cite{xu2021bgnet} stores the cost volume in a grid indexed by spatial coordinates and image intensity (rather than by every pixel and disparity); the slicing operation that recovers a per-pixel disparity is fast because the grid is smaller and respects edges in the input image. The result is a $2$--$5\times$ memory reduction with minimal accuracy loss.
+
+\subsubsection{Pruning the Disparity Hypothesis Set (DeepPruner)}
+
+A third technique is to prune disparity hypotheses that are unlikely. DeepPruner~\cite{duggal2019deeppruner} uses a differentiable PatchMatch step to estimate, for each pixel, a small number of candidate disparities; the cost volume is then evaluated only at these candidates. This can reduce cost-volume compute by an order of magnitude for scenes with low disparity entropy, but at the price of catastrophic failure on high-uncertainty pixels (transparent surfaces, occlusions) where the candidate set is poorly chosen. ADStereo~\cite{wang2023adstereo} pursues an analogous content-aware downsampling that adapts the spatial resolution of the cost volume rather than the disparity range.
+
+\subsubsection{Parameterized Cost Volume (PCVNet)}
+
+PCVNet~\cite{zeng2023pcvnet} parameterizes the cost volume as a Gaussian mixture rather than as a discrete tensor of similarity scores. The parameters of the mixture (mean, variance, weight per component) are predicted by a small head; the cost volume is reconstructed on-the-fly only at the disparities being queried. The effect is a 4--10$\times$ memory reduction at the cost of increased FLOPs per query, which is a favorable trade on memory-bound edge accelerators.
+
+\subsection{Iterative-Loop Compression}
+\label{ssec:iterloop}
+
+The iterative-refinement paradigm (Section~\ref{sec:background}) trades depth for time: rather than apply a single deep regularizer, iterative methods apply a shallow GRU operator $T$ times. The headline accuracy of IGEV-Stereo~\cite{xu2023igev} and IGEV++~\cite{xu2025igevpp} is achieved at $T = 32$ iterations; reducing $T$ naively (the obvious efficiency lever) causes catastrophic accuracy degradation. \textbf{RT-IGEV} (the real-time variant in~\cite{xu2023igev}) drops $T$ to $6$ and reports an EPE increase of about 6\% on Scene Flow, which is the best previously documented direct truncation result.
+
+\textbf{Pip-Stereo}~\cite{zheng2026pipstereo} introduces \emph{Progressive Iteration Pruning} (PIP), which addresses the truncation problem by training a sequence of models in which each successive model approximates an $r$-fold composition of the previous model's GRU operator. Concretely, let $F_\theta : \mathbb{R}^d \to \mathbb{R}^d$ be the trained ConvGRU update operator of a teacher running for $T$ iterations, with hidden states $z_t^{\mathrm{Mi}} \in \mathbb{R}^d$ evolving as
+\begin{equation}
+z_{t+1}^{\mathrm{Mi}} = F_\theta\!\left(z_t^{\mathrm{Mi}}\right),
+\label{eq:mi_rnn}
+\end{equation}
+for $t = 0, \ldots, T-1$. PIP trains a student operator $G_\phi$ running for $S = T/r$ iterations:
+\begin{equation}
+z_{s+1}^{\mathrm{Fi}} = G_\phi\!\left(z_s^{\mathrm{Fi}}\right),
+\label{eq:fi_rnn}
+\end{equation}
+for $s = 0, \ldots, S-1$, with the constraint that $G_\phi$ should approximate the $r$-fold composition of $F_\theta$. Training is supervised by aggregating the teacher's intermediate disparities into blocks of size $r$:
+\begin{equation}
+\bar{d}_s^{\mathrm{Mi}} \;=\; \frac{1}{r} \sum_{i=1}^{r} \Psi\!\left(z_{r(s-1)+i}^{\mathrm{Mi}}\right),
+\label{eq:agg}
+\end{equation}
+for $s = 1, \ldots, S$, where $\Psi$ is the disparity head. The student is trained to match the block-aggregated teacher signal at every iteration:
+\begin{equation}
+\mathcal{L}_{\mathrm{PIP}} \;=\; \sum_{s=1}^{S} \bigl\Vert \Psi\!\left(z_s^{\mathrm{Fi}}\right) - \bar{d}_s^{\mathrm{Mi}} \bigr\Vert_1 .
+\label{eq:pip_loss}
+\end{equation}
+Pip-Stereo applies PIP recursively, halving $T$ at each step ($32 \to 16 \to 8 \to 4 \to 2 \to 1$). The reported result is striking: at $T = 1$ iteration, Pip-Stereo achieves Scene Flow EPE 0.45, better than the original IGEV-Stereo at $T = 12$ iterations and 11.5$\times$ faster than DEFOM-Stereo on a Jetson Orin NX~\cite{zheng2026pipstereo}.
+
+The conceptual contribution of PIP is the realization that iterative refinement is wasteful in a specific sense: by iteration~32 of an IGEV update, fewer than 1\% of pixels are still being meaningfully updated~\cite{zheng2026pipstereo}, but the GRU is still being run on every pixel. PIP compresses the temporal redundancy without altering the spatial structure of the network.
+
+\subsection{Knowledge Distillation}
+\label{ssec:distill}
+
+Distillation in stereo predates the foundation-model era. HITNet~\cite{tankovich2021hitnet}, for instance, uses intra-network distillation between tile-based predictions and a final disparity head. Distillation has become substantially more important since 2024, however, because the foundation methods provide an excellent teacher.
+
+\textbf{Distill-then-Prune (DTP)}~\cite{pan2024dtp} formalizes a two-stage pipeline: (i) distill an IGEV-Stereo teacher's per-iteration cost-volume features into a smaller student that uses fewer 3D-conv channels; (ii) apply a structural pruning step to the student that removes individual cost-volume channels found to contribute negligibly. The reported result is DTP-IGEV-S2 at 1.90\% KITTI D1 and 24~ms latency on RTX 3090, only $\sim$0.3\% worse than IGEV-Stereo at 8$\times$ the speed.
+
+\textbf{Fast-FoundationStereo}~\cite{wen2026fastfoundationstereo} performs cross-architecture distillation: a FoundationStereo teacher (with a Depth Anything V2 ViT backbone) supervises an EfficientViT-based student. The student inherits the foundation prior through feature-matching losses at multiple resolutions but never runs the heavy ViT at inference. The reported result is 1.74\% KITTI D1 at 85~ms on RTX 4090, the best foundation-derived efficient model at the time of writing.
+
+\textbf{Pip-Stereo's MPT}~\cite{zheng2026pipstereo} (Monocular Prior Transfer) is a similar idea applied to the iterative paradigm: the Depth Anything V2 ViT teacher supervises a NAS-searched RepViT student via a multi-resolution feature-alignment loss, and the teacher is discarded at inference. The MPT student carries the monocular knowledge in its weights without any ViT computation at inference time.
+
+The empirical pattern across all three is consistent: a foundation teacher transfers cross-domain robustness to a much smaller student, but only when the student is large enough to absorb the teacher's representational capacity (typically 4--12\,M parameters; smaller students plateau).
+
+\subsection{Architectural Compression}
+\label{ssec:arch}
+
+A fifth family makes no use of distillation and no use of cascading; it simply hand-designs a more efficient architecture. The 2024--2026 wave of architectural compression has produced four notable variants.
+
+\textbf{BANet}~\cite{xu2025banet} replaces the standard 3D-convolutional hourglass with a Bilateral Aggregation Network: a 2D context branch and a 3D matching branch fuse via a bilateral grid (in spirit similar to BGNet, but applied to the entire regularizer rather than just the cost volume). At its mobile setting BANet reports 1.4\,M parameters and 12~ms on RTX 3090 at 2.30\% KITTI D1, the fastest model in our comparison among non-iterative architectures.
+
+\textbf{LightStereo}~\cite{guo2025lightstereo} pursues an extreme position: it eliminates the 3D-convolutional regularizer altogether, replacing it with a 2D-only ``channel boost MLP'' that operates on a flattened cost volume. At its largest setting (LightStereo-L) it achieves 1.94\% KITTI D1 at 40~ms, demonstrating that 3D convolutions are not architecturally necessary for high-accuracy stereo.
+
+\textbf{GGEV}~\cite{liu2026ggev} (Geometry-Guided Encoding Volume) uses a geometry-aware feature aggregator that incorporates explicit epipolar-line context. The result is a 2.5\,M-parameter network at 18~ms with 2.20\% KITTI D1.
+
+\textbf{LiteAnyStereo}~\cite{jing2025liteanystereo} packages a foundation-aware compact architecture into a single-shot inference path, reporting 1.97\% KITTI D1 at 30~ms with 4.6\,M parameters. It is, alongside Pip-Stereo and DTP, among the strongest 2025 efficient models on cross-domain benchmarks.
+
+\subsection{Adaptive Compute}
+\label{ssec:adaptive}
+
+The sixth family spends compute non-uniformly across the spatial extent of the input, on the principle that easy regions (textured, well-lit, fronto-parallel surfaces) need little processing while hard regions (occlusion boundaries, transparent surfaces, large-depth-discontinuity edges) need more.
+
+\textbf{AnyNet}~\cite{wang2019anynet} is the canonical example of \emph{anytime inference}: the network runs in stages of increasing accuracy and can be terminated at any stage to produce a usable disparity map. The four stages of AnyNet correspond to different latency/accuracy trade-offs (12--40\,ms on Jetson TX2, with KITTI D1 ranging from 6.2\% at the earliest stage to roughly 4\% at the deepest), and the runtime can choose adaptively based on a budget signal. \textbf{HITNet}~\cite{tankovich2021hitnet} performs a different form of adaptivity: it operates on tiles and refines each tile's disparity hypothesis independently, allowing the per-tile compute to scale with tile difficulty.
+
+\textbf{ADStereo}~\cite{wang2023adstereo} (Adaptive Downsampling Stereo) takes adaptivity to the cost-volume construction: rather than uniformly downsampling the feature maps before the cost volume, it learns a content-aware sampling map that allocates more samples to high-detail regions. The result is a $1.5$--$2\times$ speedup at minimal accuracy loss for natural images.
+
+The principal limitation of adaptive-compute methods is that the runtime cost is data-dependent. For real-time edge deployment with hard latency contracts (e.g., a 33\,ms ADAS perception cycle), a model whose worst-case latency exceeds the budget cannot be used, even if its average is acceptable. In practice, adaptive-compute methods are most useful when paired with a hard fallback (e.g., terminate at AnyNet stage~3 if stage~4 has not finished within budget).
+
+\subsection{Neural Architecture Search}
+\label{ssec:nas}
+
+The seventh and final family searches the architecture itself. \textbf{LEAStereo}~\cite{cheng2020leastereo} and \textbf{EASNet}~\cite{wang2022easnet} adapt the DARTS family of differentiable NAS to stereo, treating both the cell topology and the per-cell operations as continuous variables; the system gradient-descends through the architecture parameters and the weight parameters jointly. \textbf{AutoDispNet}~\cite{saikia2019autodispnet} predates the foundation-model era but demonstrated that NAS could discover stereo-specific architectures (in particular, novel 3D-conv block topologies) that outperform hand-designed PSMNet/GA-Net at fixed compute.
+
+The empirical experience with stereo NAS has been mixed. The discovered architectures generalize less well than hand-designed ones; the search itself is computationally expensive (10--100 GPU-days); and the gains over a well-tuned hand-designed baseline are modest relative to the search cost. As a result, NAS has receded from the active research frontier in stereo since approximately 2022, displaced by the foundation-distillation paradigm. We include it for completeness and because the search insights have informed hand-designed lightweight architectures (Pip-Stereo's RepViT student, for example, is a NAS-discovered backbone~\cite{zheng2026pipstereo}).
+
+\subsection{Composing Multiple Families}
+\label{ssec:composition}
+
+The seven families are not mutually exclusive and the strongest 2024--2026 efficient methods compose multiple families. Pip-Stereo combines iterative-loop compression (PIP) with knowledge distillation (MPT). DTP combines distillation with structural pruning (a subset of architectural compression). Fast-FoundationStereo combines distillation with backbone substitution (replacing ViT-Large with EfficientViT). LiteAnyStereo combines architectural compression with the StereoAnything training-data recipe.
+
+The reported numbers suggest that these families are largely \emph{orthogonal}: the compression ratios and accuracy losses reported in each paper do not appear to stack linearly when two families are combined. We note this pattern but emphasise that no published experiment has directly varied family combinations in a controlled setting, so the claim should be read as a qualitative observation drawn from cross-paper comparison rather than as a measured effect.
+
+\subsection{Empirical Footprint of Each Family}
+\label{ssec:empirical}
+
+Fig.~\ref{fig:family_contribution} summarises the per-family distribution of the three metrics that matter most for edge deployment. Three patterns stand out. First, the foundation-model family occupies a tight, high-cost region (desktop-GPU latencies in the several-hundred-millisecond range, parameters of 215--350\,M, KITTI D1 in a narrow 1.46--1.83\% band; see Table~\ref{tab:efficient_comparison} for the per-method values): uniformly accurate and uniformly expensive. Second, the post-RAFT iterative family achieves nearly the same accuracy at one-tenth the parameters and roughly half the latency, but remains well above the 33\,ms real-time budget. Third, the foundation-aware efficient family (the 2024--2026 wave reviewed in Sections~\ref{ssec:iterloop}--\ref{ssec:arch}) is the only group whose latency distribution overlaps the 33\,ms budget while its accuracy distribution approaches that of the foundation models.
+
+\begin{figure*}[!htbp]
+\centering
+\includegraphics[width=0.95\textwidth]{figures/fig_family_contribution.pdf}
+\caption{Compression-family contribution analysis. For each of the five families that the surveyed corpus populates densely, the panels show the distribution of inference latency (left, log scale), KITTI 2015 D1-all accuracy (middle), and trainable parameters (right, log scale). Each box gives the inter-quartile range; the line inside the box is the median; whiskers extend to 1.5$\times$IQR; individual methods are shown as jittered points. The visual story is monotonic: as one moves from the right (foundation models) to the left (foundation-aware efficient methods), parameters and latency drop by one to two orders of magnitude while accuracy degrades only modestly.}
+\label{fig:family_contribution}
+\end{figure*}
+
+\input{sections/_tables/tab_efficient_comparison}

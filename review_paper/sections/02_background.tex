@@ -1,0 +1,75 @@
+\section{Background}
+\label{sec:background}
+
+This section reviews the components common to nearly all modern deep stereo networks. We assume a rectified stereo pair $(I^L, I^R)$ such that for every left pixel $\mathbf{p} = (u, v)$ the corresponding right pixel lies on the same scanline at $(u - d(\mathbf{p}),\, v)$, where $d(\mathbf{p}) \ge 0$ is the disparity at $\mathbf{p}$. The metric depth at that pixel follows from the stereo geometry:
+\begin{equation}
+Z(\mathbf{p}) \;=\; \frac{f \, B}{d(\mathbf{p})},
+\label{eq:depth}
+\end{equation}
+where $f$ is the camera focal length (in pixels) and $B$ is the stereo baseline (in metres). The core task of a deep stereo network is therefore to predict a dense disparity map $\hat{d}(\mathbf{p})$ from $(I^L, I^R)$.
+
+\subsection{The Generic Deep Stereo Pipeline}
+
+After about 2018 the deep-stereo community converged on a four-stage pipeline that closely mirrors the classical one~\cite{scharstein2002taxonomy}:
+
+\begin{enumerate}
+\item \textbf{Feature extraction}. A shared-weight CNN (typically a ResNet- or UNet-style encoder) maps $I^L$ and $I^R$ to feature maps $F^L, F^R \in \mathbb{R}^{C \times H' \times W'}$, usually at $1/4$ or $1/8$ of the input resolution.
+\item \textbf{Cost-volume construction}. The two feature maps are combined into a 4D tensor $V \in \mathbb{R}^{C' \times D \times H' \times W'}$ that, at every spatial location and every candidate disparity $d \in \{0, \ldots, D-1\}$, encodes a measure of left/right feature similarity. Two construction styles dominate: \emph{correlation} or \emph{group-wise correlation}, which compresses similarity into a small number of scalar channels; and \emph{concatenation}, which simply stacks $F^L(\mathbf{p})$ and $F^R(\mathbf{p}-d)$ at every $(\mathbf{p}, d)$ and forces the regularizer to learn the matching function. GwcNet~\cite{guo2019gwcnet} introduced the standard hybrid that combines both signals.
+\item \textbf{Cost-volume aggregation / regularization}. A 3D-convolutional hourglass (PSMNet~\cite{chang2018psmnet}, GA-Net~\cite{zhang2019ganet}) or a 2D regularizer applied to a compressed 3D volume (AANet~\cite{xu2020aanet}, BGNet~\cite{xu2021bgnet}) smooths the cost volume across spatial neighborhoods and across disparity. This is the most expensive stage in nearly every architecture.
+\item \textbf{Disparity regression}. The regularized volume is collapsed to a per-pixel disparity. The standard operator is the soft-argmin of Kendall \emph{et al.}~\cite{kendall2017gcnet}:
+\begin{equation}
+\hat{d}(\mathbf{p}) \;=\; \sum_{d=0}^{D-1} d \cdot \mathrm{softmax}_d\!\left(-c(\mathbf{p}, d)\right)
+\label{eq:softargmin}
+\end{equation}
+where $c(\mathbf{p}, d)$ is the regularized cost at pixel $\mathbf{p}$ for disparity $d$. Eq.~\eqref{eq:softargmin} is fully differentiable and produces sub-pixel-accurate disparities.
+\item \textbf{Refinement}. An optional refinement stage (residual prediction, edge-aware smoothing, or learned upsampling) corrects boundary errors and recovers full input resolution.
+\end{enumerate}
+
+In what follows, ``the cost volume'' refers to the tensor produced in stage~2 prior to regularization; ``the regularized volume'' refers to the output of stage~3.
+
+\subsection{Iterative Refinement (Post-RAFT)}
+
+A second pipeline structure, introduced by RAFT-Stereo~\cite{lipson2021raftstereo} in 2021 and now dominant for top-of-leaderboard accuracy, replaces stages~3--4 with a recurrent update. Given an all-pairs correlation pyramid $\{V^{(s)}\}_{s=0}^{S}$ (constructed once) and a context feature map $C$ (extracted by a separate context encoder), a ConvGRU repeatedly updates a disparity field $d_t$:
+\begin{equation}
+\begin{aligned}
+d_{t+1} &\;=\; d_t + \Delta d_t, \\
+\Delta d_t &\;=\; \mathrm{Head}(h_t),
+\end{aligned}
+\end{equation}
+\begin{equation}
+h_{t+1} \;=\; \mathrm{ConvGRU}\bigl(h_t,\, L_t,\, C\bigr),
+\quad L_t = \mathrm{Lookup}\bigl(V^{(0..S)},\, d_t\bigr).
+\end{equation}
+Here $h_t$ is a hidden state, $\mathrm{Lookup}$ samples the correlation pyramid at the current disparity hypothesis, and $\mathrm{Head}$ is a small CNN producing the disparity update. The same GRU weights are shared across all iterations $t = 0, \ldots, T$, and the network is trained with a sequence loss over all intermediate disparities $\{d_1, \ldots, d_T\}$ exponentially weighted toward the final iteration.
+
+The iterative pipeline has three properties that matter for the present survey. First, it tends to be more robust to domain shift than non-iterative pipelines (we discuss the empirical evidence in Section~\ref{sec:taxonomy}). Second, the per-iteration cost is dominated by the GRU and the lookup, both of which are bandwidth-bound on the GPU; this makes the iterative loop a natural target for compression. Third, the iteration count $T$ is a tunable knob: most published models train at $T \in [16, 32]$ but report reasonable accuracy at $T = 4$--$8$ at inference.
+
+\subsection{Evaluation Protocol and Standard Datasets}
+
+The de facto standard evaluation protocol, used by nearly every paper in this survey, comprises:
+
+\begin{itemize}
+\item \textbf{Scene Flow}~\cite{mayer2016sceneflow}: a synthetic dataset of 35\,454 stereo pairs with dense ground truth. Used universally for pretraining, with the test split's end-point error (EPE) reported as a sanity-check metric.
+\item \textbf{KITTI 2015}~\cite{menze2015kitti}: 200 outdoor driving pairs with sparse LiDAR ground truth. Models are typically pretrained on Scene Flow, then fine-tuned on the 200 KITTI training pairs, and evaluated by the held-out test server. The headline metric is \textbf{D1-all}: the percentage of pixels whose disparity error exceeds both 3~px and 5\% of the ground truth.
+\item \textbf{Middlebury v3}~\cite{scharstein2014middlebury}, \textbf{ETH3D}~\cite{schops2017eth3d}: high-resolution indoor (Middlebury) and mixed indoor-outdoor (ETH3D) pairs with structured-light or laser ground truth, used as zero-shot cross-domain benchmarks. The standard metric is \emph{bad-1} or \emph{bad-2}: percentage of pixels with error exceeding 1~px or 2~px.
+\item \textbf{DrivingStereo}~\cite{yang2019drivingstereo}: a large driving dataset with weather subsets (sunny, cloudy, foggy, rainy) used to test robustness under adverse conditions.
+\item \textbf{Booster}~\cite{ramirez2022booster}: 600+ indoor pairs with transparent and reflective surfaces, used to test non-Lambertian robustness.
+\item \textbf{Spring}~\cite{mehl2023spring}: a high-resolution (1920$\times$1080) synthetic dataset used as a stress test for high-resolution methods.
+\item \textbf{TartanAir}~\cite{wang2020tartanair}: a $\sim$1\,M-frame photo-realistic synthetic dataset originally for SLAM, now widely used as auxiliary stereo training data alongside Scene Flow.
+\end{itemize}
+
+Table~\ref{tab:datasets} summarizes these resources. In practice, the modern training mix for cross-domain-robust stereo (StereoAnything~\cite{guo2024stereoanything} and successors) combines Scene Flow + TartanAir + a CREStereo synthetic set + pseudo-stereo pairs generated from monocular images using Depth Anything V2~\cite{yang2024dav2} and an inpainting model, totaling tens of millions of pairs.
+
+\input{sections/_tables/tab_datasets}
+
+\subsection{Notation Used Throughout}
+
+Hereafter we use the following symbols:
+\begin{itemize}
+\item $H, W$: input image height and width (the standard KITTI evaluation resolution is $1248 \times 384$).
+\item $D$: maximum disparity (typically 192 for KITTI, 256 for Middlebury at quarter resolution).
+\item $C$: feature channel dimension at the cost-volume scale.
+\item $T$: iteration count for iterative methods.
+\item $\theta$: trainable parameters of the stereo network.
+\item $\hat{d}, d^*$: predicted and ground-truth disparity respectively.
+\end{itemize}

@@ -1,0 +1,23 @@
+% Stereo dataset summary table.
+\begin{table*}[!htbp]
+\centering
+\caption{Stereo matching datasets used throughout the deep-stereo literature, with the role each plays in the standard training and evaluation workflow. ``GT'' = ground-truth source.}
+\label{tab:datasets}
+\renewcommand{\arraystretch}{1.1}
+\footnotesize
+\begin{tabular}{lllllll}
+\toprule
+\textbf{Dataset} & \textbf{Year} & \textbf{Domain} & \textbf{Pairs} & \textbf{Resolution} & \textbf{GT source} & \textbf{Primary role} \\
+\midrule
+Scene Flow~\cite{mayer2016sceneflow}        & 2016 & Synthetic & 35\,454 & 960$\times$540  & Rendered (dense) & Universal pretraining \\
+KITTI 2012~\cite{geiger2012kitti}           & 2012 & Driving   & 194    & 1242$\times$375 & LiDAR (sparse)   & First driving benchmark \\
+KITTI 2015~\cite{menze2015kitti}            & 2015 & Driving   & 200    & 1242$\times$375 & LiDAR (sparse)   & Primary driving benchmark \\
+Middlebury v3~\cite{scharstein2014middlebury} & 2014 & Indoor   & $\sim$30 & up to 6\,Mpx  & Structured light & High-res cross-domain \\
+ETH3D~\cite{schops2017eth3d}                & 2017 & Mixed     & 27     & 940$\times$490  & Laser scanner    & Two-view cross-domain \\
+DrivingStereo~\cite{yang2019drivingstereo}  & 2019 & Driving   & 182\,000 & 1762$\times$800 & Accumulated LiDAR & Weather robustness \\
+Booster~\cite{ramirez2022booster}           & 2022 & Indoor    & $\sim$600 & 4112$\times$3008 & Active stereo + SL & Non-Lambertian surfaces \\
+Spring~\cite{mehl2023spring}                & 2023 & Synthetic & 6\,000  & 1920$\times$1080 & Rendered (dense) & High-resolution stress test \\
+TartanAir~\cite{wang2020tartanair}          & 2020 & Synthetic & $\sim$1\,M & 640$\times$480 & Rendered (dense) & Large-scale auxiliary training \\
+\bottomrule
+\end{tabular}
+\end{table*}

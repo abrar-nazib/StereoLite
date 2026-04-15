@@ -1,0 +1,55 @@
+% Table summarizing the seven compression families surveyed.
+\begin{table*}[!htbp]
+\centering
+\caption{The seven compression families surveyed in this paper, with representative methods, the cost-axis they primarily reduce, and their typical effect on cross-domain generalization.}
+\label{tab:compression_families}
+\renewcommand{\arraystretch}{1.15}
+\footnotesize
+\begin{tabular}{p{2.6cm}p{4.0cm}p{2.4cm}p{4.0cm}p{2.6cm}}
+\toprule
+\textbf{Family} & \textbf{Representative methods} & \textbf{Cost axis attacked} & \textbf{Mechanism (one sentence)} & \textbf{Typical generalization effect} \\
+\midrule
+Backbone substitution &
+MobileStereoNet~\cite{shamsafar2022mobilestereonet}, Separable-Stereo~\cite{rahim2021separable}, MABNet~\cite{xing2020mabnet} &
+Feature extractor FLOPs &
+Replace ResNet/UNet with MobileNet-style depthwise-separable backbones. &
+Mild loss; recoverable with HVT augmentation. \\
+\midrule
+Cost-volume compression &
+BGNet~\cite{xu2021bgnet}, DeepPruner~\cite{duggal2019deeppruner}, Cascade-CV~\cite{gu2020cascade}, ADStereo~\cite{wang2023adstereo}, PCVNet~\cite{zeng2023pcvnet} &
+3D-volume memory \& 3D-conv FLOPs &
+Build the cost volume at lower resolution, then refine; or prune unlikely disparity hypotheses. &
+Generally preserved; pruning can hurt thin structures. \\
+\midrule
+Iterative-loop compression &
+Pip-Stereo~\cite{zheng2026pipstereo}, RT-IGEV (variant of \cite{xu2023igev}), IINet~\cite{li2024iinet} &
+GRU iteration count &
+Compress an $r$-fold composition of the GRU update operator into a single learned operator. &
+Strong; iteration retains cross-domain robustness. \\
+\midrule
+Knowledge distillation &
+DTP~\cite{pan2024dtp}, Fast-FoundationStereo~\cite{wen2026fastfoundationstereo}, MPT (Pip)~\cite{zheng2026pipstereo} &
+Backbone size \& foundation prior &
+Distill foundation-model features into a compact student trained with feature-matching losses. &
+Strong if teacher is foundation-quality. \\
+\midrule
+Architectural compression &
+BANet~\cite{xu2025banet}, LightStereo~\cite{guo2025lightstereo}, GGEV~\cite{liu2026ggev}, LiteAnyStereo~\cite{jing2025liteanystereo} &
+Both feature \& cost-volume FLOPs &
+Hand-designed lightweight blocks (bilateral aggregation, channel-boost MLP, etc.) replacing 3D-conv hourglasses. &
+Variable; depends on training-data mix. \\
+\midrule
+Adaptive compute &
+AnyNet~\cite{wang2019anynet}, HITNet~\cite{tankovich2021hitnet}, ADStereo~\cite{wang2023adstereo}, DeepPruner~\cite{duggal2019deeppruner} &
+Per-region compute &
+Spend more compute on high-uncertainty regions and less on confident, textured regions. &
+Mostly preserved; learns where to look. \\
+\midrule
+Neural architecture search &
+LEAStereo, EASNet, AutoDispNet~\cite{saikia2019autodispnet} &
+Architectural overhead per FLOP &
+Search the architecture (cells, operations, topology) to maximize accuracy at fixed compute. &
+Limited generalization beyond search domain. \\
+\bottomrule
+\end{tabular}
+\end{table*}
