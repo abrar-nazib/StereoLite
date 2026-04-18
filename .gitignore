@@ -31,3 +31,5 @@ venv/
 Thumbs.db
 CLAUDE.md
 .claude/
+
+data/

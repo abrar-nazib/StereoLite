@@ -1,0 +1,142 @@
+<mxfile host="app.diagrams.net" modified="2026-04-18T22:50:00.000Z" version="24.0.0" type="device">
+  <diagram id="arch-cmp" name="HITNet vs TileFMStereo">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="2000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Title -->
+        <mxCell id="title" value="HITNet (CVPR 2021)  vs  TileFMStereo (current, 2026-04)" style="text;html=1;align=center;verticalAlign=middle;fontSize=20;fontStyle=1;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="80" y="20" width="1440" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- Column headers -->
+        <mxCell id="hdr_h" value="HITNet" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=18;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="70" width="600" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="hdr_ours" value="TileFMStereo (ours, current)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=18;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="860" y="70" width="600" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- =========== HITNet column =========== -->
+
+        <mxCell id="h_in" value="Input: Left + Right stereo pair&#10;(H × W × 3, rectified)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="160" y="140" width="520" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="h_feat" value="Shared Feature Encoder (U-Net variant)&#10;conv + BatchNorm + LeakyReLU&#10;outputs feature pyramid at 1/1, 1/2, 1/4, 1/8, 1/16" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="160" y="210" width="520" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="h_cv" value="TILE INIT @ 1/16:   Local cost volume per tile&#10;For each 4×4 tile: build cost volume over 16 disparities,&#10;soft-argmin → per-tile seed disparity d" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="160" y="290" width="520" height="65" as="geometry" />
+        </mxCell>
+
+        <mxCell id="h_hyp1" value="Tile hypothesis format: (d, ∂d/∂x, ∂d/∂y, w, c)&#10;   d    = tile disparity&#10;   ∂d = planar-slope (subpixel)&#10;   w   = 16-D features of the tile&#10;   c    = confidence" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="160" y="375" width="520" height="85" as="geometry" />
+        </mxCell>
+
+        <mxCell id="h_prop1" value="Refinement @ 1/8:   Per-tile message passing&#10;3×3 conv over tile neighbours, augment disp + update w&#10;(occlusion-aware via confidence c)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="160" y="480" width="520" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="h_prop2" value="Refinement @ 1/4:   Per-tile message passing&#10;(same 3×3 conv block, denser features)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="160" y="560" width="520" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="h_prop3" value="Refinement @ 1/2, 1/1:   Per-tile message passing&#10;learned upsampling per tile" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="160" y="630" width="520" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="h_out" value="Output: dense disparity at H × W&#10;~0.63 M params (original HITNet)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="160" y="700" width="520" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- HITNet arrows -->
+        <mxCell id="ha1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=classic;html=1;" edge="1" parent="1" source="h_in" target="h_feat"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ha2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=classic;html=1;" edge="1" parent="1" source="h_feat" target="h_cv"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ha3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=classic;html=1;" edge="1" parent="1" source="h_cv" target="h_hyp1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ha4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=classic;html=1;" edge="1" parent="1" source="h_hyp1" target="h_prop1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ha5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=classic;html=1;" edge="1" parent="1" source="h_prop1" target="h_prop2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ha6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=classic;html=1;" edge="1" parent="1" source="h_prop2" target="h_prop3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ha7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=classic;html=1;" edge="1" parent="1" source="h_prop3" target="h_out"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- =========== TileFMStereo column =========== -->
+
+        <mxCell id="o_in" value="Input: Left + Right stereo pair&#10;(H × W × 3, rectified)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="900" y="140" width="520" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="o_feat" value="GhostConv + SE Encoder (shared)&#10;GhostConv + SE + GroupNorm + SiLU&#10;outputs feature pyramid at 1/4, 1/8, 1/16, 1/32&#10;(lightweight CNN, ~0.35 M trainable)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="900" y="210" width="520" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="o_dav2" value="DAv2-Small ViT (FROZEN, INT8 at Jetson deploy)&#10;Patch stride 14 → spatial tokens at 1/14&#10;Resize to 1/16, 1×1 project 384 → 64 channels&#10;(24.8 M frozen params, zero trainable, ~0.025 M projection)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="900" y="310" width="520" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="o_fuse" value="FUSION @ 1/16:   Concat Ghost f16 (96 ch) + DAv2 proj (64 ch)&#10;→ 160-ch fused features per eye" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="900" y="410" width="520" height="55" as="geometry" />
+        </mxCell>
+
+        <mxCell id="o_head32" value="HypothesisHead @ 1/32   (NO cost volume!)&#10;warp(fR, d_init=0) + concat + RepVGG×2 + 1×1&#10;outputs (d, ∂d/∂x, ∂d/∂y, c) but only d used downstream" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="900" y="485" width="520" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="o_head16" value="HypothesisHead @ 1/16   (on fused Ghost+DAv2)&#10;warp(fR_fused, d_from_above) + concat + RepVGG×2" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="900" y="575" width="520" height="55" as="geometry" />
+        </mxCell>
+
+        <mxCell id="o_attn" value="Tile propagation:   NeighborhoodAttention2d&#10;Linear attention over 3×3 window&#10;Operates on disparity scalar only (lift → attn → proj)&#10;(NOT HITNet-style per-tile (d, sx, sy, w, c) message passing)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="900" y="650" width="520" height="75" as="geometry" />
+        </mxCell>
+
+        <mxCell id="o_head8" value="HypothesisHead @ 1/8,   HypothesisHead @ 1/4&#10;same warp-and-regress template (no cost volume)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="900" y="745" width="520" height="55" as="geometry" />
+        </mxCell>
+
+        <mxCell id="o_out" value="Output: dense disparity at H × W&#10;0.71 M trainable  +  24.8 M frozen DAv2 (INT8 at deploy)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="900" y="820" width="520" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- TileFMStereo arrows -->
+        <mxCell id="oa1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=classic;html=1;" edge="1" parent="1" source="o_in" target="o_feat"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="oa2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=classic;html=1;" edge="1" parent="1" source="o_in" target="o_dav2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="oa3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=classic;html=1;" edge="1" parent="1" source="o_feat" target="o_fuse"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="oa4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=classic;html=1;" edge="1" parent="1" source="o_dav2" target="o_fuse"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="oa5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=classic;html=1;" edge="1" parent="1" source="o_fuse" target="o_head32"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="oa6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=classic;html=1;" edge="1" parent="1" source="o_head32" target="o_head16"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="oa7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=classic;html=1;" edge="1" parent="1" source="o_head16" target="o_attn"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="oa8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=classic;html=1;" edge="1" parent="1" source="o_attn" target="o_head8"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="oa9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=classic;html=1;" edge="1" parent="1" source="o_head8" target="o_out"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- =========== Key-differences panel =========== -->
+
+        <mxCell id="diff_title" value="Key architectural differences (what's driving the blur)" style="text;html=1;align=center;verticalAlign=middle;fontSize=16;fontStyle=1;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="160" y="920" width="1260" height="32" as="geometry" />
+        </mxCell>
+
+        <mxCell id="diff1" value="✗  No cost volume&#10;HITNet builds a LOCAL cost volume at 1/16 to initialize tile hypotheses. This is an explicit matching operation — inherently sharp at edges. We replaced it with warp(fR, d=0) + concat + regress, which is pure regression and tends to blur boundaries." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffcccc;strokeColor=#cc3333;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="160" y="960" width="620" height="110" as="geometry" />
+        </mxCell>
+
+        <mxCell id="diff2" value="✗  Propagation passes disparity only, not full hypothesis&#10;HITNet propagates (d, slope, features w, confidence c) — the tile carries its certainty forward. Our NeighborhoodAttention2d only attends over the disparity scalar after lifting, so neighbouring refinement loses the feature + confidence context HITNet uses." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffcccc;strokeColor=#cc3333;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="800" y="960" width="620" height="110" as="geometry" />
+        </mxCell>
+
+        <mxCell id="diff3" value="✓  DAv2-Small frozen features (ours, not in HITNet)&#10;We fuse DAv2 ViT features at 1/16 before the hypothesis head. These carry strong geometric priors from a 24.8 M frozen ViT. Helps semantics, does NOT substitute for explicit matching." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ccffcc;strokeColor=#339933;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="160" y="1080" width="620" height="100" as="geometry" />
+        </mxCell>
+
+        <mxCell id="diff4" value="✓  Modern building blocks (ours)&#10;GhostConv (cheap features), Squeeze-Excitation (channel gating), GroupNorm (batch-size independent), RepVGG heads (multi-branch train → single conv deploy), SiLU activations. INT8-friendly for Jetson." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ccffcc;strokeColor=#339933;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="800" y="1080" width="620" height="100" as="geometry" />
+        </mxCell>
+
+        <mxCell id="fix_box" value="Proposed fix (next step):   Add a local cost volume at 1/8 with ~1 M hourglass aggregator (BGNet-style).&#10;Replaces or augments the 1/16 HypothesisHead warp-regress.  Restores explicit matching → recovers sharpness.&#10;If we add this and drop NeighborhoodAttention (subsumed by 3D conv spatial aggregation), &quot;Tile&quot; is no longer accurate → rename to LiteFMStereo." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="160" y="1195" width="1260" height="90" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
