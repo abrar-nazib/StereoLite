@@ -1,1 +1,1 @@
-from .model import LiteFMStereo, LiteConfig, TileHypothesisStereo, TileConfig
+from .model import StereoLite, StereoLiteConfig

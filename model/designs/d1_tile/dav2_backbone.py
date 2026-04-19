@@ -1,4 +1,4 @@
-"""Frozen DAv2-Small feature backbone for LiteFMStereo.
+"""Frozen DAv2-Small feature backbone for StereoLite.
 
 Exposes two useful feature maps:
   * `raw`   : block-11 ViT patch features at stride 14 (384 channels). Used

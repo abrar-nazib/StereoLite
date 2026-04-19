@@ -1,4 +1,4 @@
-"""Sharpness-focused trainer for TileFMStereo with DAv2.
+"""Sharpness-focused trainer for StereoLite with DAv2.
 
 Trains on a small Scene Flow Driving subset (300-500 pairs) with:
   - L1 loss on disparity
@@ -56,6 +56,54 @@ def grad_loss(pred, target, valid):
     return err.sum() / n
 
 
+def random_erase_right(R: torch.Tensor, prob: float = 0.5,
+                        n_patches: int = 2, h_frac: tuple = (0.02, 0.1),
+                        w_frac: tuple = (0.02, 0.1)) -> torch.Tensor:
+    """OpenStereo-style random erase on the right image only.
+
+    Rationale: makes matching harder on a small fraction of pixels (regions
+    where fR is blanked) which forces the net to learn robust
+    correspondence instead of latching onto trivial colour matches. Applied
+    only to R so disparity GT remains valid.
+    """
+    if prob <= 0:
+        return R
+    B, _, H, W = R.shape
+    R = R.clone()
+    for b in range(B):
+        if torch.rand(1).item() > prob:
+            continue
+        for _ in range(n_patches):
+            ph = int(H * (h_frac[0] + torch.rand(1).item() * (h_frac[1] - h_frac[0])))
+            pw = int(W * (w_frac[0] + torch.rand(1).item() * (w_frac[1] - w_frac[0])))
+            if ph < 1 or pw < 1:
+                continue
+            y0 = torch.randint(0, max(H - ph, 1), (1,)).item()
+            x0 = torch.randint(0, max(W - pw, 1), (1,)).item()
+            # Fill with the per-channel mean of the patch — closer to the
+            # "noise replacement" used in OpenStereo than solid zero.
+            fill = R[b, :, y0:y0 + ph, x0:x0 + pw].mean(dim=(-1, -2), keepdim=True)
+            R[b, :, y0:y0 + ph, x0:x0 + pw] = fill
+    return R
+
+
+def edge_aware_smooth(pred, image, sigma: float = 3.0):
+    """Penalize disparity gradients except where the image has edges.
+    pred: (B, 1, H, W). image: (B, 3, H, W) in [0, 255].
+    Uses exp(-|dI|/sigma) as the per-pixel weight; high image edges → low
+    smoothness penalty (allows disparity to change there); flat image →
+    high penalty (keeps roads/sky smooth).
+    """
+    dx_p = (pred[..., 1:] - pred[..., :-1]).abs()
+    dy_p = (pred[..., 1:, :] - pred[..., :-1, :]).abs()
+    g = image.mean(dim=1, keepdim=True)
+    dx_i = (g[..., 1:] - g[..., :-1]).abs()
+    dy_i = (g[..., 1:, :] - g[..., :-1, :]).abs()
+    wx = torch.exp(-dx_i / sigma)
+    wy = torch.exp(-dy_i / sigma)
+    return (wx * dx_p).mean() + (wy * dy_p).mean()
+
+
 # Scale weights per intermediate disparity prediction. Stronger direct
 # supervision at 1/8 (d8_cv) is the key change — it stops the network
 # from collapsing to a monocular-only prediction by forcing the cost
@@ -75,6 +123,8 @@ SCALE_WEIGHTS = {
 
 def multiscale_loss(preds: dict, D_full: torch.Tensor,
                     grad_w: float = 0.5, hinge_w: float = 0.3,
+                    smooth_w: float = 0.0,
+                    left_img: torch.Tensor | None = None,
                     max_disp: float = 192.0):
     """Compute L1 + gradient + bad-1-hinge loss at every scale, weighted.
 
@@ -105,6 +155,12 @@ def multiscale_loss(preds: dict, D_full: torch.Tensor,
         part = l1 + grad_w * g + hinge_w * hinge
         total = total + w * part
         diag[key] = (float(l1.item()), float(hinge.item()))
+    # Edge-aware smoothness on the final prediction, computed against the
+    # left image at full resolution. Applied once (not multi-scale).
+    if smooth_w > 0 and left_img is not None and "d_final" in preds:
+        smooth = edge_aware_smooth(preds["d_final"], left_img)
+        total = total + smooth_w * smooth
+        diag["smooth"] = (float(smooth.item()), 0.0)
     return total, diag
 
 
@@ -233,7 +289,7 @@ def save_sample_panels(model, track_pairs, device, out_dir, step, inf_h, inf_w,
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--data_root", default=os.path.join(PROJ, "data", "sceneflow_driving"))
-    p.add_argument("--ckpt_out", default=os.path.join(PROJ, "model", "checkpoints", "tilefm_fm_sharp.pth"))
+    p.add_argument("--ckpt_out", default=os.path.join(PROJ, "model", "checkpoints", "stereolite_fm_sharp.pth"))
     p.add_argument("--steps", type=int, default=3000)
     p.add_argument("--batch", type=int, default=2)
     p.add_argument("--lr", type=float, default=2e-4)
@@ -246,10 +302,14 @@ def main():
                    help="weight of gradient loss term")
     p.add_argument("--hinge_loss_w", type=float, default=0.3,
                    help="weight of bad-1 hinge term")
+    p.add_argument("--smooth_loss_w", type=float, default=0.1,
+                   help="weight of edge-aware smoothness term (0=disabled)")
     p.add_argument("--amp", action="store_true",
                    help="enable FP16 autocast for forward+backward")
     p.add_argument("--ckpt_in", default=None,
                    help="resume from this checkpoint (trainable params only)")
+    p.add_argument("--no_dav2", action="store_true",
+                   help="disable DAv2 branch (CNN-only ablation)")
     p.add_argument("--panel_every", type=int, default=200,
                    help="save tracking panels every N steps")
     p.add_argument("--n_track_pairs", type=int, default=20,
@@ -261,6 +321,14 @@ def main():
                         "no held-out val, track on training data")
     p.add_argument("--cv_max_disp", type=int, default=24,
                    help="cost-volume max disparities at 1/8 scale")
+    p.add_argument("--backbone", default="ghost",
+                   choices=["ghost", "mobilenet"],
+                   help="feature encoder: ghost (custom) or mobilenet (ImageNet-pretrained)")
+    p.add_argument("--lr_sched", default="cosine",
+                   choices=["cosine", "onecycle"],
+                   help="LR schedule: cosine or OneCycle (OpenStereo default)")
+    p.add_argument("--random_erase_p", type=float, default=0.0,
+                   help="probability of random-erase on right image (0=off)")
     p.add_argument("--log_every", type=int, default=50)
     p.add_argument("--panel_dir", default=None)
     args = p.parse_args()
@@ -296,9 +364,9 @@ def main():
                                          shuffle=True, num_workers=args.num_workers,
                                          pin_memory=True, persistent_workers=True)
 
-    from d1_tile import LiteFMStereo, LiteConfig
-    model = LiteFMStereo(LiteConfig(use_dav2=True,
-                                    cv_max_disp=args.cv_max_disp)).to(device)
+    from d1_tile import StereoLite, StereoLiteConfig
+    model = StereoLite(StereoLiteConfig(use_dav2=not args.no_dav2,
+                                     backbone=args.backbone)).to(device)
     if args.ckpt_in is not None and os.path.exists(args.ckpt_in):
         ck = torch.load(args.ckpt_in, map_location=device, weights_only=False)
         sd = ck["model"] if "model" in ck else ck
@@ -310,8 +378,16 @@ def main():
 
     opt = torch.optim.AdamW([p for p in model.parameters() if p.requires_grad],
                             lr=args.lr, weight_decay=1e-5)
-    sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=args.steps,
-                                                       eta_min=args.lr / 10)
+    if args.lr_sched == "onecycle":
+        sched = torch.optim.lr_scheduler.OneCycleLR(
+            opt, max_lr=args.lr, total_steps=args.steps,
+            pct_start=0.1, anneal_strategy="cos",
+            div_factor=25.0, final_div_factor=1e4)
+        print(f"scheduler: OneCycle  max_lr={args.lr:.1e}  warmup 10%  total {args.steps}")
+    else:
+        sched = torch.optim.lr_scheduler.CosineAnnealingLR(
+            opt, T_max=args.steps, eta_min=args.lr / 10)
+        print(f"scheduler: Cosine  lr {args.lr:.1e} -> {args.lr/10:.1e}  total {args.steps}")
     use_amp = args.amp and device.type == "cuda"
     scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
     print(f"AMP (FP16 autocast): {'on' if use_amp else 'off'}")
@@ -335,6 +411,8 @@ def main():
             it = iter(loader)
             L, R, D = next(it)
         L, R, D = L.to(device), R.to(device), D.to(device)
+        if args.random_erase_p > 0:
+            R = random_erase_right(R, prob=args.random_erase_p)
         with torch.amp.autocast("cuda", enabled=use_amp, dtype=torch.float16):
             preds = model(L, R, aux=True)
             if preds["d_final"].shape[-2:] != D.shape[-2:]:
@@ -345,7 +423,9 @@ def main():
             preds_fp32 = {k: v.float() for k, v in preds.items()}
             loss, diag = multiscale_loss(preds_fp32, D.float(),
                                          grad_w=args.grad_loss_w,
-                                         hinge_w=args.hinge_loss_w)
+                                         hinge_w=args.hinge_loss_w,
+                                         smooth_w=args.smooth_loss_w,
+                                         left_img=L.float())
 
         opt.zero_grad(set_to_none=True)
         scaler.scale(loss).backward()

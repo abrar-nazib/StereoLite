@@ -1,5 +1,5 @@
 """Quick test: capture one fresh stereo pair from AR0144 and run pretrained
-HITNet (Scene Flow finalpass). Also runs the existing TileFMStereo
+HITNet (Scene Flow finalpass). Also runs the existing StereoLite
 checkpoint if found, so the user can compare on the same shot.
 
 Saves per-model 3-window panel + a summary panel.
@@ -116,13 +116,13 @@ def main():
     h_depth_vis = annotate(colour_depth(dh_np),
                            f"Depth from HITNet  range {DEPTH_MIN}-{DEPTH_MAX}m   MiDaS INFERNO")
 
-    # ---- Optional: also TileFMStereo if checkpoint exists ----
+    # ---- Optional: also StereoLite if checkpoint exists ----
     tf_panel = None
     ckpt_path = os.path.join(PROJ, "model", "checkpoints", "student_d1.pth")
     if os.path.exists(ckpt_path):
-        print("\nloading TileFMStereo (indoor-distilled)...")
-        from d1_tile import TileHypothesisStereo
-        tf = TileHypothesisStereo().to(device)
+        print("\nloading StereoLite (indoor-distilled)...")
+        from d1_tile import StereoLite
+        tf = StereoLite().to(device)
         ck = torch.load(ckpt_path, map_location=device, weights_only=False)
         tf.load_state_dict(ck["model"], strict=True)
         tf.train()    # GroupNorm = batch-size independent
@@ -137,11 +137,11 @@ def main():
             torch.cuda.synchronize()
         ms_t = (time.time() - t0) * 1000
         dt_np = disp_t.squeeze().cpu().numpy()
-        print(f"  TileFMStereo: {ms_t:.0f} ms, disp [{dt_np.min():.1f}, {dt_np.max():.1f}]")
+        print(f"  StereoLite: {ms_t:.0f} ms, disp [{dt_np.min():.1f}, {dt_np.max():.1f}]")
         tf_disp_vis = annotate(colour_disp(dt_np),
-                               f"TileFMStereo (indoor-distilled, {tn/1e6:.2f}M)   {ms_t:.0f} ms")
+                               f"StereoLite (indoor-distilled, {tn/1e6:.2f}M)   {ms_t:.0f} ms")
         tf_depth_vis = annotate(colour_depth(dt_np),
-                                f"Depth from TileFMStereo   MiDaS INFERNO")
+                                f"Depth from StereoLite   MiDaS INFERNO")
         tf_panel = (tf_disp_vis, tf_depth_vis)
 
     # ---- Compose panels ----
@@ -159,7 +159,7 @@ def main():
         row_t = np.hstack([tf_disp_vis, tf_depth_vis])
         composite2 = np.vstack([cv2.resize(feed, (row_h.shape[1], feed.shape[0])),
                                  row_h, row_t])
-        p2 = os.path.join(OUT_DIR, "panel_hitnet_vs_tilefm.png")
+        p2 = os.path.join(OUT_DIR, "panel_hitnet_vs_stereolite.png")
         cv2.imwrite(p2, composite2)
         print(f"saved {p2}")
 
@@ -169,7 +169,7 @@ def main():
             annotate(colour_disp(dh_np), f"HITNet  {ms_h:.0f}ms"),
             annotate(colour_disp(dt_np), f"TileFM  {ms_t:.0f}ms"),
         ])
-        p3 = os.path.join(OUT_DIR, "strip_hitnet_vs_tilefm.png")
+        p3 = os.path.join(OUT_DIR, "strip_hitnet_vs_stereolite.png")
         cv2.imwrite(p3, strip)
         print(f"saved {p3}")
 

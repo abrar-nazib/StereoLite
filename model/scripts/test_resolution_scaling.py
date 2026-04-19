@@ -1,6 +1,6 @@
 """Resolution-scaling sanity test.
 
-Takes a trained LiteFMStereo checkpoint (trained at 384x640) and runs it
+Takes a trained StereoLite checkpoint (trained at 384x640) and runs it
 at multiple input resolutions against the same Scene Flow Driving val
 pairs. Saves side-by-side panels so we can judge whether sharpness is
 input-resolution-limited or architecture-limited.
@@ -66,7 +66,7 @@ def run_at_resolution(model, Lb, Rb, H, W, device):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--ckpt", default=os.path.join(PROJ, "model", "checkpoints", "litefm_sharp.pth"))
+    p.add_argument("--ckpt", default=os.path.join(PROJ, "model", "checkpoints", "stereolite_sharp.pth"))
     p.add_argument("--data_root", default=os.path.join(PROJ, "data", "sceneflow_driving"))
     p.add_argument("--out_dir", default=os.path.join(PROJ, "model", "benchmarks", "res_scaling"))
     p.add_argument("--n_pairs", type=int, default=10)
@@ -82,8 +82,8 @@ def main():
     track = [val[i * step] for i in range(20)][: args.n_pairs]
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    from d1_tile import LiteFMStereo, LiteConfig
-    model = LiteFMStereo(LiteConfig(use_dav2=True)).to(device)
+    from d1_tile import StereoLite, StereoLiteConfig
+    model = StereoLite(StereoLiteConfig(use_dav2=True)).to(device)
     ck = torch.load(args.ckpt, map_location=device, weights_only=False)
     sd = ck["model"] if "model" in ck else ck
     model.load_state_dict(sd, strict=True)

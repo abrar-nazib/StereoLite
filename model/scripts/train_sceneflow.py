@@ -1,4 +1,4 @@
-"""Train TileFMStereo on Scene Flow Driving with REAL disparity GT.
+"""Train StereoLite on Scene Flow Driving with REAL disparity GT.
 
 This is the apples-to-apples training: HITNet's pretrained weights came from
 the same dataset under the same supervision quality, so a fair comparison is
@@ -39,7 +39,7 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--data_root", default=os.path.join(PROJ, "data", "sceneflow_driving"))
     p.add_argument("--ckpt_in", default=None)
-    p.add_argument("--ckpt_out", default=os.path.join(PROJ, "model", "checkpoints", "tilefm_sf.pth"))
+    p.add_argument("--ckpt_out", default=os.path.join(PROJ, "model", "checkpoints", "stereolite_sf.pth"))
     p.add_argument("--steps", type=int, default=5000)
     p.add_argument("--batch", type=int, default=2)
     p.add_argument("--lr", type=float, default=2e-4)
@@ -66,8 +66,8 @@ def main():
                                           shuffle=True, num_workers=args.num_workers,
                                           pin_memory=True, persistent_workers=True)
 
-    from d1_tile import TileHypothesisStereo
-    model = TileHypothesisStereo().to(device)
+    from d1_tile import StereoLite
+    model = StereoLite().to(device)
     if args.ckpt_in is not None and os.path.exists(args.ckpt_in):
         sd = torch.load(args.ckpt_in, map_location=device, weights_only=False)
         if "model" in sd:
@@ -75,7 +75,7 @@ def main():
         model.load_state_dict(sd, strict=True)
         print(f"resumed from {args.ckpt_in}")
     n_params = sum(p.numel() for p in model.parameters())
-    print(f"TileFMStereo params: {n_params/1e6:.3f} M")
+    print(f"StereoLite params: {n_params/1e6:.3f} M")
 
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-5)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=args.steps,

@@ -1,5 +1,5 @@
 """Group-wise correlation cost volume with a 1-level 3D hourglass
-aggregator for LiteFMStereo.
+aggregator for StereoLite.
 
 Operates at 1/8 scale. For each candidate disparity d = 0..D-1:
   shift fR left by d (zero-fill on the left), compute group-wise inner
@@ -164,7 +164,20 @@ class GroupwiseCostVolume1D8(nn.Module):
         y0 = self.res_b(y0)
         logits = self.out_conv(y0).squeeze(1)
         prob = F.softmax(logits, dim=1)
-        disp = (prob * self.disp_idx).sum(dim=1, keepdim=True)
+        # Parabolic sub-pixel fit around the soft-argmin for smoother
+        # continuous gradients (roads, sky). Blended with soft-argmin by
+        # the peak confidence for stability on multimodal distributions.
+        soft = (prob * self.disp_idx).sum(dim=1, keepdim=True)
+        d_hard = prob.argmax(dim=1, keepdim=True).clamp(1, self.max_disp - 2)
+        pm1 = prob.gather(1, d_hard - 1)
+        p0 = prob.gather(1, d_hard)
+        pp1 = prob.gather(1, d_hard + 1)
+        # Safe denominator: force it away from zero and toward negative
+        denom = (pm1 - 2 * p0 + pp1) - 1e-4
+        offset = (0.5 * (pm1 - pp1) / denom).clamp(-0.5, 0.5)
+        parabolic = d_hard.float() + offset
+        peak_conf = p0.clamp(min=0.0, max=1.0)
+        disp = peak_conf * parabolic + (1 - peak_conf) * soft
         return disp
 
 

@@ -1,4 +1,4 @@
-"""Quick live test of the TileFMStereo student checkpoint trained on
+"""Quick live test of the StereoLite student checkpoint trained on
 data/user_cam_1/ pseudo-GT.
 
 Captures one fresh stereo pair, runs the new student, and saves a 3-window
@@ -83,8 +83,8 @@ def main():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    from d1_tile import TileHypothesisStereo
-    model = TileHypothesisStereo().to(device)
+    from d1_tile import StereoLite
+    model = StereoLite().to(device)
     ck = torch.load(args.ckpt, map_location=device, weights_only=False)
     sd = ck["model"] if "model" in ck else ck
     model.load_state_dict(sd, strict=True)
@@ -131,7 +131,7 @@ def main():
         feed = annotate(np.hstack([L_small, div, R_small]),
                         f"Stereo Feed (L | R)   {INF_W}x{INF_H} per eye")
         disp_vis = annotate(colour_disp(d_np),
-                            f"TileFMStereo distilled on user_cam_1 ({n_params/1e6:.2f}M)   {ms:.0f} ms")
+                            f"StereoLite distilled on user_cam_1 ({n_params/1e6:.2f}M)   {ms:.0f} ms")
         depth_vis = annotate(colour_depth(d_np),
                              f"Depth  range {DEPTH_MIN}-{DEPTH_MAX}m   INFERNO")
         bottom = np.hstack([disp_vis, depth_vis])

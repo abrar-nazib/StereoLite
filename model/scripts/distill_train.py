@@ -60,8 +60,8 @@ class PairDataset(torch.utils.data.Dataset):
 
 def build_student(name: str):
     if name == "d1":
-        from d1_tile import TileHypothesisStereo
-        return TileHypothesisStereo()
+        from d1_tile import StereoLite
+        return StereoLite()
     if name == "d2":
         from d2_cascade import CascadeStereo
         return CascadeStereo()

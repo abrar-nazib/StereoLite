@@ -1,33 +1,31 @@
-"""LiteFMStereo — Lightweight Foundation-Model Stereo.
+"""StereoLite v7 — tile-hypothesis propagation with iterative refinement.
 
 Pipeline:
-  GhostConv+SE encoder (shared) -> Ghost pyramid f4, f8, f16, f32
-  DAv2-Small frozen (INT8 at deploy):
-      raw block-11 features   -> 1/14 -> project 384 -> 64 -> interp 1/16
-      DPT path_3 features     -> 1/8  -> project 64 -> 24  -> interp 1/8
+  Input (L, R) ──► GhostConv+SE encoder (shared) ──► f2, f4, f8, f16
 
-  Fusion:
-      f16_fused = Ghost f16  ⊕  DAv2 raw projection
-      f8_fused  = Ghost f8   ⊕  DAv2 path_3 projection
+  1/16: TileInit — tiny local cost volume + soft-argmin seeds
+        (d, sx=0, sy=0, feat, conf). Iterative refine × N16.
 
-  Coarse-to-fine disparity:
-      1/32  head32 warp-regress (from zero init)
-      1/16  head16 warp-regress on fused features
-      1/8   cost volume (group-wise correlation + hourglass) — HARD init
-            head8 refines CV output
-      1/4   head4 refinement
-      full  bilinear upsample
+  Upsample to 1/8 via plane equation (d + slope * offset) → iterate × N8.
 
-Training mode (`aux=True`): returns dict of all intermediate disparities
-for multi-scale supervision. Required to prevent monocular-shortcut
-collapse (where the network ignores matching and predicts the scene-mean
-depth gradient).
+  Upsample to 1/4 via plane equation → iterate × N4.
 
-Budget: ~1.72 M trainable + 24.8 M frozen DAv2. INT8 helper at deploy.
+  Final: plane upsample 1/4 → 1/2 → full, with a single convex-mask-style
+  learned upsample for sub-pixel boundary sharpness.
+
+Key architectural changes vs v6:
+  - Slopes (sx, sy) are now USED during upsampling (plane equation)
+  - Iterative refinement: each scale runs the refine head N times
+  - No 3D cost-volume aggregator at 1/8 (just local CV at 1/16 init)
+  - No cascade CV (replaced by iteration)
+  - DAv2 optional (kept for ablation/paper; default off)
+
+Budget target: ~1.2-1.5 M trainable, ~150 ms inference on RTX 3050 at
+512×832. Jetson INT8 target: ~25-40 ms.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import sys
 from pathlib import Path
@@ -37,11 +35,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from _blocks import (GhostConv, SqueezeExcitation, RepVGGBlock,
-                     NeighborhoodAttention2d, _safe_gn)
+from _blocks import (GhostConv, SqueezeExcitation, _safe_gn)
 
 from .dav2_backbone import DAv2SmallFrozen
-from .cost_volume import GroupwiseCostVolume1D8, CascadeRefinementVolume
+from .tile_propagate import (TileState, TileInit, TileRefine, TileUpsample)
 
 
 def _gn(ch: int, groups: int = 8) -> nn.GroupNorm:
@@ -60,6 +57,8 @@ class GhostStage(nn.Module):
 
 
 class TileFeatureEncoder(nn.Module):
+    """Returns features at 1/2, 1/4, 1/8, 1/16."""
+
     def __init__(self, base: int = 24):
         super().__init__()
         self.stem = nn.Sequential(
@@ -70,82 +69,53 @@ class TileFeatureEncoder(nn.Module):
         self.s4 = GhostStage(base, 2 * base, stride=2)
         self.s8 = GhostStage(2 * base, 3 * base, stride=2)
         self.s16 = GhostStage(3 * base, 4 * base, stride=2)
-        self.s32 = GhostStage(4 * base, 4 * base, stride=2)
+        self.out_channels = (base, 2 * base, 3 * base, 4 * base)
 
     def forward(self, x: torch.Tensor):
         x = x / 255.0
-        f2 = self.stem(x)            # 1/2
-        f4 = self.s4(f2)
-        f8 = self.s8(f4)
-        f16 = self.s16(f8)
-        f32 = self.s32(f16)
-        return f2, f4, f8, f16, f32
+        f2 = self.stem(x)             # 1/2,  base ch
+        f4 = self.s4(f2)              # 1/4,  2*base
+        f8 = self.s8(f4)              # 1/8,  3*base
+        f16 = self.s16(f8)            # 1/16, 4*base
+        return f2, f4, f8, f16
 
 
-def _horizontal_warp(fR: torch.Tensor, disp: torch.Tensor) -> torch.Tensor:
-    B, _, H, W = fR.shape
-    yy, xx = torch.meshgrid(
-        torch.arange(H, device=fR.device, dtype=fR.dtype),
-        torch.arange(W, device=fR.device, dtype=fR.dtype),
-        indexing="ij",
-    )
-    gx = (xx.view(1, H, W) - disp.squeeze(1)) / max(W - 1, 1) * 2 - 1
-    gy = (yy.view(1, H, W) / max(H - 1, 1) * 2 - 1).expand_as(gx)
-    grid = torch.stack([gx, gy], dim=-1)
-    return F.grid_sample(fR, grid, align_corners=True, padding_mode="border")
+class MobileNetV2Encoder(nn.Module):
+    """ImageNet-pretrained MobileNetV2-100 features at 1/2, 1/4, 1/8, 1/16.
 
+    Uses timm's features_only API. ImageNet normalisation is applied inside
+    the module (input is expected in [0, 255] BGR→RGB-converted floats, to
+    match the rest of the codebase)."""
 
-class FullResRefinement(nn.Module):
-    """Tiny warp-regress refinement at full output resolution. Takes the
-    upsampled disparity plus left/right image features, computes a warped
-    right feature, and outputs a residual correction. ~12 k params.
-
-    Operates in PyTorch native FP32 (not AMP) to keep residuals stable,
-    but the outer model can still run under autocast; this layer will
-    promote internally as needed.
-    """
-
-    def __init__(self, hidden: int = 16):
+    def __init__(self, pretrained: bool = True):
         super().__init__()
-        self.img_feat = nn.Sequential(
-            nn.Conv2d(3, hidden, 3, padding=1, bias=False),
-            _gn(hidden),
-            nn.SiLU(inplace=True),
-        )
-        self.refine = nn.Sequential(
-            nn.Conv2d(2 * hidden + 1, hidden, 3, padding=1, bias=False),
-            _gn(hidden),
-            nn.SiLU(inplace=True),
-            nn.Conv2d(hidden, hidden, 3, padding=1, bias=False),
-            _gn(hidden),
-            nn.SiLU(inplace=True),
-            nn.Conv2d(hidden, 1, 3, padding=1, bias=True),
-        )
+        import timm
+        self.backbone = timm.create_model(
+            "mobilenetv2_100", pretrained=pretrained,
+            features_only=True, out_indices=(0, 1, 2, 3))
+        ch = self.backbone.feature_info.channels()
+        self.out_channels = tuple(ch)
+        mean = torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1) * 255.0
+        std = torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1) * 255.0
+        self.register_buffer("mean", mean, persistent=False)
+        self.register_buffer("std", std, persistent=False)
 
-    def forward(self, left: torch.Tensor, right: torch.Tensor,
-                disp: torch.Tensor) -> torch.Tensor:
-        fL = self.img_feat(left / 255.0)
-        fR = self.img_feat(right / 255.0)
-        fR_w = _horizontal_warp(fR, disp)
-        x = torch.cat([fL, fR_w, disp], dim=1)
-        return disp + self.refine(x)
+    def forward(self, x: torch.Tensor):
+        x = (x - self.mean) / self.std
+        f2, f4, f8, f16 = self.backbone(x)
+        return f2, f4, f8, f16
 
 
 class ConvexUpsample(nn.Module):
-    """RAFT-style learned upsample. Predicts a 9-neighbor soft mask per
-    subpixel position, then upsamples disparity via weighted sum of 3x3
-    neighborhoods. Much sharper than bilinear at edges.
+    """Learned 2x upsample of a (B, 1, H, W) disparity guided by per-pixel
+    CNN features. Each fine pixel is a weighted sum of 9 coarse neighbours."""
 
-    In:  disp (B, 1, H, W) at low-res, feat (B, C, H, W) same spatial.
-    Out: disp at (B, 1, scale*H, scale*W).
-    """
-
-    def __init__(self, feat_ch: int, scale: int = 4, hidden: int = 64):
+    def __init__(self, feat_ch: int, scale: int = 2, hidden: int = 48):
         super().__init__()
         self.scale = scale
         self.mask = nn.Sequential(
-            nn.Conv2d(feat_ch, hidden, 3, padding=1),
-            nn.SiLU(inplace=True),
+            nn.Conv2d(feat_ch, hidden, 3, padding=1, bias=False),
+            _gn(hidden), nn.SiLU(inplace=True),
             nn.Conv2d(hidden, 9 * scale * scale, 1),
         )
 
@@ -160,177 +130,143 @@ class ConvexUpsample(nn.Module):
         return out.view(B, 1, s * H, s * W)
 
 
-class HypothesisHead(nn.Module):
-    def __init__(self, in_ch: int, hidden: int = 48):
-        super().__init__()
-        self.rep1 = RepVGGBlock(2 * in_ch, hidden)
-        self.rep2 = RepVGGBlock(hidden, hidden)
-        self.head = nn.Conv2d(hidden, 4, 1)
-
-    def forward(self, fL: torch.Tensor, fR: torch.Tensor,
-                d_init: torch.Tensor | None):
-        if d_init is None:
-            d_init = torch.zeros(fL.shape[0], 1, *fL.shape[-2:],
-                                 device=fL.device, dtype=fL.dtype)
-        fR_w = _horizontal_warp(fR, d_init)
-        x = torch.cat([fL, fR_w], dim=1)
-        x = self.rep1(x)
-        x = self.rep2(x)
-        out = self.head(x)
-        d_abs = F.softplus(out[:, 0:1] + d_init)
-        slope = out[:, 1:3]
-        conf = torch.sigmoid(out[:, 3:4])
-        return d_abs, torch.cat([slope, conf], dim=1)
-
-
 @dataclass
-class LiteConfig:
-    base_ch: int = 32
-    use_dav2: bool = True
-    dav2_raw_proj_ch: int = 64        # raw block-11 projection for 1/16 fusion
-    dav2_path3_proj_ch: int = 24      # DPT path_3 projection for 1/8 fusion
-    cv_max_disp: int = 24
-    cv_groups: int = 8
-    cv_agg_ch: int = 48
-    cascade_half_range: int = 8       # ±8 disparity search at 1/4
-    cascade_agg_ch: int = 24
-    full_res_refine_hidden: int = 16
+class StereoLiteConfig:
+    base_ch: int = 24
+    tile_feat_ch: int = 16         # channels carried in the tile feat state
+    # Iterations at each scale:
+    iters_16: int = 2
+    iters_8: int = 3
+    iters_4: int = 3
+    # Cost volume at init
+    init_max_disp: int = 24        # at 1/16, covers 24*16=384 full-res px
+    init_groups: int = 8
+    # Foundation model (off by default; keep code path for ablations)
+    use_dav2: bool = False
+    dav2_raw_proj_ch: int = 16
+    # Refine head hidden channels
+    refine_hidden: int = 48
+    # Backbone: "ghost" (custom GhostConv) or "mobilenet" (ImageNet-pretrained)
+    backbone: str = "ghost"
+    backbone_pretrained: bool = True
 
 
-class LiteFMStereo(nn.Module):
-    def __init__(self, cfg: LiteConfig | None = None):
+class StereoLite(nn.Module):
+    def __init__(self, cfg: StereoLiteConfig | None = None):
         super().__init__()
-        self.cfg = cfg or LiteConfig()
+        self.cfg = cfg or StereoLiteConfig()
         b = self.cfg.base_ch
-        self.fnet = TileFeatureEncoder(base=b)
+        if self.cfg.backbone == "mobilenet":
+            self.fnet = MobileNetV2Encoder(pretrained=self.cfg.backbone_pretrained)
+        else:
+            self.fnet = TileFeatureEncoder(base=b)
 
+        # Channel counts per scale from the encoder
+        ch2, ch4, ch8, ch16 = self.fnet.out_channels
+
+        # Optional DAv2 fusion only at 1/16 (keeps the path simple)
         if self.cfg.use_dav2:
             self.dav2 = DAv2SmallFrozen()
             self.dav2_proj16 = nn.Conv2d(
                 self.dav2.embed_dim, self.cfg.dav2_raw_proj_ch, 1)
-            self.dav2_proj8 = nn.Conv2d(
-                self.dav2.dpt_ch, self.cfg.dav2_path3_proj_ch, 1)
-            in_ch_16 = 4 * b + self.cfg.dav2_raw_proj_ch
-            in_ch_8 = 3 * b + self.cfg.dav2_path3_proj_ch
+            ch16_fused = ch16 + self.cfg.dav2_raw_proj_ch
         else:
             self.dav2 = None
-            in_ch_16 = 4 * b
-            in_ch_8 = 3 * b
+            ch16_fused = ch16
 
-        self.head32 = HypothesisHead(4 * b)
-        self.head16 = HypothesisHead(in_ch_16)
-        self.head8 = HypothesisHead(in_ch_8)
-        self.head4 = HypothesisHead(2 * b)
-        # 1/4 -> 1/2 learned upsample, then refine at 1/2 with stem features
-        self.up4_to_2 = ConvexUpsample(feat_ch=2 * b, scale=2)
-        self.head2 = HypothesisHead(b)          # refinement at 1/2
-        # 1/2 -> full learned upsample (preserves sub-pixel edges)
-        self.up2_to_full = ConvexUpsample(feat_ch=b, scale=2)
-        # Full-resolution residual refinement with explicit warp-matching
-        self.refine_full = FullResRefinement(
-            hidden=self.cfg.full_res_refine_hidden)
+        # Groups need to divide feat_ch for the init cost volume
+        g = self.cfg.init_groups
+        while ch16_fused % g != 0 and g > 1:
+            g -= 1
+        self.init_tile = TileInit(feat_ch=ch16_fused,
+                                   max_disp=self.cfg.init_max_disp,
+                                   groups=g,
+                                   feat_out=self.cfg.tile_feat_ch)
 
-        # Cost volume at 1/8 on fused features
-        groups = self.cfg.cv_groups
-        if in_ch_8 % groups != 0:
-            for g in range(groups, 0, -1):
-                if in_ch_8 % g == 0:
-                    groups = g
-                    break
-        self.cv_groups = groups
-        self.costvol = GroupwiseCostVolume1D8(
-            feat_ch=in_ch_8, max_disp=self.cfg.cv_max_disp,
-            groups=groups, agg_ch=self.cfg.cv_agg_ch)
+        # Refinement heads — one instance per scale (weights not shared
+        # because feature channel counts differ).
+        self.refine_16 = TileRefine(feat_ch=ch16_fused,
+                                     tile_feat_ch=self.cfg.tile_feat_ch,
+                                     hidden=self.cfg.refine_hidden)
+        self.refine_8 = TileRefine(feat_ch=ch8,
+                                    tile_feat_ch=self.cfg.tile_feat_ch,
+                                    hidden=self.cfg.refine_hidden)
+        self.refine_4 = TileRefine(feat_ch=ch4,
+                                    tile_feat_ch=self.cfg.tile_feat_ch,
+                                    hidden=self.cfg.refine_hidden)
 
-        # Cascade refinement at 1/4 — narrow-range CV that commits to
-        # sub-8px disparities given a coarse 1/8 estimate.
-        f4_ch = 2 * b
-        cas_groups = self.cfg.cv_groups
-        if f4_ch % cas_groups != 0:
-            for g in range(cas_groups, 0, -1):
-                if f4_ch % g == 0:
-                    cas_groups = g
-                    break
-        self.cascade_cv = CascadeRefinementVolume(
-            feat_ch=f4_ch, half_range=self.cfg.cascade_half_range,
-            groups=cas_groups, agg_ch=self.cfg.cascade_agg_ch)
+        # Plane upsamples (no trainable weights, just geometry)
+        self.up_16_to_8 = TileUpsample(scale_factor=2)
+        self.up_8_to_4 = TileUpsample(scale_factor=2)
+
+        # Final learned 4x upsample 1/4 → full, guided by 1/2 features
+        # (done in two steps: 1/4 → 1/2 using f4 features, 1/2 → full
+        # using f2). Two small convex modules.
+        self.up_final_4_to_2 = ConvexUpsample(feat_ch=ch4, scale=2)
+        self.up_final_2_to_1 = ConvexUpsample(feat_ch=ch2, scale=2)
+
+    def _tile_d_at_scale(self, tile: TileState, scale: int) -> torch.Tensor:
+        """Return the tile's d in 1/scale-px units (what the tile stores)."""
+        return tile.d
 
     def forward(self, left: torch.Tensor, right: torch.Tensor,
                 aux: bool = False):
-        # Ghost features for L and R. Batch L+R into a single forward pass
-        # where possible to halve DAv2 compute.
-        B = left.shape[0]
-        fL2, fL4, fL8, fL16, fL32 = self.fnet(left)
-        fR2, fR4, fR8, fR16, fR32 = self.fnet(right)
+        fL2, fL4, fL8, fL16 = self.fnet(left)
+        fR2, fR4, fR8, fR16 = self.fnet(right)
 
         if self.dav2 is not None:
-            # One DAv2 forward on the stacked L|R batch, then split.
-            lr = torch.cat([left, right], dim=0)
-            out = self.dav2(lr)
-            raw_lr = out["raw"]
-            p3_lr = out["path_3"]
-            # Project once, split after projection.
+            B = left.shape[0]
+            out = self.dav2(torch.cat([left, right], dim=0))
             raw16 = self.dav2_proj16(
-                F.interpolate(raw_lr, size=fL16.shape[-2:],
-                              mode="bilinear", align_corners=False))
-            p3_8 = self.dav2_proj8(
-                F.interpolate(p3_lr, size=fL8.shape[-2:],
+                F.interpolate(out["raw"], size=fL16.shape[-2:],
                               mode="bilinear", align_corners=False))
             dL16, dR16 = raw16[:B], raw16[B:]
-            dL8, dR8 = p3_8[:B], p3_8[B:]
-            fL16_fused = torch.cat([fL16, dL16], dim=1)
-            fR16_fused = torch.cat([fR16, dR16], dim=1)
-            fL8_fused = torch.cat([fL8, dL8], dim=1)
-            fR8_fused = torch.cat([fR8, dR8], dim=1)
+            fL16_ = torch.cat([fL16, dL16], dim=1)
+            fR16_ = torch.cat([fR16, dR16], dim=1)
         else:
-            fL16_fused, fR16_fused = fL16, fR16
-            fL8_fused, fR8_fused = fL8, fR8
+            fL16_, fR16_ = fL16, fR16
 
-        # 1/32 coarse
-        d32, _ = self.head32(fL32, fR32, None)
+        # 1/16: init + iterate
+        tile = self.init_tile(fL16_, fR16_)
+        t16_stages = [tile]
+        for _ in range(self.cfg.iters_16):
+            tile = self.refine_16(tile, fL16_, fR16_)
+            t16_stages.append(tile)
 
-        # 1/16 warp-regress on fused features
-        d16_init = F.interpolate(d32 * 2, size=fL16.shape[-2:],
-                                  mode="bilinear", align_corners=True)
-        d16, _ = self.head16(fL16_fused, fR16_fused, d16_init)
+        # 1/16 → 1/8 via plane equation
+        tile = self.up_16_to_8(tile, target_hw=fL8.shape[-2:])
+        t8_stages = [tile]
+        for _ in range(self.cfg.iters_8):
+            tile = self.refine_8(tile, fL8, fR8)
+            t8_stages.append(tile)
 
-        # 1/8: cost volume HARD init, then head8 refinement
-        d8_cv = self.costvol(fL8_fused, fR8_fused)
-        d8, _ = self.head8(fL8_fused, fR8_fused, d8_cv)
+        # 1/8 → 1/4
+        tile = self.up_8_to_4(tile, target_hw=fL4.shape[-2:])
+        t4_stages = [tile]
+        for _ in range(self.cfg.iters_4):
+            tile = self.refine_4(tile, fL4, fR4)
+            t4_stages.append(tile)
 
-        # 1/4 cascade refinement volume — commits to sub-grid disparities
-        d4_init = F.interpolate(d8 * 2, size=fL4.shape[-2:],
-                                 mode="bilinear", align_corners=True)
-        d4_cas = self.cascade_cv(fL4, fR4, d4_init)
-        d4, _ = self.head4(fL4, fR4, d4_cas)
-
-        # 1/4 -> 1/2 convex upsample, then refine at 1/2 with stem features
-        d2_init = self.up4_to_2(d4, fL4)
-        d2, _ = self.head2(fL2, fR2, d2_init)
-
-        # 1/2 -> full convex upsample (sharp boundaries)
-        d_full_raw = self.up2_to_full(d2, fL2)
-        if d_full_raw.shape[-2:] != left.shape[-2:]:
-            d_full_raw = F.interpolate(d_full_raw, size=left.shape[-2:],
-                                        mode="bilinear", align_corners=True)
-        # Full-resolution residual refinement with explicit matching
-        d_final = self.refine_full(left, right, d_full_raw)
+        # Final: learned upsample 1/4 → 1/2 → full, each 2x. Disparity
+        # unit conversion: multiplying by 2 each time converts from
+        # coarse-unit disparity to fine-unit.
+        d_half = self.up_final_4_to_2(tile.d, fL4)
+        d_full = self.up_final_2_to_1(d_half, fL2)
+        if d_full.shape[-2:] != left.shape[-2:]:
+            d_full = F.interpolate(d_full, size=left.shape[-2:],
+                                    mode="bilinear", align_corners=True)
 
         if aux:
             return {
-                "d_final": d_final,
-                "d_full_raw": d_full_raw,
-                "d2": d2,
-                "d4": d4,
-                "d4_cas": d4_cas,
-                "d8": d8,
-                "d8_cv": d8_cv,
-                "d16": d16,
-                "d32": d32,
+                "d_final": d_full,
+                # expose a few iteration outputs for multi-scale loss
+                "d_half": d_half,
+                "d4": tile.d,               # after last 1/4 iteration
+                "d8": t8_stages[-1].d,      # after last 1/8 iteration
+                "d8_cv": t16_stages[-1].d,  # backward-compat key for loss
+                "d16": t16_stages[-1].d,
+                "d32": t16_stages[0].d,     # init at 1/16
             }
-        return d_final
+        return d_full
 
 
-# Backward-compat alias
-TileHypothesisStereo = LiteFMStereo
-TileConfig = LiteConfig

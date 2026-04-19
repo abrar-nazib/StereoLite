@@ -1,4 +1,4 @@
-"""Interactive stereo capture + live inference from the TileFMStereo student.
+"""Interactive stereo capture + live inference from the StereoLite student.
 
 Opens /dev/video2, runs the student at ~30-50 FPS, and displays:
     Left feed | Right feed
@@ -112,8 +112,8 @@ def main() -> None:
 
     tdev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"device={tdev.type}; loading student from {args.ckpt}")
-    from d1_tile import TileHypothesisStereo
-    model = TileHypothesisStereo().to(tdev)
+    from d1_tile import StereoLite
+    model = StereoLite().to(tdev)
     ck = torch.load(args.ckpt, map_location=tdev, weights_only=False)
     sd = ck["model"] if "model" in ck else ck
     model.load_state_dict(sd, strict=True)

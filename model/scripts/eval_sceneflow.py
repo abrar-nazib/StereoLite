@@ -1,8 +1,8 @@
 """Apples-to-apples evaluation on Scene Flow Driving held-out:
-TileFMStereo vs pretrained HITNet (Scene Flow finalpass).
+StereoLite vs pretrained HITNet (Scene Flow finalpass).
 
 Reports per-model EPE, bad-1, bad-3, latency. Saves comparison panels
-[left | GT | HITNet | TileFMStereo] to model/benchmarks/sf_eval_<TS>/.
+[left | GT | HITNet | StereoLite] to model/benchmarks/sf_eval_<TS>/.
 """
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ def annotate(img, text):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--data_root", default=os.path.join(PROJ, "data", "sceneflow_driving"))
-    p.add_argument("--tilefm_ckpt", default=os.path.join(PROJ, "model", "checkpoints", "tilefm_sf.pth"))
+    p.add_argument("--stereolite_ckpt", default=os.path.join(PROJ, "model", "checkpoints", "stereolite_sf.pth"))
     p.add_argument("--n_val", type=int, default=200)
     p.add_argument("--n_visualise", type=int, default=10)
     p.add_argument("--inf_h", type=int, default=384)
@@ -62,18 +62,18 @@ def main():
     _, val = train_val_split(items, args.n_val)
     print(f"evaluating on {len(val)} held-out pairs")
 
-    # Load TileFMStereo
-    from d1_tile import TileHypothesisStereo
-    tilefm = TileHypothesisStereo().to(device)
-    if os.path.exists(args.tilefm_ckpt):
-        sd = torch.load(args.tilefm_ckpt, map_location=device, weights_only=False)
+    # Load StereoLite
+    from d1_tile import StereoLite
+    stereolite = StereoLite().to(device)
+    if os.path.exists(args.stereolite_ckpt):
+        sd = torch.load(args.stereolite_ckpt, map_location=device, weights_only=False)
         if "model" in sd:
             sd = sd["model"]
-        tilefm.load_state_dict(sd, strict=True)
-        print(f"loaded TileFMStereo from {args.tilefm_ckpt}")
+        stereolite.load_state_dict(sd, strict=True)
+        print(f"loaded StereoLite from {args.stereolite_ckpt}")
     else:
-        print(f"WARNING: no TileFMStereo checkpoint at {args.tilefm_ckpt} — using random init")
-    tilefm.train()        # GroupNorm; train mode is safe at any batch
+        print(f"WARNING: no StereoLite checkpoint at {args.stereolite_ckpt} — using random init")
+    stereolite.train()        # GroupNorm; train mode is safe at any batch
 
     # Load HITNet
     print("loading HITNet pretrained...")
@@ -99,10 +99,10 @@ def main():
         Lt = torch.from_numpy(cv2.cvtColor(L_in, cv2.COLOR_BGR2RGB)).float().permute(2, 0, 1).unsqueeze(0).to(device)
         Rt = torch.from_numpy(cv2.cvtColor(R_in, cv2.COLOR_BGR2RGB)).float().permute(2, 0, 1).unsqueeze(0).to(device)
 
-        # TileFMStereo
+        # StereoLite
         t0 = time.time()
         with torch.no_grad():
-            pt = tilefm(Lt, Rt)
+            pt = stereolite(Lt, Rt)
         if device.type == "cuda":
             torch.cuda.synchronize()
         ms_tf = (time.time() - t0) * 1000
@@ -147,7 +147,7 @@ def main():
 
     print("\nSCENE FLOW DRIVING — apples-to-apples")
     print(f"  {'model':<14} {'params':>8} {'EPE px':>8} {'bad-1%':>8} {'bad-3%':>8} {'med ms':>8}")
-    print(f"  {'TileFMStereo':<14} {sum(p.numel() for p in tilefm.parameters())/1e6:>7.2f}M "
+    print(f"  {'StereoLite':<14} {sum(p.numel() for p in stereolite.parameters())/1e6:>7.2f}M "
           f"{float(np.mean(epes_t)):>8.3f} {float(np.mean(bad1_t))*100:>7.1f} "
           f"{float(np.mean(bad3_t))*100:>7.1f} {float(np.median(ms_t)):>7.1f}")
     print(f"  {'HITNet (SF)':<14} {hitnet.n_params/1e6:>7.2f}M "
@@ -157,8 +157,8 @@ def main():
     with open(os.path.join(args.out_dir, "summary.csv"), "w", newline="") as fp:
         w = csv.writer(fp)
         w.writerow(["model", "params_M", "epe_px", "bad1_pct", "bad3_pct", "median_ms"])
-        w.writerow(["TileFMStereo",
-                    round(sum(p.numel() for p in tilefm.parameters())/1e6, 3),
+        w.writerow(["StereoLite",
+                    round(sum(p.numel() for p in stereolite.parameters())/1e6, 3),
                     round(float(np.mean(epes_t)), 3),
                     round(float(np.mean(bad1_t))*100, 2),
                     round(float(np.mean(bad3_t))*100, 2),

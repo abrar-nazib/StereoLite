@@ -1,5 +1,5 @@
 """Offline comparison on data/user_cam_1/:
-    [left | FoundationStereo pseudo-GT | TileFMStereo student | abs-error]
+    [left | FoundationStereo pseudo-GT | StereoLite student | abs-error]
 
 Uses the same colour range per-pair for an honest visual comparison. Writes
 per-pair panels to model/benchmarks/compare_student_vs_teacher/ plus a
@@ -57,8 +57,8 @@ def main():
     os.makedirs(args.out_dir, exist_ok=True)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    from d1_tile import TileHypothesisStereo
-    model = TileHypothesisStereo().to(device)
+    from d1_tile import StereoLite
+    model = StereoLite().to(device)
     ck = torch.load(args.ckpt, map_location=device, weights_only=False)
     sd = ck["model"] if "model" in ck else ck
     model.load_state_dict(sd, strict=True)
@@ -135,7 +135,7 @@ def main():
             annotate(colourise(D_teacher, lo, hi),
                      f"FoundationStereo (teacher)  range {lo:.1f}-{hi:.1f} px"),
             annotate(colourise(D_student, lo, hi),
-                     f"TileFMStereo distilled (0.62M)  EPE={epe:.2f}  "
+                     f"StereoLite distilled (0.62M)  EPE={epe:.2f}  "
                      f"bad1={bad1:.0f}%  bad3={bad3:.0f}%"),
             annotate(err_col, "abs(student - teacher)  clipped 0-8 px  HOT"),
         ]
