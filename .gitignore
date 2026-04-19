@@ -34,3 +34,17 @@ CLAUDE.md
 
 benchmarks/
 data/
+
+# Model artifacts — don't commit weights or training run outputs
+*.pth
+*.pt
+*.ts.pt
+*.onnx
+model/checkpoints/*.pth
+model/checkpoints/*.pt
+model/benchmarks/sharp_*/
+model/benchmarks/stereolite_v8_*/
+model/benchmarks/ablation_*/
+
+# Jupyter
+.ipynb_checkpoints/
