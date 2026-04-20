@@ -83,9 +83,16 @@ class TileFeatureEncoder(nn.Module):
 class MobileNetV2Encoder(nn.Module):
     """ImageNet-pretrained MobileNetV2-100 features at 1/2, 1/4, 1/8, 1/16.
 
-    Uses timm's features_only API. ImageNet normalisation is applied inside
-    the module (input is expected in [0, 255] BGR→RGB-converted floats, to
-    match the rest of the codebase)."""
+    Uses timm's features_only API and explicitly truncates blocks beyond the
+    last requested stage. timm's FeatureListNet builds the full backbone and
+    hooks intermediate outputs — the deeper unhooked blocks (1/32 stage)
+    waste ~1 M params, consume forward compute, and break DDP because their
+    parameters never receive gradients. Slicing self.backbone.blocks fixes
+    all three problems.
+
+    ImageNet normalisation is applied inside the module (input is expected
+    in [0, 255] BGR→RGB-converted floats, to match the rest of the codebase).
+    """
 
     def __init__(self, pretrained: bool = True):
         super().__init__()
@@ -93,12 +100,34 @@ class MobileNetV2Encoder(nn.Module):
         self.backbone = timm.create_model(
             "mobilenetv2_100", pretrained=pretrained,
             features_only=True, out_indices=(0, 1, 2, 3))
+        # Drop unused 1/32 blocks. The deepest hook is at the end of the
+        # last block whose feature stride <= 16. For mobilenetv2_100 this
+        # is index 4 in self.backbone.blocks (0..6 total). Slicing keeps
+        # blocks 0..4 inclusive.
+        last_kept = self._deepest_used_block_idx()
+        self.backbone.blocks = self.backbone.blocks[: last_kept + 1]
         ch = self.backbone.feature_info.channels()
         self.out_channels = tuple(ch)
         mean = torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1) * 255.0
         std = torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1) * 255.0
         self.register_buffer("mean", mean, persistent=False)
         self.register_buffer("std", std, persistent=False)
+
+    def _deepest_used_block_idx(self) -> int:
+        """Largest index in self.backbone.blocks whose output reduction is
+        still <= 16 (our coarsest scale). Anything deeper is at 1/32 and we
+        don't use it."""
+        # feature_info.info is a list of dicts with 'reduction' and 'module'
+        # ('module' looks like 'blocks.4', 'blocks.6', etc.).
+        info = self.backbone.feature_info.info
+        deepest = 0
+        for entry in info:
+            if entry.get("reduction", 0) <= 16:
+                # Parse 'blocks.<N>' to get N
+                module = entry.get("module", "")
+                if module.startswith("blocks."):
+                    deepest = max(deepest, int(module.split(".")[1]))
+        return deepest
 
     def forward(self, x: torch.Tensor):
         x = (x - self.mean) / self.std

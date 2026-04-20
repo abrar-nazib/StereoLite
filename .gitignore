@@ -45,6 +45,6 @@ model/checkpoints/*.pt
 model/benchmarks/sharp_*/
 model/benchmarks/stereolite_v8_*/
 model/benchmarks/ablation_*/
-
+model/teachers/*
 # Jupyter
 .ipynb_checkpoints/

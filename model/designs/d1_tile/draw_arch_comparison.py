@@ -106,11 +106,11 @@ def draw_hitnet(ax):
 
 
 def draw_ours(ax):
-    """Right panel: StereoLite v8 (ours)."""
-    label(ax, 2.5, 12.5, "StereoLite v8  (ours)",
+    """Right panel: StereoLite v9 (ours)."""
+    label(ax, 2.5, 12.5, "StereoLite v9  (ours)",
           fs=12, weight="bold")
     label(ax, 2.5, 12.05,
-          "2.14 M params  |  single-scale init + iterative-per-scale refine + learned upsample",
+          "0.87 M params  |  single-scale init + iterative-per-scale refine + learned upsample",
           fs=8.5, color="#555")
 
     # Input
@@ -213,14 +213,14 @@ def draw_diff_panel(ax):
     ax.set_ylim(0, 10)
     ax.axis("off")
 
-    label(ax, 5.0, 9.5, "Differentiators of StereoLite v8 vs HITNet",
+    label(ax, 5.0, 9.5, "Differentiators of StereoLite v9 vs HITNet",
           fs=12, weight="bold")
 
     rows = [
-        ("aspect", "HITNet", "ours (v8)"),
+        ("aspect", "HITNet", "ours (v9)"),
         ("encoder",
          "custom U-Net, train from scratch",
-         "MobileNetV2-100, ImageNet-pretrained, fine-tuned"),
+         "MobileNetV2-100 (truncated), ImageNet-pretrained, fine-tuned"),
         ("cost-volume stages",
          "init CV at 3 scales (1/64, 1/16, 1/4)",
          "init CV at 1 scale (1/16) only — cheaper"),
@@ -241,7 +241,7 @@ def draw_diff_panel(ax):
          "multi-scale L1 + Sobel grad + bad-1 hinge + edge-aware smooth"),
         ("params / inference",
          "0.63 M / ~20 ms (paper, KITTI)",
-         "2.14 M / ~60 ms (RTX 3050, 512x832)"),
+         "0.87 M / ~54 ms (RTX 3050, 512x832)"),
     ]
 
     # Table render
@@ -276,7 +276,7 @@ def draw_diff_panel(ax):
             ha="center", va="center", fontsize=9, color="white", weight="bold")
     ax.text(x_col[1] + col_w[1] / 2, 8.88, "HITNet (Tankovich et al., CVPR 2021)",
             ha="center", va="center", fontsize=9, color="white", weight="bold")
-    ax.text(x_col[2] + col_w[2] / 2, 8.88, "StereoLite v8  (ours)",
+    ax.text(x_col[2] + col_w[2] / 2, 8.88, "StereoLite v9  (ours)",
             ha="center", va="center", fontsize=9, color="white", weight="bold")
 
 
@@ -306,7 +306,7 @@ def main():
     draw_diff_panel(ax_diff)
 
     fig.suptitle(
-        "Architecture comparison: HITNet vs StereoLite v8",
+        "Architecture comparison: HITNet vs StereoLite v9",
         fontsize=14, fontweight="bold", y=0.992)
 
     out_dir = os.path.dirname(os.path.abspath(__file__))
