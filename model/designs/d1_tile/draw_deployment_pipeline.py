@@ -1,5 +1,5 @@
 """Vertical deployment-pipeline diagram:
-   IMX-219 83 stereo camera -> Jetson Nano -> StereoLite model -> Socket stream.
+   AR0144 stereo USB camera -> Jetson Nano -> StereoLite -> Socket stream.
 """
 from __future__ import annotations
 
@@ -53,9 +53,9 @@ def main():
     centers_y = [7.40, 5.40, 3.40, 1.40]  # top -> bottom
 
     stages = [
-        ("IMX-219 83° Stereo Camera",
-         "MIPI-CSI dual sensor, 1280$\\times$720 @ 60 fps\n"
-         "side-by-side stereo, 83° FOV",
+        ("Waveshare AR0144 Stereo USB Camera",
+         "global-shutter dual sensor, 1280$\\times$720 @ 60 fps\n"
+         "USB-C, 65° HFOV, 52 mm baseline",
          C_HW, C_HW_E),
         ("NVIDIA Jetson Nano",
          "host SoC, CUDA + TensorRT\n"
