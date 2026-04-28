@@ -83,13 +83,16 @@ def _save(fig, name):
 
 def stage2_diagram():
     fig, ax = _frame()
+#     _txt(ax, 6.0, 6.45, "STAGE 2  ·  TILE HYPOTHESIS INIT",
+#           size=10, weight="bold", color=ACCENT,
+#           family="DejaVu Sans Mono")
 
     # Two feature inputs on the left (boxes widened to fit captions)
     _box(ax, 0.40, 5.1, 2.10, 1.0, fc=DOT_BLUE, ec=INK, lw=0.8)
-    _txt(ax, 1.45, 5.6, "left 1/16", size=9.5, color="white",
+    _txt(ax, 1.45, 5.6, "left 1/16", size=8, color="white",
           weight="bold")
     _box(ax, 0.40, 3.0, 2.10, 1.0, fc=DOT_BLUE, ec=INK, lw=0.8)
-    _txt(ax, 1.45, 3.5, "right 1/16", size=9.5, color="white",
+    _txt(ax, 1.45, 3.5, "right 1/16", size=8, color="white",
           weight="bold")
 
     # Group correlation
@@ -103,14 +106,14 @@ def stage2_diagram():
     # 3D aggregator
     _arrow(ax, 5.55, 4.85, 6.20, 4.85)
     _box(ax, 6.20, 4.0, 2.0, 1.7, fc=DOT_GREEN, ec=INK, lw=0.8)
-    _txt(ax, 7.20, 5.30, "3D agg", size=10, weight="bold", color="white")
-    _txt(ax, 7.20, 4.80, "Conv3D", size=8.5, color="white")
-    _txt(ax, 7.20, 4.40, "GN + SiLU", size=8.5, color="white")
+    _txt(ax, 7.20, 5.30, "3D agg", size=9, weight="bold", color="white")
+    _txt(ax, 7.20, 4.80, "Conv3D", size=7, color="white")
+    _txt(ax, 7.20, 4.40, "GN + SiLU", size=7, color="white")
 
     # Soft argmin
     _arrow(ax, 8.25, 4.85, 8.90, 4.85)
     _box(ax, 8.90, 4.0, 2.7, 1.7, fc=SOFT, ec=INK, lw=0.8)
-    _txt(ax, 10.25, 5.30, "soft argmin", size=10, weight="bold",
+    _txt(ax, 10.25, 5.30, "soft argmin", size=8, weight="bold",
           color="white")
     _txt(ax, 10.25, 4.80, "init d", size=9, color="white")
     _txt(ax, 10.25, 4.40, "+ confidence", size=8.5, color="white")
@@ -143,19 +146,22 @@ def stage2_diagram():
 
 def stage3_diagram():
     fig, ax = _frame()
+#     _txt(ax, 6.0, 6.45, "STAGE 3  ·  ITERATIVE REFINEMENT",
+#           size=10, weight="bold", color=ACCENT,
+#           family="DejaVu Sans Mono")
 
     # Three scale columns
     scales = [("1/16", 2, "0.13 M", DOT_BLUE),
                ("1/8",  3, "0.08 M", DOT_TEAL),
                ("1/4",  3, "0.07 M", DOT_GREEN)]
-    cw = 3.20
+    cw = 2.37
     cx = 0.55
-    cgap = 0.40
+    cgap = 1.90
     for i, (scale, iters, params, color) in enumerate(scales):
         x = cx + i * (cw + cgap)
         _box(ax, x, 2.85, cw, 2.85, fc=PANEL, ec=color, lw=1.6)
         _txt(ax, x + cw / 2, 5.20, f"refine {scale}",
-              size=11, weight="bold", color=INK)
+              size=8, weight="bold", color=INK)
         _txt(ax, x + cw / 2, 4.45, f"x {iters}",
               size=24, weight="bold", color=color)
         _txt(ax, x + cw / 2, 3.55, params,
@@ -163,28 +169,28 @@ def stage3_diagram():
         _txt(ax, x + cw / 2, 3.10, "trainable",
               size=8, color=SUBINK, italic=True)
         if i < 2:
-            ax_x = x + cw + 0.04
-            _arrow(ax, ax_x, 4.27, ax_x + cgap - 0.10, 4.27,
-                    color=ACCENT, lw=1.6)
-            _txt(ax, ax_x + (cgap - 0.10) / 2, 4.65,
-                  "plane up", size=7.5, color=ACCENT, italic=True)
+            ax_x = x + cw + 0.10
+            _arrow(ax, ax_x, 4.27, ax_x + cgap - 0.20, 4.27,
+                    color=ACCENT, lw=1.8)
+            _txt(ax, ax_x + (cgap - 0.20) / 2, 4.65,
+                  "plane up", size=8.5, color=ACCENT, italic=True)
 
     # Bottom: per-iteration mechanism, 4 short steps
     _txt(ax, 6.0, 2.30, "EACH ITERATION",
           size=9, weight="bold", color=ACCENT,
           family="DejaVu Sans Mono")
     steps = ["warp R", "concat", "trunk", "predict"]
-    sw = 2.50
+    sw = 1.89
     sx0 = 0.65
-    sgap = 0.20
+    sgap = 1.10
     for i, st in enumerate(steps):
         x = sx0 + i * (sw + sgap)
         _box(ax, x, 0.55, sw, 1.20, fc=CREAM, ec=SUBINK, lw=0.5)
         _txt(ax, x + sw / 2, 1.15, st, size=10, color=INK)
         if i < len(steps) - 1:
-            ax_x = x + sw + 0.005
-            _arrow(ax, ax_x, 1.15, ax_x + sgap - 0.02, 1.15,
-                    color=SUBINK, lw=0.9)
+            ax_x = x + sw + 0.04
+            _arrow(ax, ax_x, 1.15, ax_x + sgap - 0.08, 1.15,
+                    color=SUBINK, lw=1.1)
 
     _save(fig, "stage3_refine.png")
 
@@ -243,17 +249,12 @@ def supervision_diagram():
           size=10, weight="bold", color=ACCENT,
           family="DejaVu Sans Mono")
 
-    # Equation in dark band — split across two lines so it fits inside
-    # the band even at slide size.
-    _box(ax, 0.4, 5.05, 11.2, 1.10, fc=INK, ec=INK, lw=0.5,
+    # Equation in dark band — single line at smaller size so it fits.
+    _box(ax, 0.4, 5.30, 11.2, 0.75, fc=INK, ec=INK, lw=0.5,
           radius=0.04)
-    _txt(ax, 6.0, 5.85,
-          "L  =  sum_k wk [ L1 + a*Lgrad + b*Lhinge ]",
-          size=10.5, weight="bold", color="white",
-          family="DejaVu Sans Mono")
-    _txt(ax, 6.0, 5.30,
-          "+  c*Lsmooth",
-          size=10.5, weight="bold", color="white",
+    _txt(ax, 6.0, 5.67,
+          "L  =  sum_k wk [ L1 + a*Lgrad + b*Lhinge ]  +  c*Lsmooth",
+          size=7, weight="bold", color="white",
           family="DejaVu Sans Mono")
 
     # Three term cards
@@ -274,11 +275,11 @@ def supervision_diagram():
     for i, (sym, title, body, color) in enumerate(cards):
         x = cx0 + i * (cw + gap)
         _box(ax, x, 1.65, cw, 2.95, fc=PANEL, ec=color, lw=1.4)
-        _txt(ax, x + cw / 2, 4.00, sym, size=20, weight="bold",
+        _txt(ax, x + cw / 2, 4.00, sym, size=15, weight="bold",
               color=color)
         _txt(ax, x + cw / 2, 3.20, title, size=8.5, weight="bold",
               color=ACCENT, family="DejaVu Sans Mono")
-        _txt(ax, x + cw / 2, 2.30, body, size=9, color=INK)
+        _txt(ax, x + cw / 2, 2.30, body, size=7, color=INK)
 
     # Defaults strip
     _txt(ax, 6.0, 1.10,
@@ -426,10 +427,230 @@ def epe_trajectory_diagram():
     _save(fig, "epe_trajectory.png")
 
 
+# --------------------------------------------------------------------------
+# STAGE 1  ·  ENCODER (very simple: stereo input -> shared encoder -> 4 scales)
+# --------------------------------------------------------------------------
+
+def stage1_encoder_diagram():
+    fig, ax = _frame()
+#     _txt(ax, 6.0, 6.45, "STAGE 1  ·  SHARED ENCODER",
+#           size=10, weight="bold", color=ACCENT,
+#           family="DejaVu Sans Mono")
+
+    # Two small input boxes on the left
+    _box(ax, 0.50, 4.40, 1.50, 1.10, fc=DOT_BLUE, ec=INK, lw=0.8)
+    _txt(ax, 1.25, 4.95, "I_L", size=14, weight="bold", color="white")
+    _box(ax, 0.50, 2.50, 1.50, 1.10, fc=DOT_BLUE, ec=INK, lw=0.8)
+    _txt(ax, 1.25, 3.05, "I_R", size=14, weight="bold", color="white")
+
+    # Single shared encoder block — short label, big box
+    _arrow(ax, 2.05, 4.95, 3.30, 4.40)
+    _arrow(ax, 2.05, 3.05, 3.30, 3.60)
+    _box(ax, 3.30, 2.85, 2.85, 2.30, fc="#F0A56A", ec=INK, lw=0.8)
+    _txt(ax, 4.725, 4.55, "MobileNetV2", size=9, weight="bold")
+    _txt(ax, 4.725, 4.05, "(truncated)",
+          size=9, color=SUBINK, italic=True)
+    _txt(ax, 4.725, 3.55, "shared L+R",
+          size=9, color=SUBINK, italic=True)
+    _txt(ax, 4.725, 3.05, "0.54 M",
+          size=11, color=ACCENT, weight="bold",
+          family="DejaVu Sans Mono")
+
+    # Output: 4 feature maps in a row, pushed right to leave room for
+    # a clearly visible arrow from the encoder block.
+    scales = [("1/2", "16 ch"), ("1/4", "24 ch"),
+               ("1/8", "32 ch"), ("1/16", "96 ch")]
+    fw = 1.15
+    fh = 1.10
+    fgap = 0.10
+    fx0 = 7.00
+    fy = 3.45
+    _txt(ax, fx0 + (4 * fw + 3 * fgap) / 2, 5.30,
+          "feature pyramid",
+          size=9, color=SUBINK, italic=True)
+    for i, (sc, ch) in enumerate(scales):
+        x = fx0 + i * (fw + fgap)
+        _box(ax, x, fy, fw, fh, fc=DOT_BLUE, ec=INK, lw=0.7)
+        _txt(ax, x + fw / 2, fy + fh / 2 + 0.18, sc,
+              size=11, weight="bold", color="white")
+        _txt(ax, x + fw / 2, fy + fh / 2 - 0.22, ch,
+              size=8, color="white",
+              family="DejaVu Sans Mono")
+
+    # Long visible arrow from encoder (ends at x=6.15) to first feature
+    # map (starts at fx0=7.00).
+    _arrow(ax, 6.20, 4.00, 6.95, 4.00, color=ACCENT, lw=1.6)
+
+    # Bottom commentary
+    _txt(ax, 6.0, 2.05,
+          "Truncated after stage four (saves 1 M params).",
+          size=10.5, color=INK, italic=True)
+    _txt(ax, 6.0, 1.55,
+          "Features at 1/2, 1/4, 1/8, 1/16 feed the four refinement "
+          "stages.",
+          size=10, color=SUBINK, italic=True)
+
+    _save(fig, "stage1_encoder.png")
+
+
+def methodology_diagram():
+    """Two-track flowchart: training pipeline (top) + inference
+    pipeline (bottom), linked by a 'load weights' connector.
+    Used on slide 11 (Methodology).  Wide canvas (5.5 in) so the
+    figure fills the slide-width area when embedded."""
+    # Wider canvas, taller to fit two rows + connector + footnote
+    fig, ax = plt.subplots(figsize=(11.0, 5.4), facecolor=CREAM)
+    ax.set_facecolor(CREAM)
+    W2, H2 = 22.0, 11.0
+    ax.set_xlim(0, W2); ax.set_ylim(0, H2)
+    ax.set_aspect("equal"); ax.set_xticks([]); ax.set_yticks([])
+    for sp in ax.spines.values(): sp.set_visible(False)
+
+    # ---- Title strip ----
+#     _txt(ax, W2 / 2, H2 - 0.55, "TRAINING + INFERENCE PIPELINES",
+#           size=11, weight="bold", color=ACCENT,
+#           family="DejaVu Sans Mono")
+
+    # ---- Geometry ----
+    n = 5
+    box_w = 3.2
+    box_h = 1.80
+    gap = (W2 - 2.0 - n * box_w) / (n - 1)
+    row_x0 = 1.0
+
+    NAVY_FILL = "#1F2C4E"
+    NAVY_LITE = "#2E467A"
+    INF_BORDER = ACCENT
+    INF_FILL = "#FBF1E5"
+    BAND_TRAIN = "#ECEDF2"
+    BAND_INF = "#FBF1E5"
+
+    # ---- Training row ----
+    train_y = H2 - 4.2          # box top y in graph units (note ax y axis up)
+    train_band_y = train_y - 0.40
+    train_band_h = box_h + 0.85
+
+    # Band background
+    ax.add_patch(FancyBboxPatch((row_x0 - 0.40, train_band_y),
+        W2 - 2.0 + 0.80, train_band_h,
+        boxstyle="round,pad=0.02,rounding_size=0.18",
+        linewidth=0.6, edgecolor="#D7D9DD",
+        facecolor=BAND_TRAIN, zorder=1))
+    # Row label (left, vertical)
+#     _txt(ax, row_x0 - 0.10, train_y + box_h / 2, "TRAINING",
+#           size=10, weight="bold", color="#1F2C4E", ha="right",
+#           family="DejaVu Sans Mono")
+
+    train_steps = [
+        ("Scene Flow", "synthetic\nstereo dataset"),
+        ("Pretrain",   "30 epochs,\n2 × T4 (Kaggle)"),
+        ("Foundation\nteacher",
+                       "FoundationStereo\npseudo-disparity"),
+        ("Finetune",   "indoor pseudo-GT,\nmulti-scale loss"),
+        ("Checkpoint", "0.87 M params,\n8.7 MB"),
+    ]
+    train_xs = []
+    for i, (title, sub) in enumerate(train_steps):
+        x = row_x0 + i * (box_w + gap)
+        train_xs.append(x)
+        ax.add_patch(FancyBboxPatch((x, train_y), box_w, box_h,
+            boxstyle="round,pad=0.02,rounding_size=0.10",
+            linewidth=1.0, edgecolor=NAVY_FILL,
+            facecolor=NAVY_FILL, zorder=2))
+        _txt(ax, x + box_w / 2, train_y + box_h - 0.45, title,
+              size=11, weight="bold", color="white",
+              family="DejaVu Serif")
+        _txt(ax, x + box_w / 2, train_y + box_h / 2 - 0.25, sub,
+              size=7, color="#CFD3DD",
+              family="DejaVu Serif")
+        if i < n - 1:
+            ax.add_patch(FancyArrowPatch(
+                (x + box_w + 0.05, train_y + box_h / 2),
+                (x + box_w + gap - 0.10, train_y + box_h / 2),
+                arrowstyle="-|>", mutation_scale=14,
+                color="#3B5078", linewidth=2.0, zorder=3))
+
+    # ---- Inference row ----
+    infer_y = 1.5
+    infer_band_y = infer_y - 0.40
+    infer_band_h = box_h + 0.85
+
+    ax.add_patch(FancyBboxPatch((row_x0 - 0.40, infer_band_y),
+        W2 - 2.0 + 0.80, infer_band_h,
+        boxstyle="round,pad=0.02,rounding_size=0.18",
+        linewidth=0.6, edgecolor="#E5D7C5",
+        facecolor=BAND_INF, zorder=1))
+#     _txt(ax, row_x0 - 0.10, infer_y + box_h / 2, "INFERENCE",
+#           size=10, weight="bold", color=ACCENT, ha="right",
+#           family="DejaVu Sans Mono")
+
+    infer_steps = [
+        ("Stereo\ncamera",  "AR0144,\nrectified pair"),
+        ("Pre-process",     "BGR → tensor,\ncrop / pad"),
+        ("StereoLite",      "encoder → tile init,\nrefine × 8, upsample"),
+        ("Disparity",       "px-resolution\nleft-frame map"),
+        ("Depth + 3D",      "triangulate →\nOpen3D point cloud"),
+    ]
+    infer_xs = []
+    for i, (title, sub) in enumerate(infer_steps):
+        x = row_x0 + i * (box_w + gap)
+        infer_xs.append(x)
+        ax.add_patch(FancyBboxPatch((x, infer_y), box_w, box_h,
+            boxstyle="round,pad=0.02,rounding_size=0.10",
+            linewidth=1.4, edgecolor=INF_BORDER,
+            facecolor=INF_FILL, zorder=2))
+        _txt(ax, x + box_w / 2, infer_y + box_h - 0.45, title,
+              size=11, weight="bold", color=INK,
+              family="DejaVu Serif")
+        _txt(ax, x + box_w / 2, infer_y + box_h / 2 - 0.25, sub,
+              size=7, color=SUBINK,
+              family="DejaVu Serif")
+        if i < n - 1:
+            ax.add_patch(FancyArrowPatch(
+                (x + box_w + 0.05, infer_y + box_h / 2),
+                (x + box_w + gap - 0.10, infer_y + box_h / 2),
+                arrowstyle="-|>", mutation_scale=14,
+                color=ACCENT, linewidth=2.0, zorder=3))
+
+    # ---- Vertical "load weights" connector ----
+    cp_cx = train_xs[-1] + box_w / 2
+    sl_cx = infer_xs[2] + box_w / 2
+    cp_bottom = train_y
+    sl_top = infer_y + box_h
+    mid_y = (cp_bottom + sl_top) / 2
+
+    # 3-segment polyline  (down, left, down with arrowhead)
+    ax.plot([cp_cx, cp_cx], [cp_bottom, mid_y],
+             color=ACCENT, linewidth=2.0, zorder=3)
+    ax.plot([cp_cx, sl_cx], [mid_y, mid_y],
+             color=ACCENT, linewidth=2.0, zorder=3)
+    ax.add_patch(FancyArrowPatch((sl_cx, mid_y), (sl_cx, sl_top + 0.05),
+        arrowstyle="-|>", mutation_scale=14,
+        color=ACCENT, linewidth=2.0, zorder=3))
+    # Annotation
+    _txt(ax, (cp_cx + sl_cx) / 2, mid_y + 0.30, "load weights",
+          size=9, color=ACCENT, italic=True,
+          family="DejaVu Serif")
+
+    # ---- Footnote ----
+#     _txt(ax, W2 / 2, 0.35,
+#           "Training is offline; the trained checkpoint is loaded once and reused at inference.",
+#           size=9.5, italic=True, color=SUBINK,
+#           family="DejaVu Serif")
+
+    out = OUT / "methodology_pipeline.png"
+    fig.savefig(out, bbox_inches="tight", pad_inches=0.10,
+                 facecolor=CREAM, dpi=220)
+    plt.close(fig)
+    print(f"  -> {out}")
+
+
 if __name__ == "__main__":
+    stage1_encoder_diagram()
     stage2_diagram()
     stage3_diagram()
     stage4_diagram()
     supervision_diagram()
     budget_diagram()
     epe_trajectory_diagram()
+    methodology_diagram()

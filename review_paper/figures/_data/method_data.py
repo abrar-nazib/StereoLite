@@ -28,14 +28,17 @@ METHODS = {
     # ===== FOUNDATION-MODEL ERA (the compression target) =====
     "DEFOM-Stereo": dict(
         year=2025, family="foundation", iterative=True,
-        kitti_d1=1.55, sf_epe=0.41, params_m=350.0,
-        latency_ms=440, hardware="RTX 4090, 1248x384",
-        source="DEFOM-Stereo CVPR 2025 Tab. 2/3"),
+        kitti_d1=1.55, sf_epe=0.42, params_m=47.3,
+        latency_ms=316, hardware="RTX 3090, 960x540",
+        source="DEFOM-Stereo CVPR 2025 Tab. 2 p7 (ViT-L: 47.30 M trainable, 0.42 EPE, 0.316 s)"),
     "FoundationStereo": dict(
+        # Total includes frozen DAv2 ViT-L (~335 M) plus side-tuning
+        # adapter, hybrid cost filter, and ConvGRU. Paper does not
+        # report a clean trainable-only figure.
         year=2025, family="foundation", iterative=True,
-        kitti_d1=1.46, sf_epe=0.36, params_m=215.0,
+        kitti_d1=1.46, sf_epe=0.34, params_m=340.0,
         latency_ms=470, hardware="RTX 4090, 1248x384",
-        source="FoundationStereo CVPR 2025 Tab. 2"),
+        source="FoundationStereo CVPR 2025 Tab. 3 p7 (Ours = 0.34 EPE); ~340 M total incl. frozen ViT-L (~335 M; tier1 summary)"),
     "MonSter": dict(
         year=2025, family="foundation", iterative=True,
         kitti_d1=1.59, sf_epe=0.45, params_m=255.0,
@@ -128,20 +131,25 @@ METHODS = {
         latency_ms=62, hardware="Tesla V100",
         source="DeepPruner ICCV 2019 Tab. 4"),
     "HITNet": dict(
+        # Variant: HITNet L (the mid-size variant; supp Tab 7 row "HITNetL").
+        # The XL variant is 2.07 M / 0.36 EPE / 114 ms;
+        # the multi-scale variant is 0.66 M but EPE not reported in supp.
         year=2021, family="efficient", iterative=True,
-        kitti_d1=1.98, sf_epe=0.36, params_m=0.6,
-        latency_ms=20, hardware="Titan V",
-        source="HITNet CVPR 2021 Tab. 4"),
+        kitti_d1=1.98, sf_epe=0.43, params_m=0.97,
+        latency_ms=54, hardware="Titan V",
+        source="HITNet CVPR 2021 supp Tab. 7 p17 (HITNet L row); KITTI D1 from IGEV CVPR 2023 Tab. 5 p7"),
     "CoEx": dict(
         year=2021, family="efficient", iterative=False,
-        kitti_d1=1.93, sf_epe=0.69, params_m=2.7,
+        kitti_d1=2.13, sf_epe=0.69, params_m=2.72,
         latency_ms=27, hardware="RTX 2080Ti",
-        source="CoEx IROS 2021 Tab. 1"),
+        source="CoEx IROS 2021 Tab. I p4 (EPE 0.69 / D1 2.13 / 27 ms); LightStereo Tab I cites 2.72 M params"),
     "BGNet+": dict(
+        # BGNet+ adds a refinement module on top of BGNet (D1 2.51 / 25 ms);
+        # BGNet+ headline numbers are D1 2.19 / 32.3 ms total.
         year=2021, family="efficient", iterative=False,
-        kitti_d1=2.50, sf_epe=1.17, params_m=5.3,
-        latency_ms=35, hardware="RTX 2080Ti",
-        source="BGNet CVPR 2021 Tab. 5"),
+        kitti_d1=2.19, sf_epe=1.17, params_m=5.3,
+        latency_ms=32, hardware="RTX 2080Ti",
+        source="BGNet CVPR 2021 Tab. 1 p6 (EPE 1.17 for CUBG); Tab. 4 p7 (BGNet+ D1 2.19); Tab. 5 p7 (32.3 ms)"),
     "MobileStereoNet-2D": dict(
         year=2022, family="efficient", iterative=False,
         kitti_d1=2.83, sf_epe=1.14, params_m=2.4,
@@ -196,19 +204,19 @@ METHODS = {
     # ===== EFFICIENT — iterative, foundation-aware =====
     "LightStereo-S": dict(
         year=2025, family="efficient_iter", iterative=False,
-        kitti_d1=2.40, sf_epe=0.79, params_m=2.7,
-        latency_ms=14, hardware="RTX 3090",
-        source="LightStereo ICRA 2025 Tab. 4"),
+        kitti_d1=2.30, sf_epe=0.73, params_m=3.44,
+        latency_ms=17, hardware="RTX 3090",
+        source="LightStereo ICRA 2025 Tab. I p4 (params 3.44 M / EPE 0.73 / 17 ms); Tab. V p6 (D1 2.30)"),
     "LightStereo-M": dict(
         year=2025, family="efficient_iter", iterative=False,
-        kitti_d1=2.04, sf_epe=0.74, params_m=4.4,
-        latency_ms=22, hardware="RTX 3090",
-        source="LightStereo ICRA 2025 Tab. 4"),
+        kitti_d1=2.04, sf_epe=0.62, params_m=7.64,
+        latency_ms=23, hardware="RTX 3090",
+        source="LightStereo ICRA 2025 Tab. I p4 (params 7.64 M / EPE 0.62 / 23 ms); Tab. V p6 (D1 2.04)"),
     "LightStereo-L": dict(
         year=2025, family="efficient_iter", iterative=False,
-        kitti_d1=1.94, sf_epe=0.69, params_m=8.5,
-        latency_ms=40, hardware="RTX 3090",
-        source="LightStereo ICRA 2025 Tab. 4"),
+        kitti_d1=1.93, sf_epe=0.59, params_m=24.29,
+        latency_ms=37, hardware="RTX 3090",
+        source="LightStereo ICRA 2025 Tab. I p4 (params 24.29 M / EPE 0.59 / 37 ms); Tab. V p6 (D1 1.93)"),
     "DTP-IGEV-S2": dict(
         year=2024, family="efficient_iter", iterative=True,
         kitti_d1=1.90, sf_epe=0.49, params_m=8.1,
