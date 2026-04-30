@@ -26,7 +26,7 @@ import numpy as np
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "designs"))
-from d1_tile import StereoLite, StereoLiteConfig  # noqa: E402
+from StereoLite import StereoLite, StereoLiteConfig  # noqa: E402
 
 
 def colorize_disp(disp: np.ndarray, lo: float, hi: float) -> np.ndarray:
@@ -167,8 +167,7 @@ def main():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"device={device.type}  ckpt={args.ckpt}")
-    model = StereoLite(StereoLiteConfig(
-        backbone="mobilenet", use_dav2=False)).to(device)
+    model = StereoLite(StereoLiteConfig(backbone="mobilenet")).to(device)
     ck = torch.load(args.ckpt, map_location=device, weights_only=False)
     model.load_state_dict(ck["model"] if "model" in ck else ck, strict=True)
     model.eval()

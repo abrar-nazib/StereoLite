@@ -121,7 +121,7 @@ def main():
     ckpt_path = os.path.join(PROJ, "model", "checkpoints", "student_d1.pth")
     if os.path.exists(ckpt_path):
         print("\nloading StereoLite (indoor-distilled)...")
-        from d1_tile import StereoLite
+        from StereoLite import StereoLite
         tf = StereoLite().to(device)
         ck = torch.load(ckpt_path, map_location=device, weights_only=False)
         tf.load_state_dict(ck["model"], strict=True)

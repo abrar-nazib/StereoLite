@@ -18,7 +18,6 @@ Key architectural changes vs v6:
   - Iterative refinement: each scale runs the refine head N times
   - No 3D cost-volume aggregator at 1/8 (just local CV at 1/16 init)
   - No cascade CV (replaced by iteration)
-  - DAv2 optional (kept for ablation/paper; default off)
 
 Budget target: ~1.2-1.5 M trainable, ~150 ms inference on RTX 3050 at
 512×832. Jetson INT8 target: ~25-40 ms.
@@ -37,7 +36,6 @@ import torch.nn.functional as F
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from _blocks import (GhostConv, SqueezeExcitation, _safe_gn)
 
-from .dav2_backbone import DAv2SmallFrozen
 from .tile_propagate import (TileState, TileInit, TileRefine, TileUpsample)
 
 
@@ -170,9 +168,6 @@ class StereoLiteConfig:
     # Cost volume at init
     init_max_disp: int = 24        # at 1/16, covers 24*16=384 full-res px
     init_groups: int = 8
-    # Foundation model (off by default; keep code path for ablations)
-    use_dav2: bool = False
-    dav2_raw_proj_ch: int = 16
     # Refine head hidden channels
     refine_hidden: int = 48
     # Backbone: "ghost" (custom GhostConv) or "mobilenet" (ImageNet-pretrained)
@@ -193,28 +188,18 @@ class StereoLite(nn.Module):
         # Channel counts per scale from the encoder
         ch2, ch4, ch8, ch16 = self.fnet.out_channels
 
-        # Optional DAv2 fusion only at 1/16 (keeps the path simple)
-        if self.cfg.use_dav2:
-            self.dav2 = DAv2SmallFrozen()
-            self.dav2_proj16 = nn.Conv2d(
-                self.dav2.embed_dim, self.cfg.dav2_raw_proj_ch, 1)
-            ch16_fused = ch16 + self.cfg.dav2_raw_proj_ch
-        else:
-            self.dav2 = None
-            ch16_fused = ch16
-
         # Groups need to divide feat_ch for the init cost volume
         g = self.cfg.init_groups
-        while ch16_fused % g != 0 and g > 1:
+        while ch16 % g != 0 and g > 1:
             g -= 1
-        self.init_tile = TileInit(feat_ch=ch16_fused,
+        self.init_tile = TileInit(feat_ch=ch16,
                                    max_disp=self.cfg.init_max_disp,
                                    groups=g,
                                    feat_out=self.cfg.tile_feat_ch)
 
         # Refinement heads — one instance per scale (weights not shared
         # because feature channel counts differ).
-        self.refine_16 = TileRefine(feat_ch=ch16_fused,
+        self.refine_16 = TileRefine(feat_ch=ch16,
                                      tile_feat_ch=self.cfg.tile_feat_ch,
                                      hidden=self.cfg.refine_hidden)
         self.refine_8 = TileRefine(feat_ch=ch8,
@@ -240,26 +225,20 @@ class StereoLite(nn.Module):
 
     def forward(self, left: torch.Tensor, right: torch.Tensor,
                 aux: bool = False):
-        fL2, fL4, fL8, fL16 = self.fnet(left)
-        fR2, fR4, fR8, fR16 = self.fnet(right)
-
-        if self.dav2 is not None:
-            B = left.shape[0]
-            out = self.dav2(torch.cat([left, right], dim=0))
-            raw16 = self.dav2_proj16(
-                F.interpolate(out["raw"], size=fL16.shape[-2:],
-                              mode="bilinear", align_corners=False))
-            dL16, dR16 = raw16[:B], raw16[B:]
-            fL16_ = torch.cat([fL16, dL16], dim=1)
-            fR16_ = torch.cat([fR16, dR16], dim=1)
-        else:
-            fL16_, fR16_ = fL16, fR16
+        # Batch L+R through the encoder in a single forward: the GPU runs
+        # both views in parallel inside the same kernel launches, roughly
+        # halving encoder latency vs two sequential calls.
+        feats = self.fnet(torch.cat([left, right], dim=0))
+        fL2,  fR2  = feats[0].chunk(2, dim=0)
+        fL4,  fR4  = feats[1].chunk(2, dim=0)
+        fL8,  fR8  = feats[2].chunk(2, dim=0)
+        fL16, fR16 = feats[3].chunk(2, dim=0)
 
         # 1/16: init + iterate
-        tile = self.init_tile(fL16_, fR16_)
+        tile = self.init_tile(fL16, fR16)
         t16_stages = [tile]
         for _ in range(self.cfg.iters_16):
-            tile = self.refine_16(tile, fL16_, fR16_)
+            tile = self.refine_16(tile, fL16, fR16)
             t16_stages.append(tile)
 
         # 1/16 → 1/8 via plane equation

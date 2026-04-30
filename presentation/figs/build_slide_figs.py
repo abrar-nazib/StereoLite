@@ -101,7 +101,7 @@ def build_research_gap():
         "efficient_iter": "#A07A1F",
     }
     family_label = {
-        "foundation":    "Foundation models  (DAv2-backed)",
+        "foundation":    "Foundation models  (mono-prior backed)",
         "iterative":     "Iterative refinement  (10 to 25 M)",
         "3dcv":          "3D cost volume  (5 to 25 M)",
         "efficient":     "Efficient pre 2024  (0.5 to 8 M)",

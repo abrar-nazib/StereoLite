@@ -164,9 +164,6 @@ Input Stereo Pair
   [Efficient CNN Encoder]  ---- MobileNetV4 / EfficientViT / FastViT
        |                         (replace heavy ViT backbone)
        |
-  [Distilled Mono Prior]   ---- Lightweight Depth Anything distillation
-       |                         (fewer channels, smaller resolution)
-       |
   [Fused Cost Volume]      ---- Bilateral grid (BGNet) or
        |                         sparse adaptive sampling
        |

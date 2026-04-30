@@ -82,8 +82,8 @@ def main():
     track = [val[i * step] for i in range(20)][: args.n_pairs]
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    from d1_tile import StereoLite, StereoLiteConfig
-    model = StereoLite(StereoLiteConfig(use_dav2=True)).to(device)
+    from StereoLite import StereoLite, StereoLiteConfig
+    model = StereoLite(StereoLiteConfig()).to(device)
     ck = torch.load(args.ckpt, map_location=device, weights_only=False)
     sd = ck["model"] if "model" in ck else ck
     model.load_state_dict(sd, strict=True)

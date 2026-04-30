@@ -63,7 +63,7 @@ def main():
     print(f"evaluating on {len(val)} held-out pairs")
 
     # Load StereoLite
-    from d1_tile import StereoLite
+    from StereoLite import StereoLite
     stereolite = StereoLite().to(device)
     if os.path.exists(args.stereolite_ckpt):
         sd = torch.load(args.stereolite_ckpt, map_location=device, weights_only=False)

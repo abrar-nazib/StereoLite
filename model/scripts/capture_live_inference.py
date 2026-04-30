@@ -112,7 +112,7 @@ def main() -> None:
 
     tdev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"device={tdev.type}; loading student from {args.ckpt}")
-    from d1_tile import StereoLite
+    from StereoLite import StereoLite
     model = StereoLite().to(tdev)
     ck = torch.load(args.ckpt, map_location=tdev, weights_only=False)
     sd = ck["model"] if "model" in ck else ck

@@ -21,19 +21,9 @@ def read(rel: str) -> str:
     return (PROJ / rel).read_text()
 
 
-# ---------------------------- source adaptations --------------------------- #
-def adapt_model_py(src: str) -> str:
-    """Remove the dav2 import since we never enable it on Kaggle and don't
-    want to ship the DAv2 weights along with the notebook."""
-    src = src.replace(
-        "from .dav2_backbone import DAv2SmallFrozen",
-        "DAv2SmallFrozen = None  # not used on Kaggle (use_dav2=False only)")
-    return src
-
-
 BLOCKS_PY = read("model/designs/_blocks.py")
-TILE_PROPAGATE_PY = read("model/designs/d1_tile/tile_propagate.py")
-MODEL_PY = adapt_model_py(read("model/designs/d1_tile/model.py"))
+TILE_PROPAGATE_PY = read("model/designs/StereoLite/tile_propagate.py")
+MODEL_PY = read("model/designs/StereoLite/model.py")
 SF_LOADER_PY = read("model/scripts/sceneflow_loader.py")
 
 INIT_PY = '''"""Kaggle build of StereoLite v8."""
@@ -77,7 +67,7 @@ import torch.distributed as dist
 sys.path.insert(0, "/kaggle/working/src")
 os.environ.setdefault("XFORMERS_DISABLED", "1")
 
-from d1_tile import StereoLite, StereoLiteConfig
+from StereoLite import StereoLite, StereoLiteConfig
 from sceneflow_loader import enumerate_pairs, train_val_split, SceneFlowDriving, read_pfm
 
 
@@ -345,7 +335,7 @@ def main():
 
     # ---- model ----
     model = StereoLite(StereoLiteConfig(backbone="mobilenet",
-                                     use_dav2=False)).to(device)
+                                     )).to(device)
     if args.resume and os.path.exists(args.resume):
         ck = torch.load(args.resume, map_location="cpu", weights_only=False)
         sd = ck["model"] if "model" in ck else ck
@@ -508,12 +498,12 @@ import torch
 sys.path.insert(0, "/kaggle/working/src")
 os.environ.setdefault("XFORMERS_DISABLED", "1")
 
-from d1_tile import StereoLite, StereoLiteConfig
+from StereoLite import StereoLite, StereoLiteConfig
 
 
 def load_model(ckpt_path: str, device: torch.device) -> torch.nn.Module:
     model = StereoLite(StereoLiteConfig(backbone="mobilenet",
-                                     use_dav2=False)).to(device)
+                                     )).to(device)
     ck = torch.load(ckpt_path, map_location=device, weights_only=False)
     sd = ck["model"] if "model" in ck else ck
     model.load_state_dict(sd, strict=True)
@@ -813,18 +803,18 @@ cells.append(code(
 
 cells.append(md("## 4. Write model source files\n\nWe recreate the exact "
                 "repo layout under `/kaggle/working/src/` so the training "
-                "script can `import d1_tile` as a package."))
+                "script can `import StereoLite` as a package."))
 cells.append(code(
     "import os\n"
-    "os.makedirs('/kaggle/working/src/d1_tile', exist_ok=True)\n"
+    "os.makedirs('/kaggle/working/src/StereoLite', exist_ok=True)\n"
     "print(os.listdir('/kaggle/working/src'))\n"
 ))
 
 cells.append(writefile("/kaggle/working/src/_blocks.py", BLOCKS_PY))
-cells.append(writefile("/kaggle/working/src/d1_tile/__init__.py", INIT_PY))
-cells.append(writefile("/kaggle/working/src/d1_tile/tile_propagate.py",
+cells.append(writefile("/kaggle/working/src/StereoLite/__init__.py", INIT_PY))
+cells.append(writefile("/kaggle/working/src/StereoLite/tile_propagate.py",
                         TILE_PROPAGATE_PY))
-cells.append(writefile("/kaggle/working/src/d1_tile/model.py", MODEL_PY))
+cells.append(writefile("/kaggle/working/src/StereoLite/model.py", MODEL_PY))
 cells.append(writefile("/kaggle/working/src/sceneflow_loader.py",
                         SF_LOADER_PY))
 cells.append(writefile("/kaggle/working/train_ddp.py", TRAIN_DDP_PY))
@@ -837,9 +827,9 @@ cells.append(code(
     "os.environ.setdefault('XFORMERS_DISABLED', '1')\n"
     "sys.path.insert(0, '/kaggle/working/src')\n"
     "import torch\n"
-    "from d1_tile import StereoLite, StereoLiteConfig\n"
+    "from StereoLite import StereoLite, StereoLiteConfig\n"
     "\n"
-    "m = StereoLite(StereoLiteConfig(backbone='mobilenet', use_dav2=False)).cuda()\n"
+    "m = StereoLite(StereoLiteConfig(backbone='mobilenet', )).cuda()\n"
     "L = torch.rand(1, 3, INF_H, INF_W, device='cuda') * 255\n"
     "R = torch.rand(1, 3, INF_H, INF_W, device='cuda') * 255\n"
     "with torch.no_grad():\n"
@@ -915,7 +905,7 @@ cells.append(code(
     "import torch, time, sys, os\n"
     "sys.path.insert(0, '/kaggle/working/src')\n"
     "os.environ.setdefault('XFORMERS_DISABLED', '1')\n"
-    "from d1_tile import StereoLite, StereoLiteConfig\n"
+    "from StereoLite import StereoLite, StereoLiteConfig\n"
     "\n"
     "device = torch.device('cuda')\n"
     "L = torch.rand(1, 3, INF_H, INF_W, device=device) * 255\n"
@@ -931,7 +921,7 @@ cells.append(code(
     "    return (time.time() - t0) / n * 1000\n"
     "\n"
     "# (A) .pth — state_dict + source code\n"
-    "m_pth = StereoLite(StereoLiteConfig(backbone='mobilenet', use_dav2=False)).to(device)\n"
+    "m_pth = StereoLite(StereoLiteConfig(backbone='mobilenet', )).to(device)\n"
     "ck = torch.load('/kaggle/working/stereolite_v8_best.pth',\n"
     "                 map_location=device, weights_only=False)\n"
     "m_pth.load_state_dict(ck['model'])\n"
@@ -977,7 +967,7 @@ cells.append(md(
     "- model artifacts (.pth, .ts.pt, .onnx x 3)\n"
     "- `src/` — the exact Python source files needed to load the `.pth` on "
     "your own machine. Just `sys.path.insert(0, 'src')` and "
-    "`from d1_tile import StereoLite, StereoLiteConfig`.\n"
+    "`from StereoLite import StereoLite, StereoLiteConfig`.\n"
     "- `load_pth_example.py` — minimal loader / inference script\n"
     "- `train_log.csv` — training curves\n"
 ))
@@ -995,9 +985,9 @@ cells.append(code(
     "]\n"
     "SRC_FILES = [\n"
     "    'src/_blocks.py',\n"
-    "    'src/d1_tile/__init__.py',\n"
-    "    'src/d1_tile/model.py',\n"
-    "    'src/d1_tile/tile_propagate.py',\n"
+    "    'src/StereoLite/__init__.py',\n"
+    "    'src/StereoLite/model.py',\n"
+    "    'src/StereoLite/tile_propagate.py',\n"
     "    'src/sceneflow_loader.py',\n"
     "]\n"
     "\n"
@@ -1008,14 +998,14 @@ cells.append(code(
     "\"\"\"\n"
     "import sys, os, numpy as np, torch, cv2\n"
     "sys.path.insert(0, os.path.join(os.path.dirname(__file__), \"src\"))\n"
-    "from d1_tile import StereoLite, StereoLiteConfig\n"
+    "from StereoLite import StereoLite, StereoLiteConfig\n"
     "\n"
     "CKPT = os.path.join(os.path.dirname(__file__), \"stereolite_v8_best.pth\")\n"
     "INF_H, INF_W = 384, 768\n"
     "\n"
     "def main(left_path, right_path):\n"
     "    dev = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\n"
-    "    m = StereoLite(StereoLiteConfig(backbone=\"mobilenet\", use_dav2=False)).to(dev)\n"
+    "    m = StereoLite(StereoLiteConfig(backbone=\"mobilenet\", )).to(dev)\n"
     "    ck = torch.load(CKPT, map_location=dev, weights_only=False)\n"
     "    m.load_state_dict(ck[\"model\"])\n"
     "    m.eval()\n"

@@ -57,7 +57,7 @@ def main():
     os.makedirs(args.out_dir, exist_ok=True)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    from d1_tile import StereoLite
+    from StereoLite import StereoLite
     model = StereoLite().to(device)
     ck = torch.load(args.ckpt, map_location=device, weights_only=False)
     sd = ck["model"] if "model" in ck else ck

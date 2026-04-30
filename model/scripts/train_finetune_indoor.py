@@ -95,9 +95,8 @@ def main():
     history: list[dict] = []
 
     # ---- model ----
-    from d1_tile import StereoLite, StereoLiteConfig
-    model = StereoLite(StereoLiteConfig(
-        backbone="mobilenet", use_dav2=False)).to(device)
+    from StereoLite import StereoLite, StereoLiteConfig
+    model = StereoLite(StereoLiteConfig(backbone="mobilenet")).to(device)
     if os.path.exists(args.ckpt_in):
         ck = torch.load(args.ckpt_in, map_location=device, weights_only=False)
         sd = ck["model"] if "model" in ck else ck

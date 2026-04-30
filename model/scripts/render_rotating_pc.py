@@ -37,7 +37,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "designs"))
 
 from pseudo_pairs_loader import list_pairs, split_pairs  # noqa: E402
 from disparity_to_pointcloud import disparity_to_points, write_ply  # noqa: E402
-from d1_tile import StereoLite, StereoLiteConfig  # noqa: E402
+from StereoLite import StereoLite, StereoLiteConfig  # noqa: E402
 
 
 # Top-3 best-EPE val pairs (from progress.csv at step 9000)
@@ -277,8 +277,7 @@ def main():
     # Load model
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"device={device.type}  ckpt={args.ckpt}")
-    model = StereoLite(StereoLiteConfig(
-        backbone="mobilenet", use_dav2=False)).to(device)
+    model = StereoLite(StereoLiteConfig(backbone="mobilenet")).to(device)
     ck = torch.load(args.ckpt, map_location=device, weights_only=False)
     sd = ck["model"] if "model" in ck else ck
     model.load_state_dict(sd, strict=True)

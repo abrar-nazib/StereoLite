@@ -48,3 +48,6 @@ model/benchmarks/ablation_*/
 model/teachers/*
 # Jupyter
 .ipynb_checkpoints/
+
+# Presentation source files (large; never push to GitHub)
+*.pptx

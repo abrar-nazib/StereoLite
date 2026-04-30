@@ -1,4 +1,4 @@
-"""Sharpness-focused trainer for StereoLite with DAv2.
+"""Sharpness-focused trainer for StereoLite.
 
 Trains on a small Scene Flow Driving subset (300-500 pairs) with:
   - L1 loss on disparity
@@ -308,8 +308,6 @@ def main():
                    help="enable FP16 autocast for forward+backward")
     p.add_argument("--ckpt_in", default=None,
                    help="resume from this checkpoint (trainable params only)")
-    p.add_argument("--no_dav2", action="store_true",
-                   help="disable DAv2 branch (CNN-only ablation)")
     p.add_argument("--panel_every", type=int, default=200,
                    help="save tracking panels every N steps")
     p.add_argument("--n_track_pairs", type=int, default=20,
@@ -364,17 +362,15 @@ def main():
                                          shuffle=True, num_workers=args.num_workers,
                                          pin_memory=True, persistent_workers=True)
 
-    from d1_tile import StereoLite, StereoLiteConfig
-    model = StereoLite(StereoLiteConfig(use_dav2=not args.no_dav2,
-                                     backbone=args.backbone)).to(device)
+    from StereoLite import StereoLite, StereoLiteConfig
+    model = StereoLite(StereoLiteConfig(backbone=args.backbone)).to(device)
     if args.ckpt_in is not None and os.path.exists(args.ckpt_in):
         ck = torch.load(args.ckpt_in, map_location=device, weights_only=False)
         sd = ck["model"] if "model" in ck else ck
         missing, unexpected = model.load_state_dict(sd, strict=False)
         print(f"resumed from {args.ckpt_in} (missing={len(missing)} unexpected={len(unexpected)})")
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    frozen = sum(p.numel() for p in model.parameters() if not p.requires_grad)
-    print(f"trainable={trainable/1e6:.3f} M  frozen DAv2={frozen/1e6:.3f} M")
+    print(f"trainable={trainable/1e6:.3f} M")
 
     opt = torch.optim.AdamW([p for p in model.parameters() if p.requires_grad],
                             lr=args.lr, weight_decay=1e-5)

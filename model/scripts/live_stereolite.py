@@ -111,9 +111,8 @@ def main():
     print(f"device={device}  ckpt={args.ckpt}")
     print(f"inference resolution: {args.inf_h}x{args.inf_w}")
 
-    from d1_tile import StereoLite, StereoLiteConfig
-    model = StereoLite(StereoLiteConfig(
-        backbone="mobilenet", use_dav2=False)).to(device)
+    from StereoLite import StereoLite, StereoLiteConfig
+    model = StereoLite(StereoLiteConfig(backbone="mobilenet")).to(device)
     ck = torch.load(args.ckpt, map_location=device, weights_only=False)
     sd = ck["model"] if "model" in ck else ck
     missing, unexpected = model.load_state_dict(sd, strict=True)

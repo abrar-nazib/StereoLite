@@ -66,7 +66,7 @@ def main():
                                           shuffle=True, num_workers=args.num_workers,
                                           pin_memory=True, persistent_workers=True)
 
-    from d1_tile import StereoLite
+    from StereoLite import StereoLite
     model = StereoLite().to(device)
     if args.ckpt_in is not None and os.path.exists(args.ckpt_in):
         sd = torch.load(args.ckpt_in, map_location=device, weights_only=False)

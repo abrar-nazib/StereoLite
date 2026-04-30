@@ -1,47 +1,62 @@
-# Design 1 — Foundation-Seeded Tile-Hypothesis Stereo
+# StereoLite — edge tier (GhostConv encoder)
 
-## Base paradigm
-HITNet (Tankovich et al., CVPR 2021). Tile-hypothesis propagation: every 4×4
-image tile carries a slanted-plane hypothesis `(d, d/dx, d/dy, w)` that
-propagates coarse-to-fine via local message passing. **No all-pairs
-correlation volume. No iterative GRU.** Single forward pass.
+Lightweight HITNet-paradigm tile-hypothesis network with a small RAFT-style
+iterative refinement loop and convex-mask final upsample. Targets the
+< 1 M param / Raspberry Pi 5 / Jetson Nano (~1-2 TOPS) deployment slot.
 
-| Property | HITNet baseline |
+## Pipeline
+
+```
+(L, R) ─► GhostConv encoder ─► f2, f4, f8, f16  (shared L/R weights)
+
+  1/16: TileInit (8-group cost volume, max_disp=24)
+        → seeds (d, sx=0, sy=0, feat, conf) per tile
+        → TileRefine × 2 (warps fR by current d, residual updates)
+
+  1/16 → 1/8 via plane-equation upsample (uses slopes sx, sy)
+        → TileRefine × 3
+
+  1/8 → 1/4 via plane-equation upsample
+        → TileRefine × 3
+
+  1/4 → 1/2 via ConvexUpsample (RAFT-style 9-neighbour learned mask)
+  1/2 → full via ConvexUpsample
+```
+
+Total iterative refinement passes: 8 (2 + 3 + 3).
+
+## Numbers (current)
+
+| | |
 |---|---|
-| Parameters | 0.63 M |
-| Input resolution | 1024×384 (KITTI native) |
-| Jetson Orin Nano | ~30 FPS at 1080p |
-| KITTI D1-all | 2.40 |
+| Trainable params | 0.874 M (full chassis) / 0.538 M (overfit-harness config) |
+| Inference latency, RTX 3050, 384×640, B=1 | ~23.5 ms (42.5 FPS) |
+| Inference latency, RTX 3050, 512×832, B=1 | ~54 ms |
+| Best val EPE (InStereo2K, post-finetune) | 1.54 px |
 
-## Contribution on top of HITNet
+## Files
 
-1. **Foundation-seeded initial hypotheses.** Run a frozen DAv2-Small on the
-   left image once. Fit a cheap per-image affine against a 1/32 scale
-   cost-slice to convert relative depth into a scale-aware initial disparity.
-   Use this to initialise the coarsest-level tile hypotheses instead of the
-   learned-zero that HITNet uses.
-2. **Attention-gated tile propagation.** Replace HITNet's hand-designed 3×3
-   propagation with a small 4-head linear-attention block over each tile's
-   eight neighbours. Adds ~0.1 M params; lets propagation respect tile
-   confidence.
-3. **Foundation-teacher disparity distillation.** A FoundationStereo or
-   DEFOM teacher supervises the final tile disparity plus the per-tile
-   confidence head. Training-only cost.
+| File | Role |
+|---|---|
+| `model.py` | `StereoLite`, `StereoLiteConfig`, `TileFeatureEncoder` (GhostConv default), `MobileNetV2Encoder` (alternative), `ConvexUpsample` |
+| `tile_propagate.py` | `TileState`, `TileInit`, `TileRefine`, `TileUpsample` |
+| `cost_volume.py` | `GroupwiseCostVolume1D8` (1/16, 8 groups, max_disp=24) |
+| `arch_refs/` | Reference architecture PDFs (RAFT, IGEV, BANet, etc.) used when sketching diagrams |
+| `stereolite_architecture_doc.{tex,pdf}` | Formal architecture spec |
 
-## Paper claim
-*Foundation-seeded tile-hypothesis stereo matches RAFT-Stereo accuracy at
-1/9th the parameters by seeding tile hypotheses with a monocular foundation
-prior and distilling from a foundation stereo teacher.*
+## Backbone choices
 
-## Target budget
-- Parameters: **~1.2 M**
-- Latency (Orin Nano, 1280×720): **<35 ms**
+`StereoLiteConfig.backbone` selects the encoder:
 
-## Ablations the paper will need
-- HITNet baseline / + foundation init / + attention propagation / + teacher KD
-- Teacher choice: FoundationStereo vs DEFOM vs IGEV
-- Mono backbone ablation: DAv2-Small vs MiDaS-small vs none
+- `"ghost"` (default) — GhostConv stack, 24/48/72/96 channels at 1/2 to 1/16
+- `"mobilenet"` — timm `mobilenetv2_100`, ImageNet-pretrained, 1/32 stage truncated
 
-## What is not yet implemented
-Everything. This directory contains only this README until you greenlight the
-design. The RAFT chassis we had was deleted (see project history).
+The mid-tier YOLO26s variant lives in the sibling folder
+[`../StereoLite_yolo/`](../StereoLite_yolo/) — never edit this folder for
+encoder-swap experiments; spawn a new sibling instead.
+
+## Training entry points
+
+See [`../../scripts/`](../../scripts/) — `train_sceneflow.py` for full Scene
+Flow training, `train_finetune_indoor.py` for indoor pseudo-GT finetune,
+`overfit_yolo_ablation.py` for the matched-overfit A/B harness.

@@ -265,7 +265,7 @@ PAPERS = [
 # lightstereo Guo et al., ICRA 2025, Tab I p4 (3.44 M / 0.73 EPE / 17 ms); Tab V p6 (D1 2.30)
 # fstereo     Wen et al., CVPR 2025, Tab 3 p7 (EPE 0.34); ~335 M ViT-L backbone (tier1 summary)
 # defom       Jiang et al., CVPR 2025, Tab 2 p7 (ViT-L: 47.30 M trainable / 0.42 EPE / 0.316 s)
-# stereolite  d1_tile model; 0.87 M (architecture doc:57); 54 ms RTX 3050 (architecture doc:58)
+# stereolite  StereoLite model; 0.87 M (architecture doc:57); 54 ms RTX 3050 (architecture doc:58)
 
 
 # IEEE-style references (slide 28). Each entry mirrors PAPERS row.
@@ -414,7 +414,7 @@ def rebuild_literature_review(prs):
 #  R  = Real-time edge (<60 ms typical inference)
 #  I  = Iterative refinement (allows compute-vs-accuracy trade)
 #  P  = Plane / tile geometry (sub-pixel via slopes, not just scalar disp)
-#  F  = Foundation prior (DAv2 / monocular backbone integrated)
+#  F  = Foundation prior (monocular depth backbone integrated)
 #  C  = Cross-domain robustness (zero-shot generalization claimed)
 #
 # Cell rule: ✓ requires the paper to *claim* the property; ~ if the
@@ -433,7 +433,7 @@ MATRIX = [
     ("lightstereo",     "~", "✓", "✗", "✗", "✗", "✗"),
     ("fstereo",         "✗", "✗", "✓", "✗", "✓", "✓"),
     ("defom",           "✗", "✗", "✓", "✗", "✓", "✓"),
-    ("stereolite",      "✓", "✓", "✓", "✓", "~", "?"),
+    ("stereolite",      "✓", "✓", "✓", "✓", "✗", "?"),
 ]
 
 
@@ -952,7 +952,7 @@ def embed_results_progress_gifs(prs):
     The graphs are pre-existing static training-curve PNGs."""
     v8_gif    = FIGS / "training_v8_top3.gif"
     ft_gif    = FIGS / "training_finetune_top3.gif"
-    sf_curves = ROOT / "model/designs/d1_tile/training_curves.png"
+    sf_curves = ROOT / "model/designs/StereoLite/training_curves.png"
     ft_curves = FIGS / "realdata_training.png"
 
     plan = [
