@@ -222,13 +222,19 @@ def render_panel(left_chw: torch.Tensor, gt_hw: torch.Tensor,
     H, W = L_bgr.shape[:2]
     pad = np.zeros((H, W, 3), dtype=np.uint8)
     # First line starts well below the y=22 quadrant label so they don't
-    # overlap; tighter line spacing fits more metric rows in one panel.
-    y = 60
-    line_h = 28
+    # overlap. Auto-fit line height to the number of stats so all rows are
+    # visible regardless of how many metrics we're showing.
+    y0 = 60
+    avail = H - y0 - 4
+    n = max(1, len(stats))
+    line_h = max(14, min(28, avail // n))
+    font_scale = 0.65 if line_h >= 26 else (0.55 if line_h >= 22 else 0.48)
+    thickness = 2 if line_h >= 24 else 1
+    y = y0 + line_h - 6
     for k, v in stats.items():
         cv2.putText(pad, f"{k}: {v}", (10, y),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2,
-                    cv2.LINE_AA)
+                    cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 255, 255),
+                    thickness, cv2.LINE_AA)
         y += line_h
 
     top = np.hstack([L_bgr, GT])

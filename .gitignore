@@ -32,7 +32,7 @@ Thumbs.db
 CLAUDE.md
 .claude/
 
-benchmarks/
+model/benchmarks/*/
 data/
 
 # Model artifacts — don't commit weights or training run outputs
