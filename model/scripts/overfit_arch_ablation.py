@@ -65,19 +65,28 @@ from overfit_yolo_ablation import (  # noqa: E402
 )
 
 
-def _cache_path_for(n_pairs: int):
-    """Derive a per-n_pairs cache file so larger sweeps don't clobber
-    the default 20-pair cache. n=20 keeps the original path for
-    backward compat with prior runs."""
+def _cache_path_for(n_pairs: int, height: int = 384, width: int = 640):
+    """Derive a per-(n_pairs, resolution) cache file so larger sweeps
+    don't clobber the default 20-pair cache. n=20 at default resolution
+    keeps the original path for backward compat with prior runs.
+    Higher-res training writes a separate cache file."""
     from pathlib import Path
-    if n_pairs == 20:
+    if n_pairs == 20 and height == 384 and width == 640:
         return CACHE_PATH
     cache_dir = CACHE_PATH.parent
     cache_dir.mkdir(parents=True, exist_ok=True)
-    return cache_dir / f"sf_overfit_pairs_v1_n{n_pairs}.pt"
+    if height == 384 and width == 640:
+        # Backward-compat name when resolution is the default
+        return cache_dir / f"sf_overfit_pairs_v1_n{n_pairs}.pt"
+    return cache_dir / f"sf_overfit_pairs_v1_n{n_pairs}_{height}x{width}.pt"
 
 
 _NEW_ARCHES = ("costlookup", "tilegru", "raftlike")
+
+# Phase-2 architecture flags injected from main()'s argparse before
+# build_model() is called. Avoids changing build_model's signature for
+# every variant.
+_arch_flags: dict[str, bool] = {}
 
 
 def build_model(arch: str, backbone: str = "ghost",
@@ -100,8 +109,15 @@ def build_model(arch: str, backbone: str = "ghost",
         cfg = StereoLiteConfig()
     elif arch == "costlookup":
         from StereoLite_costlookup.model import StereoLite, StereoLiteConfig
-        cfg = StereoLiteConfig(backbone=backbone, extend_to_full=extend_to_full,
-                                widener=widener)
+        cfg_kwargs = dict(backbone=backbone, extend_to_full=extend_to_full,
+                           widener=widener)
+        # Phase-2 architecture ablation flags (passed via outer scope).
+        for k in ("slope_aware_warp", "selective_gate", "cascade_cv_4",
+                   "context_branch", "init_regress"):
+            v = _arch_flags.get(k)
+            if v is not None:
+                cfg_kwargs[k] = v
+        cfg = StereoLiteConfig(**cfg_kwargs)
     elif arch == "tilegru":
         from StereoLite_tilegru.model import StereoLite, StereoLiteConfig
         cfg = StereoLiteConfig(backbone=backbone, extend_to_full=extend_to_full)
@@ -142,6 +158,29 @@ def main():
                           "the prior multi-scale L1 + grad + bad-1 hinge "
                           "(matches the 12-config sweep). Others add a "
                           "single extra term on top.")
+    ap.add_argument("--seq_loss_gamma", type=float, default=0.9,
+                    help="γ exponent for the RAFT-style γ-weighted "
+                          "per-iter sequence loss (only used if "
+                          "--loss_variant=seq_loss). Lower γ = more "
+                          "weight on the FINAL iter; higher γ = more "
+                          "uniform across iters.")
+    # Phase-2 architecture-side ablation flags.
+    ap.add_argument("--slope_aware_warp", type=int, default=0,
+                    help="A2 — warp fR by slope-corrected disparity")
+    ap.add_argument("--selective_gate", type=int, default=0,
+                    help="A5 — per-pixel 'stop refining' gate in TileRefine")
+    ap.add_argument("--cascade_cv_4", type=int, default=0,
+                    help="A3 — narrow-range 3D-agg CV at 1/4")
+    ap.add_argument("--context_branch", type=int, default=0,
+                    help="A1 — small parallel context encoder fed into TileRefine")
+    ap.add_argument("--init_regress", type=int, default=0,
+                    help="Expert-recommended: APC + 2-layer regression head "
+                          "in TileInit (costlookup variant only). Pair with "
+                          "--init_loss_weight > 0 to actually supervise it.")
+    ap.add_argument("--init_loss_weight", type=float, default=0.0,
+                    help="Smooth-L1 supervision weight on the post-init "
+                          "disparity (out_dict['d32']). Implements the IGEV "
+                          "L_init pattern. 0 = off; 0.5 is a reasonable start.")
     ap.add_argument("--variant_tag", type=str, default="",
                     help="optional override for the per-variant subdir. "
                           "Defaults to arch name.")
@@ -204,7 +243,7 @@ def main():
     # Load pairs.
     Ls, Rs, Ds, valid, pair_paths = load_or_cache_pairs(
         args.n_pairs, (args.height, args.width),
-        cache_path=_cache_path_for(args.n_pairs))
+        cache_path=_cache_path_for(args.n_pairs, args.height, args.width))
     # For n_pairs > ~30 the upfront .to(device) eats too much GPU memory on
     # the RTX 3050 (each pair is ~7 MB across L+R+D+valid; 100 pairs = ~786 MB
     # before training even starts). Keep on pinned CPU memory and ship each
@@ -219,6 +258,13 @@ def main():
         Ds = Ds.to(device); valid = valid.to(device)
     print(f"  L shape={tuple(Ls.shape)}  D range=[{Ds[valid > 0].min():.1f}, "
           f"{Ds[valid > 0].max():.1f}]")
+
+    # Pass Phase-2 arch flags into build_model via module-level dict.
+    _arch_flags["slope_aware_warp"] = bool(args.slope_aware_warp)
+    _arch_flags["selective_gate"] = bool(args.selective_gate)
+    _arch_flags["cascade_cv_4"] = bool(args.cascade_cv_4)
+    _arch_flags["context_branch"] = bool(args.context_branch)
+    _arch_flags["init_regress"] = bool(args.init_regress)
 
     # Build model.
     model, cfg = build_model(args.arch,
@@ -429,13 +475,19 @@ def main():
                 )
                 # Phase-2 ablation: optional extra loss term
                 if args.loss_variant == "seq_loss":
-                    loss = loss + 0.3 * seq_loss(out_dict, D, V)
+                    loss = loss + 0.3 * seq_loss(out_dict, D, V,
+                                                  gamma=args.seq_loss_gamma)
                 elif args.loss_variant == "slope_sup":
                     loss = loss + 0.3 * slope_sup_loss(out_dict, D, V)
                 elif args.loss_variant == "conf_aware":
                     loss = loss + 0.3 * conf_aware_loss(out_dict, D, V)
                 elif args.loss_variant == "edge_smooth":
                     loss = loss + 0.1 * edge_smooth_loss(d_full, L, V)
+                # Expert-recommended: L_init supervision on the post-init
+                # disparity (d32) with smooth-L1. Implements IGEV's L_init.
+                if args.init_loss_weight > 0:
+                    loss = loss + args.init_loss_weight * ms_l1(
+                        out_dict["d32"], D, V, 16.0)
             scaler.scale(loss).backward()
             scaler.unscale_(opt)
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -458,13 +510,17 @@ def main():
                 + 0.2 * bad1_hinge(d_full, D, V)
             )
             if args.loss_variant == "seq_loss":
-                loss = loss + 0.3 * seq_loss(out_dict, D, V)
+                loss = loss + 0.3 * seq_loss(out_dict, D, V,
+                                              gamma=args.seq_loss_gamma)
             elif args.loss_variant == "slope_sup":
                 loss = loss + 0.3 * slope_sup_loss(out_dict, D, V)
             elif args.loss_variant == "conf_aware":
                 loss = loss + 0.3 * conf_aware_loss(out_dict, D, V)
             elif args.loss_variant == "edge_smooth":
                 loss = loss + 0.1 * edge_smooth_loss(d_full, L, V)
+            if args.init_loss_weight > 0:
+                loss = loss + args.init_loss_weight * ms_l1(
+                    out_dict["d32"], D, V, 16.0)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             opt.step()

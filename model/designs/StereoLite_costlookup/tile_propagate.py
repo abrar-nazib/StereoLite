@@ -107,15 +107,28 @@ def _correlation_lookup(fL: torch.Tensor, fR: torch.Tensor,
 
 
 class TileInit(nn.Module):
-    """Same as the StereoLite TileInit — local cost volume + soft-argmin."""
+    """Same as the StereoLite TileInit — local cost volume + soft-argmin.
+
+    When `regress=True`, additionally appends a small regression head that
+    refines the soft-argmin estimate. The head:
+      1) applies an APC-style 1D conv along the disparity axis of the
+         logits (kernel=3, max_disp -> max_disp), giving each disparity bin
+         a wider receptive field along d before regression;
+      2) reduces the refined logits + fL features through 2 2D conv layers;
+      3) emits a per-pixel additive correction `delta` that is added to the
+         soft-argmin output.
+    The regressed output is supervised explicitly with smooth-L1 in the
+    trainer — this is the IGEV-style L_init pattern adapted for our chassis.
+    """
 
     def __init__(self, feat_ch: int, max_disp: int = 24, groups: int = 8,
-                 feat_out: int = 16):
+                 feat_out: int = 16, regress: bool = False):
         super().__init__()
         assert feat_ch % groups == 0
         self.max_disp = max_disp
         self.groups = groups
         self.feat_out = feat_out
+        self.regress = regress
         self.agg = nn.Sequential(
             nn.Conv3d(groups, 16, 3, padding=1, bias=False),
             _safe_gn(16), nn.SiLU(inplace=True),
@@ -127,6 +140,19 @@ class TileInit(nn.Module):
             nn.Conv2d(feat_ch, feat_out, 3, padding=1, bias=False),
             _safe_gn(feat_out), nn.SiLU(inplace=True),
         )
+        if regress:
+            # APC-style 1D conv along the disparity axis. Treats the
+            # max_disp logits as a 1D signal at each (H, W) location.
+            # Kernel 3 along d gives ±1 disparity-bin context.
+            self.apc_d = nn.Conv1d(max_disp, max_disp, kernel_size=3,
+                                    padding=1, bias=False)
+            # 2-layer 2D regression head: takes refined logits +
+            # feat_out as input and emits a scalar delta_d.
+            self.regress_head = nn.Sequential(
+                nn.Conv2d(max_disp + feat_out, 32, 3, padding=1, bias=False),
+                _safe_gn(32), nn.SiLU(inplace=True),
+                nn.Conv2d(32, 1, 3, padding=1, bias=True),
+            )
         self.register_buffer(
             "disp_idx",
             torch.arange(max_disp, dtype=torch.float32).view(1, max_disp, 1, 1),
@@ -146,24 +172,45 @@ class TileInit(nn.Module):
                 fR_s[:, :, :, d:] = fR[:, :, :, :-d]
             fR_g = fR_s.view(B, self.groups, cg, H, W)
             cv[:, :, d] = (fL_g * fR_g).mean(dim=2)
-        logits = self.agg(cv).squeeze(1)
+        logits = self.agg(cv).squeeze(1)            # (B, D, H, W)
         prob = F.softmax(logits, dim=1)
-        d = (prob * self.disp_idx).sum(dim=1, keepdim=True)
+        d_sa = (prob * self.disp_idx).sum(dim=1, keepdim=True)  # soft-argmin
         conf = prob.max(dim=1, keepdim=True).values
-        sx = torch.zeros_like(d)
-        sy = torch.zeros_like(d)
         feat = self.feat_head(fL)
-        return TileState(d=d, sx=sx, sy=sy, feat=feat, conf=conf)
+        if self.regress:
+            # APC: 1D conv along d. Reshape (B, D, H, W) -> (B, D, H*W)
+            # treated as Conv1d input with channels=D, length=H*W.
+            B_, D_, H_, W_ = logits.shape
+            apc_in = logits.view(B_, D_, H_ * W_)
+            apc_out = self.apc_d(apc_in).view(B_, D_, H_, W_)
+            # 2-layer 2D regression head -> additive correction
+            head_in = torch.cat([apc_out, feat], dim=1)
+            delta = self.regress_head(head_in)
+            d_init = d_sa + delta
+        else:
+            d_init = d_sa
+        sx = torch.zeros_like(d_init)
+        sy = torch.zeros_like(d_init)
+        return TileState(d=d_init, sx=sx, sy=sy, feat=feat, conf=conf)
 
 
 class TileRefineCostLookup(nn.Module):
     """TileRefine + per-iter local correlation lookup.
 
     Channels added to input: groups_eff * (2*half_range+1).
+
+    Optional ablation knobs (config-controlled, all default off):
+      - slope_aware_warp: warp fR using slope-corrected disparity
+        (averages two grid_samples at d±0.5*sx)
+      - selective_gate: per-pixel gate scales the residual updates
+        (Selective-Stereo style "stop refining" when confident)
     """
 
     def __init__(self, feat_ch: int, tile_feat_ch: int, hidden: int = 48,
-                 half_range: int = 2, groups: int = 8):
+                 half_range: int = 2, groups: int = 8,
+                 slope_aware_warp: bool = False,
+                 selective_gate: bool = False,
+                 context_ch: int = 0):
         super().__init__()
         # Pick groups that divides feat_ch
         g = groups
@@ -172,8 +219,11 @@ class TileRefineCostLookup(nn.Module):
         self.groups_eff = g
         self.half_range = half_range
         self.feat_ch = feat_ch
+        self.slope_aware_warp = slope_aware_warp
+        self.selective_gate = selective_gate
+        self.context_ch = context_ch
         cost_ch = g * (2 * half_range + 1)
-        in_ch = 2 * feat_ch + tile_feat_ch + 4 + cost_ch
+        in_ch = 2 * feat_ch + tile_feat_ch + 4 + cost_ch + context_ch
         self.trunk = nn.Sequential(
             nn.Conv2d(in_ch, hidden, 3, padding=1, bias=False),
             _safe_gn(hidden), nn.SiLU(inplace=True),
@@ -187,20 +237,35 @@ class TileRefineCostLookup(nn.Module):
         self.head_sy = nn.Conv2d(hidden, 1, 1)
         self.head_conf = nn.Conv2d(hidden, 1, 1)
         self.head_feat = nn.Conv2d(hidden, tile_feat_ch, 1)
+        if selective_gate:
+            self.gate_head = nn.Conv2d(hidden, 1, 1)
 
     def forward(self, tile: TileState, fL: torch.Tensor,
-                fR: torch.Tensor) -> TileState:
-        fR_w = _horizontal_warp(fR, tile.d)
+                fR: torch.Tensor,
+                context: torch.Tensor | None = None) -> TileState:
+        if self.slope_aware_warp:
+            fR_w = _horizontal_warp(fR, tile.d, sx=tile.sx, sy=tile.sy)
+        else:
+            fR_w = _horizontal_warp(fR, tile.d)
         cost = _correlation_lookup(fL, fR, tile.d,
                                    self.half_range, self.groups_eff)
-        x = torch.cat([fL, fR_w, tile.feat, tile.d, tile.sx, tile.sy,
-                        tile.conf, cost], dim=1)
+        cat_list = [fL, fR_w, tile.feat, tile.d, tile.sx, tile.sy,
+                    tile.conf, cost]
+        if context is not None and self.context_ch > 0:
+            cat_list.append(context)
+        x = torch.cat(cat_list, dim=1)
         h = self.trunk(x)
-        d = F.softplus(self.head_d(h) + tile.d)
-        sx = tile.sx + self.head_sx(h) * 0.1
-        sy = tile.sy + self.head_sy(h) * 0.1
+        # Selective-Stereo style "stop refining" gate — per-pixel scalar in
+        # [0, 1] that scales the residual updates.
+        if self.selective_gate:
+            gate = torch.sigmoid(self.gate_head(h))
+        else:
+            gate = 1.0
+        d = F.softplus(self.head_d(h) * gate + tile.d)
+        sx = tile.sx + self.head_sx(h) * gate * 0.1
+        sy = tile.sy + self.head_sy(h) * gate * 0.1
         conf = torch.sigmoid(self.head_conf(h) + 2.0 * tile.conf - 1.0)
-        feat = tile.feat + self.head_feat(h)
+        feat = tile.feat + self.head_feat(h) * gate
         return TileState(d=d, sx=sx, sy=sy, feat=feat, conf=conf)
 
 

@@ -107,6 +107,17 @@ class StereoLiteConfig:
     # Optional feature-widener applied to the encoder outputs.
     # See model/designs/_wideners.py for the catalogue. None = no widener.
     widener: str | None = None
+    # ---- Phase-2 ablation knobs (default off; baseline = ghostconv winner) ----
+    slope_aware_warp: bool = False        # A2 — slope-corrected fR sample
+    selective_gate: bool = False          # A5 — per-pixel "stop refining" gate
+    cascade_cv_4: bool = False            # A3 — narrow-range 3D-agg CV at 1/4
+    context_branch: bool = False          # A1 — small parallel encoder fed
+                                           # into TileRefine alongside fL/fR
+    context_branch_ch: int = 24           # base channels for the context encoder
+    # ---- Expert-recommended warm-start init regression (IGEV-style) ----
+    init_regress: bool = False            # add APC + 2-layer head to TileInit;
+                                           # supervise d_init with smooth-L1 in the
+                                           # trainer (--init_loss_weight > 0).
 
 
 class StereoLite(nn.Module):
@@ -136,23 +147,52 @@ class StereoLite(nn.Module):
         self.init_tile = TileInit(feat_ch=ch16,
                                    max_disp=self.cfg.init_max_disp,
                                    groups=g,
-                                   feat_out=self.cfg.tile_feat_ch)
+                                   feat_out=self.cfg.tile_feat_ch,
+                                   regress=self.cfg.init_regress)
 
-        def make_refine(feat_ch):
+        # Context branch (A1) — small parallel encoder mimicking the matching
+        # encoder's strides. Provides per-stage context features that get
+        # concatenated into TileRefine's input alongside fL/fR_warp.
+        if self.cfg.context_branch:
+            cb = self.cfg.context_branch_ch
+            # Reuse TileFeatureEncoder for the context encoder; it already
+            # gives 4 stages at strides (2, 4, 8, 16) with channels
+            # (cb, 2*cb, 3*cb, 4*cb). Tiny by construction.
+            self.cnet = TileFeatureEncoder(base=cb)
+            ctx2, ctx4, ctx8, ctx16 = self.cnet.out_channels
+            ctx_chs = (ctx2, ctx4, ctx8, ctx16)
+        else:
+            self.cnet = None
+            ctx_chs = (0, 0, 0, 0)
+
+        def make_refine(feat_ch, ctx_ch=0):
             return TileRefineCostLookup(
                 feat_ch=feat_ch, tile_feat_ch=self.cfg.tile_feat_ch,
                 hidden=self.cfg.refine_hidden,
                 half_range=self.cfg.cost_lookup_half_range,
-                groups=self.cfg.cost_lookup_groups)
+                groups=self.cfg.cost_lookup_groups,
+                slope_aware_warp=self.cfg.slope_aware_warp,
+                selective_gate=self.cfg.selective_gate,
+                context_ch=ctx_ch)
 
-        self.refine_16 = make_refine(ch16)
-        self.refine_8 = make_refine(ch8)
-        self.refine_4 = make_refine(ch4)
+        self.refine_16 = make_refine(ch16, ctx_chs[3])
+        self.refine_8 = make_refine(ch8, ctx_chs[2])
+        self.refine_4 = make_refine(ch4, ctx_chs[1])
         self.up_16_to_8 = TileUpsample(scale_factor=2)
         self.up_8_to_4 = TileUpsample(scale_factor=2)
 
+        # A3 cascade_cv_4 — narrow-range 3D-aggregated cost volume between
+        # iters at 1/4 (BGNet/CFNet style). Refines the disparity field
+        # mid-iteration with a denser matching signal at fine scale.
+        if self.cfg.cascade_cv_4:
+            from StereoLite.cost_volume import CascadeRefinementVolume
+            self.cascade_4 = CascadeRefinementVolume(
+                feat_ch=ch4, half_range=4, groups=8, agg_ch=24)
+        else:
+            self.cascade_4 = None
+
         if self.cfg.extend_to_full:
-            self.refine_2 = make_refine(ch2)
+            self.refine_2 = make_refine(ch2, ctx_chs[0])
             self.up_4_to_2 = TileUpsample(scale_factor=2)
             self.up_2_to_1 = TileUpsample(scale_factor=2)
             self.up_final_4_to_2 = None
@@ -174,29 +214,41 @@ class StereoLite(nn.Module):
         fL8,  fR8  = feats[2].chunk(2, dim=0)
         fL16, fR16 = feats[3].chunk(2, dim=0)
 
+        # Context branch (A1) — runs only on the LEFT image, in parallel.
+        if self.cnet is not None:
+            cfeats = self.cnet(left)
+            ctx2, ctx4, ctx8, ctx16 = cfeats
+        else:
+            ctx2 = ctx4 = ctx8 = ctx16 = None
+
         tile = self.init_tile(fL16, fR16)
         t16_stages = [tile]
         for _ in range(self.cfg.iters_16):
-            tile = self.refine_16(tile, fL16, fR16)
+            tile = self.refine_16(tile, fL16, fR16, context=ctx16)
             t16_stages.append(tile)
 
         tile = self.up_16_to_8(tile, target_hw=fL8.shape[-2:])
         t8_stages = [tile]
         for _ in range(self.cfg.iters_8):
-            tile = self.refine_8(tile, fL8, fR8)
+            tile = self.refine_8(tile, fL8, fR8, context=ctx8)
             t8_stages.append(tile)
 
         tile = self.up_8_to_4(tile, target_hw=fL4.shape[-2:])
         t4_stages = [tile]
-        for _ in range(self.cfg.iters_4):
-            tile = self.refine_4(tile, fL4, fR4)
+        for i in range(self.cfg.iters_4):
+            # A3: insert cascade CV refinement between iter 1 and iter 2
+            if self.cascade_4 is not None and i == 1:
+                d_ref = self.cascade_4(fL4, fR4, tile.d)
+                tile = TileState(d=d_ref, sx=tile.sx, sy=tile.sy,
+                                  feat=tile.feat, conf=tile.conf)
+            tile = self.refine_4(tile, fL4, fR4, context=ctx4)
             t4_stages.append(tile)
 
         if self.cfg.extend_to_full:
             tile = self.up_4_to_2(tile, target_hw=fL2.shape[-2:])
             t2_stages = [tile]
             for _ in range(self.cfg.iters_2):
-                tile = self.refine_2(tile, fL2, fR2)
+                tile = self.refine_2(tile, fL2, fR2, context=ctx2)
                 t2_stages.append(tile)
             d_half = tile.d
             tile_full = self.up_2_to_1(tile, target_hw=left.shape[-2:])

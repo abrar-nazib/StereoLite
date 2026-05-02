@@ -143,7 +143,8 @@ class StereoLite(nn.Module):
             self.up_final_4_to_2 = ConvexUpsample(feat_ch=ch4, scale=2)
             self.up_final_2_to_1 = ConvexUpsample(feat_ch=ch2, scale=2)
 
-    def forward(self, left, right, aux: bool = False):
+    def forward(self, left, right, aux: bool = False,
+                with_iter_stages: bool = False):
         feats = self.fnet(torch.cat([left, right], dim=0))
         fL2,  fR2  = feats[0].chunk(2, dim=0)
         fL4,  fR4  = feats[1].chunk(2, dim=0)
@@ -178,6 +179,7 @@ class StereoLite(nn.Module):
             tile_full = self.up_2_to_1(tile, target_hw=left.shape[-2:])
             d_full = tile_full.d
         else:
+            t2_stages = []
             d_half = self.up_final_4_to_2(tile.d, fL4)
             d_full = self.up_final_2_to_1(d_half, fL2)
 
@@ -186,7 +188,7 @@ class StereoLite(nn.Module):
                                     mode="bilinear", align_corners=True)
 
         if aux:
-            return {
+            d = {
                 "d_final": d_full,
                 "d_half": d_half,
                 "d4": t4_stages[-1].d,
@@ -195,4 +197,10 @@ class StereoLite(nn.Module):
                 "d16": t16_stages[-1].d,
                 "d32": t16_stages[0].d,
             }
+            if with_iter_stages:
+                d["iter_stages_16"] = [t.d for t in t16_stages]
+                d["iter_stages_8"]  = [t.d for t in t8_stages]
+                d["iter_stages_4"]  = [t.d for t in t4_stages]
+                d["iter_stages_2"]  = [t.d for t in t2_stages]
+            return d
         return d_full
