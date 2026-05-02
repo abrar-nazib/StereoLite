@@ -65,10 +65,29 @@ from overfit_yolo_ablation import (  # noqa: E402
 )
 
 
-def build_model(arch: str):
-    """Return (StereoLite_class, StereoLiteConfig_class) for the chosen arch.
+def _cache_path_for(n_pairs: int):
+    """Derive a per-n_pairs cache file so larger sweeps don't clobber
+    the default 20-pair cache. n=20 keeps the original path for
+    backward compat with prior runs."""
+    from pathlib import Path
+    if n_pairs == 20:
+        return CACHE_PATH
+    cache_dir = CACHE_PATH.parent
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    return cache_dir / f"sf_overfit_pairs_v1_n{n_pairs}.pt"
 
-    All three accept backbone="ghost" as the only valid backbone.
+
+_NEW_ARCHES = ("costlookup", "tilegru", "raftlike")
+
+
+def build_model(arch: str, backbone: str = "ghost",
+                extend_to_full: bool = False,
+                widener: str | None = None):
+    """Return (StereoLite_instance, StereoLiteConfig).
+
+    `backbone` and `extend_to_full` are honoured for the costlookup /
+    tilegru / raftlike variants. The legacy archs (current, v1_iter,
+    v2_hitnet) ignore them — they're each fixed to a specific config.
     """
     if arch == "current":
         from StereoLite_yolo.model import StereoLite, StereoLiteConfig
@@ -79,6 +98,16 @@ def build_model(arch: str):
     elif arch == "v2_hitnet":
         from StereoLite_v2_hitnet.model import StereoLite, StereoLiteConfig
         cfg = StereoLiteConfig()
+    elif arch == "costlookup":
+        from StereoLite_costlookup.model import StereoLite, StereoLiteConfig
+        cfg = StereoLiteConfig(backbone=backbone, extend_to_full=extend_to_full,
+                                widener=widener)
+    elif arch == "tilegru":
+        from StereoLite_tilegru.model import StereoLite, StereoLiteConfig
+        cfg = StereoLiteConfig(backbone=backbone, extend_to_full=extend_to_full)
+    elif arch == "raftlike":
+        from StereoLite_raftlike.model import StereoLite, StereoLiteConfig
+        cfg = StereoLiteConfig(backbone=backbone, extend_to_full=extend_to_full)
     else:
         raise ValueError(f"unknown arch: {arch}")
     return StereoLite(cfg), cfg
@@ -87,8 +116,35 @@ def build_model(arch: str):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--arch",
-                    choices=["current", "v1_iter", "v2_hitnet"],
+                    choices=["current", "v1_iter", "v2_hitnet",
+                              "costlookup", "tilegru", "raftlike"],
                     required=True)
+    ap.add_argument("--backbone",
+                    choices=["ghost", "yolo26n", "yolo26s"],
+                    default="ghost",
+                    help="encoder backbone (only used for costlookup/"
+                          "tilegru/raftlike). Legacy archs ignore this.")
+    ap.add_argument("--extend_to_full", type=int, default=0,
+                    help="1 = TileRefine all the way to 1/2 + plane-eq to "
+                          "full (no ConvexUpsample). 0 = ConvexUpsample "
+                          "1/4 -> 1/2 -> full. Only used for new archs.")
+    ap.add_argument("--widener", type=str, default=None,
+                    choices=[None, "none", "f2_only", "f2_f4", "all_to_s",
+                              "dw", "mbconv", "ghostconv",
+                              "topdown_fpn", "bifpn", "gn_replace"],
+                    help="optional feature widener applied to the yolo26n "
+                          "encoder outputs (only meaningful for costlookup). "
+                          "See model/designs/_wideners.py for definitions.")
+    ap.add_argument("--loss_variant", type=str, default="baseline",
+                    choices=["baseline", "seq_loss", "slope_sup",
+                              "conf_aware", "edge_smooth"],
+                    help="Phase-2 loss-side ablation variant. baseline = "
+                          "the prior multi-scale L1 + grad + bad-1 hinge "
+                          "(matches the 12-config sweep). Others add a "
+                          "single extra term on top.")
+    ap.add_argument("--variant_tag", type=str, default="",
+                    help="optional override for the per-variant subdir. "
+                          "Defaults to arch name.")
     ap.add_argument("--steps", type=int, default=3000)
     ap.add_argument("--lr", type=float, default=2e-4)
     ap.add_argument("--batch", type=int, default=4)
@@ -111,7 +167,16 @@ def main():
     torch.cuda.manual_seed_all(args.seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-    torch.use_deterministic_algorithms(True, warn_only=True)
+    # `use_deterministic_algorithms(True)` forces a decomposed path for
+    # bilinear interpolate that allocates ~2x more activation memory at
+    # high resolutions, which OOMs on RTX 3050 for the new arches at 1/2
+    # res. Seeded RNG + cudnn.deterministic still give run-to-run
+    # reproducibility for the legacy archs; we relax only the ATen-level
+    # enforcement, and only for the new (memory-heavier) arches.
+    if args.arch in _NEW_ARCHES:
+        torch.use_deterministic_algorithms(False)
+    else:
+        torch.use_deterministic_algorithms(True, warn_only=True)
     device = "cuda" if torch.cuda.is_available() else "cpu"
     if device != "cuda":
         print("[WARN] no GPU detected; running on CPU will be very slow.")
@@ -122,19 +187,44 @@ def main():
     else:
         ts = datetime.now().strftime("%Y%m%d-%H%M%S")
         out_root = BENCH_ROOT / f"arch_ablation_{ts}"
-    out = out_root / args.arch
+    # variant_tag wins if set; else encode (arch, backbone, extend) for the
+    # new archs to disambiguate sweep variants.
+    if args.variant_tag:
+        tag = args.variant_tag
+    elif args.arch in _NEW_ARCHES:
+        suffix = "_full" if args.extend_to_full else ""
+        widener_suf = (f"_w_{args.widener}" if args.widener
+                        and args.widener != "none" else "")
+        tag = f"{args.arch}_{args.backbone}{suffix}{widener_suf}"
+    else:
+        tag = args.arch
+    out = out_root / tag
     out.mkdir(parents=True, exist_ok=True)
 
     # Load pairs.
     Ls, Rs, Ds, valid, pair_paths = load_or_cache_pairs(
-        args.n_pairs, (args.height, args.width))
-    Ls = Ls.to(device); Rs = Rs.to(device)
-    Ds = Ds.to(device); valid = valid.to(device)
+        args.n_pairs, (args.height, args.width),
+        cache_path=_cache_path_for(args.n_pairs))
+    # For n_pairs > ~30 the upfront .to(device) eats too much GPU memory on
+    # the RTX 3050 (each pair is ~7 MB across L+R+D+valid; 100 pairs = ~786 MB
+    # before training even starts). Keep on pinned CPU memory and ship each
+    # mini-batch to GPU on demand. For small N (<=30) keep the old fast path.
+    cpu_residency = args.n_pairs > 30
+    if cpu_residency:
+        if device == "cuda":
+            Ls = Ls.pin_memory(); Rs = Rs.pin_memory()
+            Ds = Ds.pin_memory(); valid = valid.pin_memory()
+    else:
+        Ls = Ls.to(device); Rs = Rs.to(device)
+        Ds = Ds.to(device); valid = valid.to(device)
     print(f"  L shape={tuple(Ls.shape)}  D range=[{Ds[valid > 0].min():.1f}, "
           f"{Ds[valid > 0].max():.1f}]")
 
     # Build model.
-    model, cfg = build_model(args.arch)
+    model, cfg = build_model(args.arch,
+                              backbone=args.backbone,
+                              extend_to_full=bool(args.extend_to_full),
+                              widener=args.widener)
     model = model.to(device)
     n_total = sum(p.numel() for p in model.parameters())
     n_train = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -185,6 +275,11 @@ def main():
     Rviz = Rs[viz_pair:viz_pair + 1]
     Dviz = Ds[viz_pair:viz_pair + 1]
     Vviz = valid[viz_pair:viz_pair + 1]
+    if cpu_residency and device == "cuda":
+        Lviz = Lviz.to(device, non_blocking=True)
+        Rviz = Rviz.to(device, non_blocking=True)
+        Dviz = Dviz.to(device, non_blocking=True)
+        Vviz = Vviz.to(device, non_blocking=True)
     show_ok = bool(args.show) and bool(os.environ.get("DISPLAY"))
 
     def ms_l1(pred, gt, val, scale):
@@ -209,31 +304,170 @@ def main():
         hinge = (err - 1.0).clamp(min=0) ** 2
         return (hinge * val).sum() / val.sum().clamp(min=1)
 
-    for step in range(1, args.steps + 1):
-        idx = rng.choice(N, size=args.batch, replace=False)
-        L = Ls[idx]; R = Rs[idx]; D = Ds[idx]; V = valid[idx]
+    # ---------- Phase-2 ablation extras (loss-side variants) ----------
+    def seq_loss(out_dict, gt, val, gamma=0.9):
+        """RAFT-style γ-weighted L1 across every TileRefine iteration at
+        every scale. Each list `iter_stages_<s>` holds tile.d at every iter
+        — element 0 is post-init/upsample, element i>=1 is after the i-th
+        refine pass. Later iters get higher weight; supervises early iters."""
+        total = 0.0
+        wsum = 0.0
+        scale_keys = [(16, "iter_stages_16"), (8, "iter_stages_8"),
+                      (4, "iter_stages_4"),  (2, "iter_stages_2")]
+        all_stages = [(s, d) for s, k in scale_keys for d in out_dict.get(k, [])]
+        N = len(all_stages)
+        for i, (sc, d) in enumerate(all_stages):
+            weight = gamma ** (N - 1 - i)
+            if d.shape[-2:] != gt.shape[-2:]:
+                d_up = F.interpolate(d, size=gt.shape[-2:],
+                                      mode="bilinear", align_corners=False) * sc
+            else:
+                d_up = d
+            term = ((d_up - gt).abs() * val).sum() / val.sum().clamp(min=1)
+            total = total + weight * term
+            wsum += weight
+        return total / max(wsum, 1e-6)
 
-        out_dict = model(L, R, aux=True)
+    def slope_sup_loss(out_dict, gt, val):
+        """Direct supervision of sx, sy from finite-difference GT gradient.
+        Currently slopes (sx, sy) are unsupervised — only flow through
+        plane-eq upsample. This term gives them an explicit target."""
+        # Compute target slopes at full resolution from GT
+        gx_gt = gt[..., :, 1:] - gt[..., :, :-1]                    # (B,1,H,W-1)
+        gy_gt = gt[..., 1:, :] - gt[..., :-1, :]                    # (B,1,H-1,W)
+        # Use d_full as predicted gradient surrogate (slope behaviour
+        # in-betweens scales is hard to supervise; cleanest target is
+        # via the final disparity prediction's gradient).
         d_full = out_dict["d_final"]
-        d_half = out_dict["d_half"]
-        d4 = out_dict["d4"]
-        d8 = out_dict["d8"]
-        d16 = out_dict["d16"]
+        gx_p = d_full[..., :, 1:] - d_full[..., :, :-1]
+        gy_p = d_full[..., 1:, :] - d_full[..., :-1, :]
+        vx = val[..., :, 1:] * val[..., :, :-1]
+        vy = val[..., 1:, :] * val[..., :-1, :]
+        lx = ((gx_p - gx_gt).abs() * vx).sum() / vx.sum().clamp(min=1)
+        ly = ((gy_p - gy_gt).abs() * vy).sum() / vy.sum().clamp(min=1)
+        # This is structurally similar to grad_consistency; the difference
+        # is intent: slope_sup targets the *gradient-of-disparity* directly
+        # instead of as a side-effect of multi-scale L1 + grad consistency.
+        return lx + ly
 
-        loss = (
-            1.0 * ms_l1(d_full, D, V, 1.0)
-            + 0.5 * ms_l1(d_half, D, V, 2.0)
-            + 0.3 * ms_l1(d4, D, V, 4.0)
-            + 0.2 * ms_l1(d8, D, V, 8.0)
-            + 0.1 * ms_l1(d16, D, V, 16.0)
-            + 0.5 * grad_consistency(d_full, D, V)
-            + 0.2 * bad1_hinge(d_full, D, V)
-        )
+    def conf_aware_loss(out_dict, gt, val, tau_correct=1.0):
+        """Train conf head with proxy targets: pixels where |d_pred - GT|
+        < tau_correct are 'correct', conf should be high. Else low.
+        Loss: BCE on conf vs binary correctness target.
+        Conf is at 1/4 resolution (last tile state's conf field upsampled
+        to full); we read it from out_dict if present, else skip."""
+        # We don't currently have conf in aux dict. For this ablation,
+        # use the model's last tile state - we'd need to surface it.
+        # Quick proxy: penalise where d_full is wrong (encourage low conf
+        # on hard pixels), via |err| as a soft target weight.
+        # (Real conf head loss requires extra plumbing; this term is a
+        # lightweight proxy.)
+        d_full = out_dict["d_final"]
+        err = (d_full - gt).abs()
+        # Target conf: 1 if correct (err < tau), 0 otherwise. Continuous
+        # version: target = exp(-err / tau).
+        target = torch.exp(-err / tau_correct)
+        # Without an exposed conf head, supervise the *disparity* harder
+        # where err > tau (focal-style weighting). This is a stand-in.
+        focal_w = (1 - target).clamp(0, 1)
+        return ((err * focal_w) * val).sum() / val.sum().clamp(min=1)
+
+    def edge_smooth_loss(d, left, val, alpha=10.0):
+        """First-order edge-aware smoothness: |∇d| * exp(-α |∇L|).
+        Penalises disparity discontinuities except where the image has
+        edges (preserves real depth boundaries, smooths flat regions)."""
+        # Image gradient (mean over channels)
+        L_grey = left.mean(dim=1, keepdim=True) / 255.0   # (B,1,H,W) in [0,1]
+        gx_L = (L_grey[..., :, 1:] - L_grey[..., :, :-1]).abs()
+        gy_L = (L_grey[..., 1:, :] - L_grey[..., :-1, :]).abs()
+        gx_d = (d[..., :, 1:] - d[..., :, :-1]).abs()
+        gy_d = (d[..., 1:, :] - d[..., :-1, :]).abs()
+        wx = torch.exp(-alpha * gx_L)
+        wy = torch.exp(-alpha * gy_L)
+        vx = val[..., :, 1:] * val[..., :, :-1]
+        vy = val[..., 1:, :] * val[..., :-1, :]
+        lx = (gx_d * wx * vx).sum() / vx.sum().clamp(min=1)
+        ly = (gy_d * wy * vy).sum() / vy.sum().clamp(min=1)
+        return lx + ly
+
+    # AMP autocast for the new (memory-heavy) arches — cuts activation
+    # memory ~50% with negligible accuracy impact in our experience.
+    use_amp = (device == "cuda") and (args.arch in _NEW_ARCHES)
+    scaler = torch.amp.GradScaler("cuda") if use_amp else None
+
+    for step in range(1, args.steps + 1):
+        # Allow batch > n_pairs by sampling with replacement; otherwise sample
+        # without replacement (matches prior runs).
+        replace_sampling = args.batch > N
+        idx = rng.choice(N, size=args.batch, replace=replace_sampling)
+        if cpu_residency and device == "cuda":
+            L = Ls[idx].to(device, non_blocking=True)
+            R = Rs[idx].to(device, non_blocking=True)
+            D = Ds[idx].to(device, non_blocking=True)
+            V = valid[idx].to(device, non_blocking=True)
+        else:
+            L = Ls[idx]; R = Rs[idx]; D = Ds[idx]; V = valid[idx]
 
         opt.zero_grad(set_to_none=True)
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-        opt.step()
+        if use_amp:
+            with torch.amp.autocast("cuda", dtype=torch.float16):
+                out_dict = model(L, R, aux=True,
+                                  with_iter_stages=(args.loss_variant == "seq_loss"))
+                d_full = out_dict["d_final"]
+                d_half = out_dict["d_half"]
+                d4 = out_dict["d4"]
+                d8 = out_dict["d8"]
+                d16 = out_dict["d16"]
+                loss = (
+                    1.0 * ms_l1(d_full, D, V, 1.0)
+                    + 0.5 * ms_l1(d_half, D, V, 2.0)
+                    + 0.3 * ms_l1(d4, D, V, 4.0)
+                    + 0.2 * ms_l1(d8, D, V, 8.0)
+                    + 0.1 * ms_l1(d16, D, V, 16.0)
+                    + 0.5 * grad_consistency(d_full, D, V)
+                    + 0.2 * bad1_hinge(d_full, D, V)
+                )
+                # Phase-2 ablation: optional extra loss term
+                if args.loss_variant == "seq_loss":
+                    loss = loss + 0.3 * seq_loss(out_dict, D, V)
+                elif args.loss_variant == "slope_sup":
+                    loss = loss + 0.3 * slope_sup_loss(out_dict, D, V)
+                elif args.loss_variant == "conf_aware":
+                    loss = loss + 0.3 * conf_aware_loss(out_dict, D, V)
+                elif args.loss_variant == "edge_smooth":
+                    loss = loss + 0.1 * edge_smooth_loss(d_full, L, V)
+            scaler.scale(loss).backward()
+            scaler.unscale_(opt)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            scaler.step(opt)
+            scaler.update()
+        else:
+            out_dict = model(L, R, aux=True)
+            d_full = out_dict["d_final"]
+            d_half = out_dict["d_half"]
+            d4 = out_dict["d4"]
+            d8 = out_dict["d8"]
+            d16 = out_dict["d16"]
+            loss = (
+                1.0 * ms_l1(d_full, D, V, 1.0)
+                + 0.5 * ms_l1(d_half, D, V, 2.0)
+                + 0.3 * ms_l1(d4, D, V, 4.0)
+                + 0.2 * ms_l1(d8, D, V, 8.0)
+                + 0.1 * ms_l1(d16, D, V, 16.0)
+                + 0.5 * grad_consistency(d_full, D, V)
+                + 0.2 * bad1_hinge(d_full, D, V)
+            )
+            if args.loss_variant == "seq_loss":
+                loss = loss + 0.3 * seq_loss(out_dict, D, V)
+            elif args.loss_variant == "slope_sup":
+                loss = loss + 0.3 * slope_sup_loss(out_dict, D, V)
+            elif args.loss_variant == "conf_aware":
+                loss = loss + 0.3 * conf_aware_loss(out_dict, D, V)
+            elif args.loss_variant == "edge_smooth":
+                loss = loss + 0.1 * edge_smooth_loss(d_full, L, V)
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            opt.step()
 
         if device == "cuda":
             peak_mem = max(peak_mem, torch.cuda.max_memory_allocated())
@@ -290,47 +524,91 @@ def main():
     elapsed = time.time() - t0
     cf.close()
 
-    # Final eval.
+    # Final eval — chunk through pairs so we never blow up GPU memory.
     model.eval()
+    chunk = max(1, min(args.batch, 4))
+    preds = []
     with torch.no_grad():
-        all_pred = model(Ls, Rs, aux=False)
+        for i in range(0, N, chunk):
+            sl = slice(i, min(i + chunk, N))
+            if cpu_residency and device == "cuda":
+                Lc = Ls[sl].to(device, non_blocking=True)
+                Rc = Rs[sl].to(device, non_blocking=True)
+                preds.append(model(Lc, Rc, aux=False).cpu())
+            else:
+                preds.append(model(Ls[sl], Rs[sl], aux=False))
+        all_pred = torch.cat(preds, dim=0)
+        # Compute metrics on whichever device the GT lives on
         final_metrics = stereo_metrics(all_pred, Ds, valid)
         final_epe = final_metrics["epe"]
 
-    # Inference latency benchmark.
+    # Inference latency benchmark. Wrapped so any failure here doesn't
+    # destroy the meta.json — training metrics are the priority.
     torch.backends.cudnn.deterministic = False
     torch.backends.cudnn.benchmark = True
     torch.use_deterministic_algorithms(False)
     inf_bench = {}
-    if device == "cuda":
-        torch.cuda.synchronize()
-    with torch.no_grad():
-        L1 = Ls[:1]; R1 = Rs[:1]
-        for _ in range(10):
-            _ = model(L1, R1, aux=False)
+    arr = None
+    try:
         if device == "cuda":
             torch.cuda.synchronize()
-        per_call = []
-        for _ in range(100):
-            t = time.time()
-            _ = model(L1, R1, aux=False)
+        with torch.no_grad():
+            L1 = Ls[:1]; R1 = Rs[:1]
+            # Under cpu_residency, Ls/Rs live on pinned CPU; the model is
+            # on GPU. Move the single-pair benchmark inputs to the device.
+            if cpu_residency and device == "cuda":
+                L1 = L1.to(device, non_blocking=True)
+                R1 = R1.to(device, non_blocking=True)
+            for _ in range(10):
+                _ = model(L1, R1, aux=False)
             if device == "cuda":
                 torch.cuda.synchronize()
-            per_call.append((time.time() - t) * 1000.0)
-    arr = np.asarray(per_call)
-    inf_bench = {
-        "n_warmup": 10, "n_timed": 100,
-        "input_size_HW": [args.height, args.width],
-        "batch_size": 1,
-        "ms_mean": round(float(arr.mean()), 3),
-        "ms_std": round(float(arr.std()), 3),
-        "ms_median": round(float(np.median(arr)), 3),
-        "ms_p95": round(float(np.percentile(arr, 95)), 3),
-        "fps_mean": round(1000.0 / float(arr.mean()), 2),
-    }
-    print(f"[inference] mean={inf_bench['ms_mean']} ms  "
-          f"median={inf_bench['ms_median']} ms  "
-          f"p95={inf_bench['ms_p95']} ms  fps={inf_bench['fps_mean']}")
+            per_call = []
+            for _ in range(100):
+                t = time.time()
+                _ = model(L1, R1, aux=False)
+                if device == "cuda":
+                    torch.cuda.synchronize()
+                per_call.append((time.time() - t) * 1000.0)
+        arr = np.asarray(per_call)
+    except Exception as e:
+        print(f"[inference benchmark] failed: {type(e).__name__}: {e}",
+              flush=True)
+    if arr is not None:
+        inf_bench = {
+            "n_warmup": 10, "n_timed": 100,
+            "input_size_HW": [args.height, args.width],
+            "batch_size": 1,
+            "ms_mean": round(float(arr.mean()), 3),
+            "ms_std": round(float(arr.std()), 3),
+            "ms_median": round(float(np.median(arr)), 3),
+            "ms_p95": round(float(np.percentile(arr, 95)), 3),
+            "fps_mean": round(1000.0 / float(arr.mean()), 2),
+        }
+        print(f"[inference] mean={inf_bench['ms_mean']} ms  "
+              f"median={inf_bench['ms_median']} ms  "
+              f"p95={inf_bench['ms_p95']} ms  fps={inf_bench['fps_mean']}")
+    else:
+        inf_bench = {"failed": True}
+
+    # Save checkpoint so we can reuse the trained model later (compare against
+    # other checkpoints, run the held-out eval again, fine-tune, etc.).
+    ckpt_path = out / "checkpoint.pth"
+    try:
+        ckpt = {
+            "model": model.state_dict(),
+            "cfg": vars(cfg) if hasattr(cfg, "__dict__") else dict(cfg.__dict__),
+            "args": vars(args),
+            "params_train_M": round(n_train / 1e6, 4),
+            "final_metrics_all": {k: float(v) for k, v in final_metrics.items()},
+            "inference_bench": inf_bench,
+            "tag": tag,
+        }
+        torch.save(ckpt, ckpt_path)
+        print(f"[checkpoint] saved -> {ckpt_path} "
+              f"({ckpt_path.stat().st_size/1e6:.1f} MB)")
+    except Exception as e:
+        print(f"[checkpoint] save failed: {type(e).__name__}: {e}")
 
     meta["finished_at"] = datetime.now().isoformat(timespec="seconds")
     meta["elapsed_s"] = round(elapsed, 2)

@@ -30,6 +30,47 @@ _Per-variant artefacts: [`benchmarks/yolo_ablation_20260430-204526/`](benchmarks
 
 _Per-variant artefacts: [`benchmarks/yolo_ablation_20260430-202931/`](benchmarks/yolo_ablation_20260430-202931/)_
 
+## widener_n100_20260502-013518
+**Type:** Unknown
+**Started:** 2026-05-02T03:30:15  ·  **Config:** 5000 steps, 384×640, 100 pairs, batch=3
+
+| Variant | Trainable (M) | EPE | RMSE | Median | bad-0.5 | bad-1.0 | bad-2.0 | bad-3.0 | D1-all | Latency (ms) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| costlookup | 1.288 | (running) | | | | | | | | |
+| costlookup | 1.045 | (running) | | | | | | | | |
+| costlookup | 1.677 | (running) | | | | | | | | |
+| costlookup | 0.952 | (running) | | | | | | | | |
+| costlookup | 0.918 | (running) | | | | | | | | |
+| costlookup | 1.254 | (running) | | | | | | | | |
+| costlookup | 0.904 | (running) | | | | | | | | |
+| costlookup | 3.562 | (running) | | | | | | | | |
+| costlookup | 0.904 | (running) | | | | | | | | |
+| costlookup | 1.306 | (running) | | | | | | | | |
+| costlookup | 2.136 | **1.0390** | 2.929 | 0.235 | 30.00% | **19.22%** | 11.96% | 8.52% | 8.25% | 56.1 |
+
+_Per-variant artefacts: [`benchmarks/widener_n100_20260502-013518/`](benchmarks/widener_n100_20260502-013518/)_
+
+## raftlike_sweep_20260501-211601
+**Type:** Unknown
+**Started:** 2026-05-01T21:16:06  ·  **Config:** 3000 steps, 384×640, 20 pairs, batch=8
+
+| Variant | Trainable (M) | EPE | RMSE | Median | bad-0.5 | bad-1.0 | bad-2.0 | bad-3.0 | D1-all | Latency (ms) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| costlookup | 0.590 | **0.5743** | 1.397 | 0.242 | 25.20% | **11.55%** | 5.75% | 3.50% | 3.50% | 39.9 |
+| costlookup | 0.645 | **0.6102** | 1.393 | 0.301 | 30.78% | **12.35%** | 5.50% | 3.30% | 3.30% | 50.8 |
+| costlookup | 0.860 | **0.7500** | 1.385 | 0.485 | 49.16% | **23.66%** | 4.95% | 2.82% | 2.82% | 36.4 |
+| costlookup | 0.904 | **0.5984** | 1.328 | 0.332 | 38.23% | **10.33%** | 4.84% | 3.00% | 3.00% | 49.9 |
+| raftlike | 0.546 | **0.7966** | 1.557 | 0.491 | 48.91% | **18.21%** | 7.09% | 4.08% | 4.08% | 41.8 |
+| raftlike | 0.586 | **0.6141** | 1.479 | 0.220 | 30.19% | **13.61%** | 6.22% | 3.84% | 3.84% | 56.9 |
+| raftlike | 0.816 | **0.6246** | 1.344 | 0.329 | 35.90% | **14.44%** | 4.73% | 2.96% | 2.96% | 41.8 |
+| raftlike | 0.845 | **0.7303** | 1.500 | 0.374 | 41.04% | **20.37%** | 6.21% | 3.69% | 3.69% | 59.7 |
+| tilegru | 0.494 | **0.6779** | 1.538 | 0.331 | 30.22% | **14.15%** | 6.57% | 4.13% | 4.12% | 27.7 |
+| tilegru | 0.517 | **0.6402** | 1.495 | 0.290 | 28.78% | **13.42%** | 6.57% | 3.96% | 3.96% | 40.3 |
+| tilegru | 0.764 | **0.6132** | 1.325 | 0.291 | 34.23% | **14.82%** | 4.88% | 2.92% | 2.92% | 29.3 |
+| tilegru | 0.776 | **0.7764** | 1.508 | 0.486 | 48.95% | **18.62%** | 6.71% | 3.84% | 3.84% | 37.5 |
+
+_Per-variant artefacts: [`benchmarks/raftlike_sweep_20260501-211601/`](benchmarks/raftlike_sweep_20260501-211601/)_
+
 ## matched_overfit_20260430-234721
 **Type:** Matched encoder overfit (ghost vs yolo26n vs yolo26s)
 **Started:** 2026-04-30T23:47:28  ·  **Config:** 3000 steps, 384×640, 20 pairs, batch=4

@@ -1,0 +1,43 @@
+\relax 
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\@writefile{toc}{\contentsline {section}{\numberline {1}Architecture Diagram}{1}{section.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces StereoLite end-to-end architecture. Input stereo pair on the left; predicted disparity $\hat  {d}$ on the right. The model has four phases, labelled along the bottom rail: a truncated MobileNetV2-100 encoder producing features at $\{1/2, 1/4, 1/8, 1/16\}$, a tile-hypothesis initialisation at $1/16$ using a group-correlation cost volume and a 3D aggregator, an iterative refinement stack that propagates and refines the tile state at $1/16$ ($\times 2$), $1/8$ ($\times 3$), and $1/4$ ($\times 3$), and a learned convex-upsample cascade that produces the full-resolution disparity. Depth in metres is computed post-hoc from disparity via $Z = f\cdot B / \hat  {d}$ and is not part of the network.}}{1}{figure.1}\protected@file@percent }
+\newlabel{fig:arch}{{1}{1}{StereoLite end-to-end architecture. Input stereo pair on the left; predicted disparity $\hat {d}$ on the right. The model has four phases, labelled along the bottom rail: a truncated MobileNetV2-100 encoder producing features at $\{1/2, 1/4, 1/8, 1/16\}$, a tile-hypothesis initialisation at $1/16$ using a group-correlation cost volume and a 3D aggregator, an iterative refinement stack that propagates and refines the tile state at $1/16$ ($\times 2$), $1/8$ ($\times 3$), and $1/4$ ($\times 3$), and a learned convex-upsample cascade that produces the full-resolution disparity. Depth in metres is computed post-hoc from disparity via $Z = f\cdot B / \hat {d}$ and is not part of the network}{figure.1}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {2}Technical Specification}{1}{section.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Notation}{1}{subsection.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Encoder}{2}{subsection.2.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Tile-Hypothesis Initialisation}{2}{subsection.2.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4}Iterative Refinement}{2}{subsection.2.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.5}Scale Transitions (Plane-equation Upsample)}{2}{subsection.2.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.6}Convex Upsample Cascade}{3}{subsection.2.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.7}Outputs and Depth Conversion}{3}{subsection.2.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.8}Supervision}{3}{subsection.2.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.9}Training Recipe}{3}{subsection.2.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.10}Parameter Budget}{3}{subsection.2.10}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3}Plain-English Walkthrough}{4}{section.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}What is the network trying to do?}{4}{subsection.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Stage 1: Encoder (blue blocks)}{4}{subsection.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Stage 2: Tile-hypothesis initialisation (orange block)}{4}{subsection.3.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4}Stage 3: Iterative refinement (green blocks)}{5}{subsection.3.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.5}Scale transitions: plane-equation upsample}{5}{subsection.3.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.6}Stage 4: Learned convex upsample (grey blocks)}{5}{subsection.3.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.7}Output: disparity and depth}{5}{subsection.3.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.8}How we train it}{6}{subsection.3.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.9}Why it is small and fast}{6}{subsection.3.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.10}What the network does not do}{6}{subsection.3.10}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4}Training Results (Scene Flow Driving)}{7}{section.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Final metrics}{7}{subsection.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Training curves}{7}{subsection.4.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Kaggle training curves over 30 epochs. (a)~total multi-scale loss (log scale); (b)~L1 on the full-resolution disparity; (c)~L1 on the 1/8 cost-volume output; (d)~OneCycle learning-rate schedule.}}{7}{figure.2}\protected@file@percent }
+\newlabel{fig:curves}{{2}{7}{Kaggle training curves over 30 epochs. (a)~total multi-scale loss (log scale); (b)~L1 on the full-resolution disparity; (c)~L1 on the 1/8 cost-volume output; (d)~OneCycle learning-rate schedule}{figure.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Per-step qualitative progression}{8}{subsection.4.3}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Training progression for two held-out validation pairs. Columns: training-step checkpoints. Rows for each pair: input left image $I_L$, ground-truth \textbf  {disparity}, and predicted \textbf  {disparity}~$\hat  {d}$ (TURBO colourmap; red = high disparity / close, blue = low disparity / far). These are \emph  {disparity} maps in pixel units, not depth maps in metres; metric depth would have the inverse colouring (blue = close, red = far) under the same colourmap.}}{8}{figure.3}\protected@file@percent }
+\newlabel{fig:progress}{{3}{8}{Training progression for two held-out validation pairs. Columns: training-step checkpoints. Rows for each pair: input left image $I_L$, ground-truth \textbf {disparity}, and predicted \textbf {disparity}~$\hat {d}$ (TURBO colourmap; red = high disparity / close, blue = low disparity / far). These are \emph {disparity} maps in pixel units, not depth maps in metres; metric depth would have the inverse colouring (blue = close, red = far) under the same colourmap}{figure.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}Final-checkpoint gallery}{8}{subsection.4.4}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces All six tracked validation pairs at the final step. Columns: left image, ground-truth \textbf  {disparity}, predicted \textbf  {disparity}~$\hat  {d}$. TURBO colour map, red = high disparity (close), blue = low disparity (far). These are disparity maps (pixel shift between left/right views), not depth maps; the pinhole conversion to metric depth $Z = f \cdot B / \hat  {d}$ is applied outside the network.}}{9}{figure.4}\protected@file@percent }
+\newlabel{fig:gallery}{{4}{9}{All six tracked validation pairs at the final step. Columns: left image, ground-truth \textbf {disparity}, predicted \textbf {disparity}~$\hat {d}$. TURBO colour map, red = high disparity (close), blue = low disparity (far). These are disparity maps (pixel shift between left/right views), not depth maps; the pinhole conversion to metric depth $Z = f \cdot B / \hat {d}$ is applied outside the network}{figure.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.5}Reading the curves and the gallery together}{9}{subsection.4.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.6}Open items before publication}{10}{subsection.4.6}\protected@file@percent }
+\gdef \@abspage@last{10}
