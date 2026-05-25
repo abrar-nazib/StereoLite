@@ -300,6 +300,38 @@ These papers are absolutely essential for our project goals.
 | 131 | **SegStereo: Exploiting Semantic for Disparity** | Yang et al. | ECCV 2018 | **4** | Joint segmentation+stereo |
 | 132 | **Multi-Task Learning Using Uncertainty** | Kendall et al. | CVPR 2018 | **4** | Multi-task uncertainty weighting |
 | 133 | **RAFT-3D: Scene Flow using Rigid-Motion** | Teed et al. | CVPR 2021 | **4** | RAFT extended to scene flow |
+| 133.1 | **TiCoSS: Tightening Coupling Seg+Stereo** | Liu et al. | arXiv 2024 | **6** | Modern tightly-coupled joint stereo+seg; CT loss + gated SIG fusion |
+| 133.2 | **S³M-Net: Joint Learning of Seg + Stereo** | Wu et al. | T-IV 2024 | **6** | FFA fusion module, SCG boundary loss; KITTI joint benchmark |
+| 133.3 | **MSDESIS: Multi-task Stereo + Surgical Seg** | Psychogyios et al. | T-MI 2022 | **7** | 3.30 M / 22 FPS / 1280×1024; seg-as-domain-adapter cuts stereo EPE 77.73% |
+| 133.4 | **YOLOP: Panoptic Driving Perception** | Wu et al. | MIR 2022 | **6** | Canonical mono multi-task; shared CSPDarknet + 3 heads; 23 FPS Jetson TX2 |
+| 133.5 | **HybridNets: End-to-End Perception** | Vu et al. | arXiv 2022 | **5** | YOLOP successor with BiFPN + unified seg head; no joint vs single ablation |
+| 133.6 | **TwinLiteNet: Drivable Area + Lane Seg** | Che et al. | MAPR 2023 | **7** | 0.4 M / 25 FPS Jetson TX2 — only paper at our edge envelope; load-bearing twin-decoder |
+| 133.7 | **Yolo-SGN: Lightweight UAV Detection** | Wang et al. | Sci Rep 2025 | **5** | 2.42 M / 25 FPS TX2 UAV detector + classical ORB stereo (not joint deep learning) |
+| 133.8 | **DispSegNet: Semantics for Disparity** | Zhang et al. | RAL 2019 | **5** | Two-stage refine fuses seg embedding into disparity; coupling load-bearing for stereo but costs 0.7 mIoU for seg |
+| 133.9 | **SSPCV-Net: Semantic Stereo + Pyramid CV** | Wu et al. | ICCV 2019 | **5** | Pyramid of cost volumes + semantic CV + recursive 3D FFM; semantic component smaller than pyramid contribution |
+| 133.10 | **SGNet: Semantics Guided Deep Stereo** | Chen et al. | ACCV 2020 | **5** | PSMNet + 3 semantic guidance modules (conf+residual+loss); conf/res load-bearing, loss-module cosmetic |
+| 133.11 | **SemStereo: Semantic-Constrained Stereo** | (Anon) | AAAI 2025 | **5** | Remote-sensing stereo; cascade + SSR + LRSC; bidirectional coupling **load-bearing** (rare case, dataset-conditional) |
+| 133.12 | **Real-Time Semantic Stereo Matching** | Dovesi et al. | ICRA 2020 | **6** | First real-time semantic stereo at 6.3 FPS Jetson TX2; parallel MTL = -0.08 D1 (noise); synergy refine = -0.65 D1 |
+| 133.13 | **DSGN: Deep Stereo Geometry Network** | Chen et al. | CVPR 2020 | **5** | First one-stage stereo 3D detector; PSV→3DGV differentiable warp; 670 ms V100 |
+| 133.14 | **DSGN++: Better Stereo 3D Geometry** | Chen et al. | arXiv 2022 | **5** | Dual-view stereo + LiDAR copy-paste; KITTI 3D AP 83.2/67.4/59.9; 281 ms 2080Ti |
+| 133.15 | **LIGA-Stereo: LiDAR-Imitating Stereo** | Guo et al. | ICCV 2021 | **5** | SECOND LiDAR teacher distills into stereo student at train time; 81.4/64.7/57.2 KITTI AP3D, 350 ms Titan Xp |
+| 133.16 | **PLUMENet: Efficient Stereo 3D Det** | Wang et al. | IROS 2021 | **5** | PLUME volume metric-space + hybrid 3D-BEV head; 80-530 ms V100; stage-wise frozen backbone (weakest coupling) |
+| 133.17 | **YOLOStereo3D: Step Back to 2D** | Liu et al. | ICRA 2021 | **6** | Light correlation CV + M3D-RPN; **80 ms 1080Ti — only edge-realistic stereo+3D-det chassis**; KITTI AP3D 65.7/41.3/30.4 |
+| 133.18 | **Stereo R-CNN: 3D Object Detection** | Li et al. | CVPR 2019 | **4** | ResNet-101+FPN+stereo RPN + Gauss-Newton 3D solver + SSD depth refine; KITTI AP3D-mod 36.69; no FPS reported |
+| 133.19 | **Pseudo-LiDAR for 3D Detection** | Wang et al. | CVPR 2019 | **5** | Represent-as-3D-cloud trick; AVOD on PSMNet pseudo-cloud; 56.8/45.3 KITTI BEV/AP3D mod; ~1 s, not real-time |
+| 133.20 | **YOLOPv2: Better Panoptic Driving** | Han et al. | arXiv 2022 | **5** | YOLOP + E-ELAN backbone + dice+focal seg; 38.9 M / 91 FPS V100; mAP50 83.4 / drivable 93.2 / lane 87.31 |
+| 133.21 | **AurigaNet: Real-Time Urban Perception** | (Anon) | arXiv 2026 | **5** | YOLOP/HybridNets + drivable-area instance seg via deformable+vMF mean-shift; 9.09 M / **5.08 FPS Orin NX FP32** (not real-time) |
+| 133.22 | **MultiNet: Real-Time Driving Perception** | Teichmann et al. | IV 2018 | **5** | Foundational one-encoder-three-decoder; KITTI Road MaxF 94.88, 42 ms VGG; compute amortisation only, no joint accuracy win |
+| 133.23 | **Cross-Stitch Networks** | Misra et al. | CVPR 2016 | **5** | Foundational soft-param sharing via 2×2 learnable mixer; load-bearing for rare classes but dual-backbone cost rules out edge |
+| 133.24 | **PAD-Net: Multi-Task Distillation** | Xu et al. | CVPR 2018 | **5** | 4 intermediate tasks → attention-gated message passing → 2 final tasks; NYUD-v2 rel 0.260→0.214, mIoU 0.294→0.331 |
+| 133.25 | **NDDR-CNN: Task Fusion** | Gao et al. | CVPR 2019 | **4** | Cross-stitch reframed as concat+1×1+BN+wd; +1-3 mIoU over scalar gating but same 2× backbone cost |
+| 133.26 | **MTI-Net: Multi-Scale Multi-Modal Distill** | Vandenhende et al. | ECCV 2020 | **7** | Multi-scale PAD-Net; converts -1.71% naive-MTL → +10.91% positive transfer; *single-scale fusion is decorative — must go multi-scale* |
+| 133.27 | **MTAN: Multi-Task Attention Network** | Liu et al. | CVPR 2019 | **6** | Single shared backbone + per-task soft-attention; dominates Cross-Stitch at lower params; **most edge-compatible MTL recipe** |
+| 133.28 | **InvPT: Inverted Pyramid Multi-task TF** | Ye & Xu | ECCV 2022 | **4** | Joint spatial+all-task self-attention with up-transformer blocks; MTL gain modest (+0.98 mIoU after -2.23 negative transfer) |
+| 133.29 | **TaskPrompter: Spatial-Channel Prompt** | Ye & Xu | ICLR 2023 | **4** | T learnable task-prompt tokens + Hierarchical Prompting; +1.86 PASCAL over InvPT; transformer-only, no edge story |
+| 133.30 | **MTL Survey: Dense Prediction** | Vandenhende et al. | TPAMI 2022 | **7** | THE survey. Decoder>encoder; **fixed grid-searched loss weights > Kendall/MGDA/GradNorm/DWA**; task-dictionary correlation determines MTL win/loss |
+| 133.31 | **Panoptic Perception Survey** | Li & Xu | arXiv 2024 | **6** | 28 panoptic nets for AD; 3 MTL pathologies + 3 remedies; flags zero-depth + zero-Jetson-latency benchmarks (our gap) |
+| 133.32 | **DroNet: Learning to Fly by Driving** | Loquercio et al. | RAL 2018 | **6** | ResNet-8, **320 K params, 20 FPS Intel i7 CPU**; steering+collision two heads; closest edge precedent to drone use case |
 
 ### Temporal Consistency
 

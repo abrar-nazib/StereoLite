@@ -5,6 +5,29 @@
 **Priority:** 9/10 — **most directly relevant paper to our edge model goals**
 **arXiv:** https://arxiv.org/abs/2511.16555
 **WebPage:** https://tomtomtommi.github.io/LiteAnyStereo/
+**Code:** https://github.com/tomtomtommi/LiteAnyStereo (cloned to `.claude/skills/stereo-vision-expert/reference_impls/lite_any_stereo/` — `liteanystereo.py`, `aggregation.py`, `fnet.py`, `submodule.py`, `profile_speed.py`)
+
+## VERIFIED FACTS (instantiated from official code 2026-05-02)
+
+| Attribute | Value | Source |
+|---|---|---|
+| **Trainable parameters** | **7.604 M** | `model = LiteAnyStereo(); sum(p.numel() for p in model.parameters() if p.requires_grad)` — paper does NOT state |
+| `cost_agg_2d` (ConvNeXt 2D blocks) | **5.731 M** | per-module sum — dominant component, 75% of total |
+| `fnet` (MobileNetV2 + multi-scale heads) | **1.846 M** | per-module sum |
+| All other (refines + stems) | ~25 k | per-module sum |
+| **MACs at KITTI 1242×375** | **33 G** | Paper Tab. 3 + Tab. 5 |
+| **Latency at 4K on GTX 1080 fp32** | **21 ms** | Paper Fig. 1 caption |
+| **Latency at 384×640 on RTX 3050 fp16** (verified locally, with cuDNN warmup) | **70 ms mean / 73 ms median / 87 ms p95** | Tested 2026-05-02 |
+| **Latency at 480×768 on RTX 3050 fp16** | **57 ms mean / 56 ms median** | Tested 2026-05-02 |
+| **Peak GPU memory at 384×640 fp16** | **0.69 GB** | Tested 2026-05-02 |
+| **Latency on Jetson / Orin / mobile NPU** | **NOT MEASURED** | Not in paper, not in code; **unknown** |
+
+**Real-time on edge — honest caveats:**
+- Paper's only edge-relevant claim is "21 ms at 4K on GTX 1080" (a desktop GPU, ~6.4 TFLOPS fp16, 320 W).
+- RTX 3050 (~9 TFLOPS fp16) is roughly equivalent to Jetson AGX Orin in compute, but **5× faster than Jetson Orin Nano** (~6 TFLOPS fp16 with much narrower memory bus).
+- Naive extrapolation: 70 ms RTX 3050 fp16 → likely **200-350 ms on Jetson Orin Nano fp16 raw PyTorch**. NOT real-time on Orin Nano.
+- TensorRT INT8 typically gives 2-4× speedup on Jetson; **borderline real-time at 50-90 ms** on Orin Nano with full optimization, untested.
+- The 5.73 M `cost_agg_2d` ConvNeXt block is the obvious compression target — halving its width should land closer to 30-50 ms on Orin Nano with TensorRT.
 
 ---
 
@@ -200,8 +223,8 @@ Each stage contributes measurably. Stage 3 (KD from FoundationStereo) provides t
 **Limitations:**
 - **Still behind prior-based methods on indoor benchmarks** (FoundationStereo: 0.49 vs 3.53 on ETH3D Bad 1.0)
 - **Middlebury performance is weakest** relative to SOTA (7.51 vs 1.12 for FoundationStereo)
-- **No mobile latency reported** — only GPU inference times (though 33G MACs suggests ~45ms on Snapdragon 8G3)
-- **Parameter count not reported**
+- **No edge-hardware latency reported** in the paper. Only "21 ms at 4K on GTX 1080" (desktop). Local RTX 3050 fp16 measurement: 70 ms at 384×640 (verified 2026-05-02). Likely 200-350 ms on Jetson Orin Nano without TensorRT INT8.
+- **Paper does not state parameter count.** Verified from the public code: **7.604 M trainable**, with 5.73 M concentrated in the `cost_agg_2d` ConvNeXt blocks.
 - **Requires FoundationStereo for Stage 3 training** — creates a dependency on teacher availability and inference cost during training
 - **No iterative refinement** — single-pass, lacks the inductive bias that Pip-Stereo demonstrated is important
 - **Interleaved aggregation design is marginally better** — the 3D→2D choice may not be globally optimal
