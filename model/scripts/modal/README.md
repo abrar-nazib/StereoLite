@@ -87,6 +87,50 @@ modal volume rm stereo-datasets sceneflow/<subset>/<file>
 idempotent. `vol.commit()` runs after each file completes so other
 containers (e.g. `status`) see progress without waiting for shutdown.
 
+## Middlebury training on Modal
+
+Download Middlebury once into the master dataset Volume:
+
+```bash
+modal run -d model/scripts/modal/download_middlebury.py::main \
+    --action download --year all
+
+modal app logs download-middlebury --follow
+modal run model/scripts/modal/download_middlebury.py::main --action status
+```
+
+Launch GEV4 training on Modal. `--batch` is per GPU; for early/cheap
+experiments prefer `T4`, `L4`, or `A10`. Multi-GPU only makes sense after
+the single-GPU run is behaving well. The launcher uses Modal `.spawn()` by
+default, so it submits the cloud job and exits; your PC does not need to stay
+on after the command prints `Spawned Modal training job`.
+
+```bash
+modal run -d model/scripts/modal/train_middlebury.py::main \
+    --gpu A10 \
+    --run-name yolo_ctx_gev4_mb_a10_b4_10k \
+    --steps 10000 \
+    --batch 4 \
+    --height 384 \
+    --width 640 \
+    --train-mode mixed \
+    --crop-prob 0.25
+
+modal app logs stereolite-middlebury-train --follow
+modal volume ls stereolite-results middlebury_runs/yolo_ctx_gev4_mb_a10_b4_10k
+```
+
+If you want the terminal to wait until training finishes, add `--wait 1`.
+For overnight runs, leave it as the default `--wait 0`.
+
+Results live in the `stereolite-results` Volume under
+`/middlebury_runs/<run-name>/`. Pull a checkpoint with:
+
+```bash
+modal volume get stereolite-results \
+    /middlebury_runs/yolo_ctx_gev4_mb_a10_b4_10k/best.pth ./best.pth
+```
+
 ## Probe scripts
 
 `probe1_hello.py` / `probe2_volume.py` / `probe3_gpu.py` were used to

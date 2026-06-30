@@ -44,6 +44,10 @@ from StereoLite_yolo.model import StereoLite, StereoLiteConfig  # noqa: E402
 SF_ROOT_CANDIDATES = [
     Path("/media/abrar/AbrarSSD/Datasets/sceneflow_driving"),
     Path("/mnt/abrarssd/Datasets/sceneflow_driving"),
+    # Local checkout of the SF Driving subset, also used on the local
+    # RTX 4070 box where data is checked out into the repo's gitignored
+    # data/ directory.
+    ROOT / "data" / "sceneflow_driving",
 ]
 BENCH_ROOT = ROOT / "model" / "benchmarks"
 CACHE_PATH = ROOT / ".cache" / "sf_overfit_pairs_v1.pt"

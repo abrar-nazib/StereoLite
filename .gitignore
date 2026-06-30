@@ -25,12 +25,18 @@ venv/
 # IDE
 .vscode/
 *.swp
+.mcp.json
+PUKU.md
+skills-lock.json
+.forge/skills
+.puku-cli/
 
 # OS
 .DS_Store
 Thumbs.db
 CLAUDE.md
 .claude/
+PUKU.local.md
 
 model/benchmarks/*/
 data/
@@ -44,6 +50,7 @@ model/checkpoints/*.pth
 model/checkpoints/*.pt
 model/benchmarks/sharp_*/
 model/benchmarks/stereolite_v8_*/
+model/checkpoints/yolo_ctx_gev4_full_retry_es/samples
 model/benchmarks/ablation_*/
 model/teachers/*
 # Jupyter
