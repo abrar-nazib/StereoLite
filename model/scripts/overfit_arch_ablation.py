@@ -1,6 +1,6 @@
-"""3-way architecture A/B/C overfit comparison.
+"""Multi-way architecture A/B overfit comparison.
 
-Architectures:
+Architectures (legacy, GhostConv encoder fixed for fairness):
     current  : StereoLite_yolo with backbone=ghost.
                TileRefine iterated at 1/16 (×2), 1/8 (×3), 1/4 (×3),
                then ConvexUpsample 1/4 → 1/2 → full.
@@ -17,18 +17,51 @@ Architectures:
                1/16, 1/8, 1/4, 1/2. Plane equation upsample throughout.
                No ConvexUpsample.
 
-All three use the GhostConv encoder so the only delta is the
-refinement+upsample design.
+Architectures (newer, backbone + extend_to_full configurable):
+    costlookup : YOLO encoder + local cost-lookup-driven TileRefine.
+    tilegru    : YOLO encoder + ConvGRU on tile.feat (no cost lookup).
+    raftlike   : YOLO encoder + cost-lookup-driven ConvGRU (combo).
+    yolo_ctx   : YOLO matching encoder + dedicated context-encoder
+                 stream (RAFT-Stereo Fig 1 bottom stream). Cost-lookup-
+                 driven ConvGRU on the tile feat slot, initialised from
+                 the projected context features at 1/16.
+    yolo_ctx_gate: yolo_ctx plus a lightweight context/confidence gate
+                   that scales residual tile updates.
+    yolo_ctx_gev4: yolo_ctx_gate plus a fail-soft 1/4 Geometry Encoding
+                   Volume before final 1/4 refinement.
+    yolo_ctx_hstereo: yolo_ctx_gev4 plus true 1/2-resolution TileRefineCtx
+                      before the final upsample.
+    yolo_ctx_guided: yolo_ctx_gev4 plus fail-soft full-resolution guided
+                     propagation for sharper boundaries.
+    yolo_ctx_init4: yolo_ctx_gate plus a fresh 1/4-resolution cost-volume
+                    warm start before the final 1/4 refinement stage.
+    yolo_ctx_sru: yolo_ctx_gate plus a Selective-Stereo-style recurrent
+                  update with 1x1 edge and 3x3 smooth branches.
+    yolo_ctx_sharp: yolo_ctx_gate plus a lightweight full-resolution
+                    boundary residual tail.
+    yolo_ctx_hrrefine: yolo_ctx_gate plus a small half-resolution residual
+                       refinement loop before final full-resolution output.
+    yolo_geomctx: yolo_ctx plus slant-aware local lookup and a context /
+                  confidence gate that blends ConvGRU updates with local
+                  stereo evidence.
 
 Run:
     python3 model/scripts/overfit_arch_ablation.py --arch current
-    python3 model/scripts/overfit_arch_ablation.py --arch v1_iter
-    python3 model/scripts/overfit_arch_ablation.py --arch v2_hitnet
+    python3 model/scripts/overfit_arch_ablation.py --arch raftlike --backbone yolo26s
+    python3 model/scripts/overfit_arch_ablation.py --arch yolo_ctx --backbone yolo26s
+    python3 model/scripts/overfit_arch_ablation.py --arch yolo_ctx_gate --backbone yolo26s
+    python3 model/scripts/overfit_arch_ablation.py --arch yolo_ctx_gev4 --backbone yolo26s
+    python3 model/scripts/overfit_arch_ablation.py --arch yolo_ctx_guided --backbone yolo26s
+    python3 model/scripts/overfit_arch_ablation.py --arch yolo_ctx_init4 --backbone yolo26s
+    python3 model/scripts/overfit_arch_ablation.py --arch yolo_ctx_sru --backbone yolo26s
+    python3 model/scripts/overfit_arch_ablation.py --arch yolo_ctx_sharp --backbone yolo26s
+    python3 model/scripts/overfit_arch_ablation.py --arch yolo_ctx_hrrefine --backbone yolo26s
+    python3 model/scripts/overfit_arch_ablation.py --arch yolo_geomctx --backbone yolo26s
 
-Or run all three back-to-back into one timestamped directory:
+Or run all back-to-back into one timestamped directory:
     TS=$(date +%Y%m%d-%H%M%S)
     OUT=model/benchmarks/arch_ablation_$TS
-    for a in current v1_iter v2_hitnet; do
+    for a in current costlookup tilegru raftlike yolo_ctx; do
         python3 model/scripts/overfit_arch_ablation.py --arch $a --out_root $OUT
     done
 
@@ -81,7 +114,11 @@ def _cache_path_for(n_pairs: int, height: int = 384, width: int = 640):
     return cache_dir / f"sf_overfit_pairs_v1_n{n_pairs}_{height}x{width}.pt"
 
 
-_NEW_ARCHES = ("costlookup", "tilegru", "raftlike")
+_NEW_ARCHES = ("costlookup", "tilegru", "raftlike", "yolo_ctx",
+               "yolo_ctx_gate", "yolo_ctx_gev4", "yolo_ctx_hstereo",
+               "yolo_ctx_guided",
+               "yolo_ctx_init4", "yolo_ctx_sru", "yolo_ctx_sharp",
+               "yolo_ctx_hrrefine", "yolo_geomctx")
 
 # Phase-2 architecture flags injected from main()'s argparse before
 # build_model() is called. Avoids changing build_model's signature for
@@ -124,6 +161,58 @@ def build_model(arch: str, backbone: str = "ghost",
     elif arch == "raftlike":
         from StereoLite_raftlike.model import StereoLite, StereoLiteConfig
         cfg = StereoLiteConfig(backbone=backbone, extend_to_full=extend_to_full)
+    elif arch == "yolo_ctx":
+        from StereoLite_yolo_ctx.model import (
+            StereoLiteYoloCtx, StereoLiteYoloCtxConfig)
+        cfg = StereoLiteYoloCtxConfig(backbone=backbone)
+        return StereoLiteYoloCtx(cfg), cfg
+    elif arch == "yolo_ctx_gate":
+        from StereoLite_yolo_ctx_gate.model import (
+            StereoLiteYoloCtxGate, StereoLiteYoloCtxGateConfig)
+        cfg = StereoLiteYoloCtxGateConfig(backbone=backbone)
+        return StereoLiteYoloCtxGate(cfg), cfg
+    elif arch == "yolo_ctx_gev4":
+        from StereoLite_yolo_ctx_gev4.model import (
+            StereoLiteYoloCtxGEV4, StereoLiteYoloCtxGEV4Config)
+        cfg = StereoLiteYoloCtxGEV4Config(backbone=backbone)
+        return StereoLiteYoloCtxGEV4(cfg), cfg
+    elif arch == "yolo_ctx_hstereo":
+        from StereoLite_yolo_ctx_hstereo.model import (
+            StereoLiteYoloCtxHStereo, StereoLiteYoloCtxHStereoConfig)
+        cfg = StereoLiteYoloCtxHStereoConfig(backbone=backbone)
+        return StereoLiteYoloCtxHStereo(cfg), cfg
+    elif arch == "yolo_ctx_guided":
+        from StereoLite_yolo_ctx_guided.model import (
+            StereoLiteYoloCtxGuided, StereoLiteYoloCtxGuidedConfig)
+        cfg = StereoLiteYoloCtxGuidedConfig(backbone=backbone)
+        return StereoLiteYoloCtxGuided(cfg), cfg
+    elif arch == "yolo_ctx_init4":
+        from StereoLite_yolo_ctx_init4.model import (
+            StereoLiteYoloCtxInit4, StereoLiteYoloCtxInit4Config)
+        cfg = StereoLiteYoloCtxInit4Config(backbone=backbone)
+        return StereoLiteYoloCtxInit4(cfg), cfg
+    elif arch == "yolo_ctx_sru":
+        from StereoLite_yolo_ctx_sru.model import (
+            StereoLiteYoloCtxSRU, StereoLiteYoloCtxSRUConfig)
+        cfg = StereoLiteYoloCtxSRUConfig(backbone=backbone)
+        return StereoLiteYoloCtxSRU(cfg), cfg
+    elif arch == "yolo_ctx_sharp":
+        from StereoLite_yolo_ctx_sharp.model import (
+            StereoLiteYoloCtxSharp, StereoLiteYoloCtxSharpConfig)
+        cfg = StereoLiteYoloCtxSharpConfig(backbone=backbone)
+        return StereoLiteYoloCtxSharp(cfg), cfg
+    elif arch == "yolo_ctx_hrrefine":
+        from StereoLite_yolo_ctx_hrrefine.model import (
+            StereoLiteYoloCtxHRRefine, StereoLiteYoloCtxHRRefineConfig)
+        cfg = StereoLiteYoloCtxHRRefineConfig(backbone=backbone)
+        return StereoLiteYoloCtxHRRefine(cfg), cfg
+    elif arch == "yolo_geomctx":
+        from StereoLite_yolo_geomctx.model import (
+            StereoLiteYoloGeomCtx, StereoLiteYoloGeomCtxConfig)
+        cfg = StereoLiteYoloGeomCtxConfig(
+            backbone=backbone,
+            slant_patch_radius=int(_arch_flags.get("slant_patch_radius", 1)))
+        return StereoLiteYoloGeomCtx(cfg), cfg
     else:
         raise ValueError(f"unknown arch: {arch}")
     return StereoLite(cfg), cfg
@@ -133,7 +222,13 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--arch",
                     choices=["current", "v1_iter", "v2_hitnet",
-                              "costlookup", "tilegru", "raftlike"],
+                              "costlookup", "tilegru", "raftlike",
+                              "yolo_ctx", "yolo_ctx_gate",
+                              "yolo_ctx_gev4", "yolo_ctx_hstereo",
+                              "yolo_ctx_guided",
+                              "yolo_ctx_init4", "yolo_ctx_sru",
+                              "yolo_ctx_sharp",
+                              "yolo_ctx_hrrefine", "yolo_geomctx"],
                     required=True)
     ap.add_argument("--backbone",
                     choices=["ghost", "yolo26n", "yolo26s"],
@@ -153,7 +248,8 @@ def main():
                           "See model/designs/_wideners.py for definitions.")
     ap.add_argument("--loss_variant", type=str, default="baseline",
                     choices=["baseline", "seq_loss", "slope_sup",
-                              "conf_aware", "edge_smooth"],
+                              "conf_aware", "edge_smooth",
+                              "boundary_focus", "seq_boundary"],
                     help="Phase-2 loss-side ablation variant. baseline = "
                           "the prior multi-scale L1 + grad + bad-1 hinge "
                           "(matches the 12-config sweep). Others add a "
@@ -164,6 +260,10 @@ def main():
                           "--loss_variant=seq_loss). Lower γ = more "
                           "weight on the FINAL iter; higher γ = more "
                           "uniform across iters.")
+    ap.add_argument("--guided_start_step", type=int, default=3000,
+                    help="yolo_ctx_guided only: train the GEV4/base path with "
+                         "guided refinement bypassed before this step. This "
+                         "keeps the sharpness tail from slowing early EPE.")
     # Phase-2 architecture-side ablation flags.
     ap.add_argument("--slope_aware_warp", type=int, default=0,
                     help="A2 — warp fR by slope-corrected disparity")
@@ -190,6 +290,9 @@ def main():
                     help="Smooth-L1 supervision weight on the post-init "
                           "disparity (out_dict['d32']). Implements the IGEV "
                           "L_init pattern. 0 = off; 0.5 is a reasonable start.")
+    ap.add_argument("--slant_patch_radius", type=int, default=1,
+                    help="yolo_geomctx only: 1 = 3x3 slanted support patch, "
+                          "0 = center-only lookup ablation.")
     ap.add_argument("--variant_tag", type=str, default="",
                     help="optional override for the per-variant subdir. "
                           "Defaults to arch name.")
@@ -204,7 +307,12 @@ def main():
     ap.add_argument("--show", type=int, default=1,
                     help="1 = open OpenCV window with live panel; 0 = headless")
     ap.add_argument("--viz_interval_s", type=float, default=15.0)
-    ap.add_argument("--viz_pair_idx", type=int, default=0)
+    ap.add_argument("--viz_pair_idx", type=int, default=-1,
+                    help="-1 = choose one seeded-random pair for viz; "
+                         ">=0 = fixed pair index.")
+    ap.add_argument("--viz_rotate", type=int, default=0,
+                    help="1 = rotate the saved/live viz pair over the "
+                         "loaded training pairs.")
     args = ap.parse_args()
 
     # Reproducibility patch.
@@ -275,6 +383,7 @@ def main():
     _arch_flags["context_branch"] = bool(args.context_branch)
     _arch_flags["init_regress"] = bool(args.init_regress)
     _arch_flags["init_gce"] = bool(args.init_gce)
+    _arch_flags["slant_patch_radius"] = int(args.slant_patch_radius)
 
     # Build model.
     model, cfg = build_model(args.arch,
@@ -307,6 +416,9 @@ def main():
         "params_train_M": round(n_train / 1e6, 4),
         "encoder_out_channels": list(model.fnet.out_channels),
         "pair_paths": pair_paths,
+        "viz_pair_idx": args.viz_pair_idx,
+        "viz_rotate": bool(args.viz_rotate),
+        "guided_start_step": args.guided_start_step,
     }
     (out / "meta.json").write_text(json.dumps(meta, indent=2))
 
@@ -326,16 +438,25 @@ def main():
     viz_dir.mkdir(exist_ok=True)
     last_viz_t = 0.0
     win_name = f"overfit {args.arch}"
-    viz_pair = max(0, min(args.viz_pair_idx, N - 1))
-    Lviz = Ls[viz_pair:viz_pair + 1]
-    Rviz = Rs[viz_pair:viz_pair + 1]
-    Dviz = Ds[viz_pair:viz_pair + 1]
-    Vviz = valid[viz_pair:viz_pair + 1]
-    if cpu_residency and device == "cuda":
-        Lviz = Lviz.to(device, non_blocking=True)
-        Rviz = Rviz.to(device, non_blocking=True)
-        Dviz = Dviz.to(device, non_blocking=True)
-        Vviz = Vviz.to(device, non_blocking=True)
+    viz_rng = np.random.default_rng(args.seed + 1009)
+    if args.viz_pair_idx < 0:
+        viz_pair0 = int(viz_rng.integers(0, N))
+    else:
+        viz_pair0 = max(0, min(args.viz_pair_idx, N - 1))
+    viz_count = 0
+
+    def get_viz_batch(pair_idx: int):
+        Lviz = Ls[pair_idx:pair_idx + 1]
+        Rviz = Rs[pair_idx:pair_idx + 1]
+        Dviz = Ds[pair_idx:pair_idx + 1]
+        Vviz = valid[pair_idx:pair_idx + 1]
+        if cpu_residency and device == "cuda":
+            Lviz = Lviz.to(device, non_blocking=True)
+            Rviz = Rviz.to(device, non_blocking=True)
+            Dviz = Dviz.to(device, non_blocking=True)
+            Vviz = Vviz.to(device, non_blocking=True)
+        return Lviz, Rviz, Dviz, Vviz
+
     show_ok = bool(args.show) and bool(os.environ.get("DISPLAY"))
 
     def ms_l1(pred, gt, val, scale):
@@ -359,6 +480,9 @@ def main():
         err = (pred - gt).abs()
         hinge = (err - 1.0).clamp(min=0) ** 2
         return (hinge * val).sum() / val.sum().clamp(min=1)
+
+    def to_unit_image(x):
+        return x / 255.0 if x.detach().amax() > 2.0 else x
 
     # ---------- Phase-2 ablation extras (loss-side variants) ----------
     def seq_loss(out_dict, gt, val, gamma=0.9):
@@ -433,7 +557,7 @@ def main():
         Penalises disparity discontinuities except where the image has
         edges (preserves real depth boundaries, smooths flat regions)."""
         # Image gradient (mean over channels)
-        L_grey = left.mean(dim=1, keepdim=True) / 255.0   # (B,1,H,W) in [0,1]
+        L_grey = to_unit_image(left).mean(dim=1, keepdim=True)
         gx_L = (L_grey[..., :, 1:] - L_grey[..., :, :-1]).abs()
         gy_L = (L_grey[..., 1:, :] - L_grey[..., :-1, :]).abs()
         gx_d = (d[..., :, 1:] - d[..., :, :-1]).abs()
@@ -445,6 +569,81 @@ def main():
         lx = (gx_d * wx * vx).sum() / vx.sum().clamp(min=1)
         ly = (gy_d * wy * vy).sum() / vy.sum().clamp(min=1)
         return lx + ly
+
+    def boundary_focus_loss(pred, gt, val, left):
+        """Extra pressure on thin structures and disparity discontinuities.
+
+        Plain EPE is dominated by road/wall pixels. Tree leaves, poles, and
+        far object boundaries occupy few pixels, so a model can look soft
+        while still scoring well. This term upweights GT-disparity edges and
+        image edges, and also matches second-order detail with a Laplacian.
+        """
+        gx_g = (gt[..., :, 1:] - gt[..., :, :-1]).abs()
+        gy_g = (gt[..., 1:, :] - gt[..., :-1, :]).abs()
+        disp_edge = F.pad(gx_g, (0, 1, 0, 0)) + F.pad(gy_g, (0, 0, 0, 1))
+        L_grey = to_unit_image(left).mean(dim=1, keepdim=True)
+        gx_l = (L_grey[..., :, 1:] - L_grey[..., :, :-1]).abs()
+        gy_l = (L_grey[..., 1:, :] - L_grey[..., :-1, :]).abs()
+        img_edge = F.pad(gx_l, (0, 1, 0, 0)) + F.pad(gy_l, (0, 0, 0, 1))
+
+        # Clamp keeps the loss from being hijacked by huge foreground jumps.
+        w_edge = 1.0 + 4.0 * disp_edge.clamp(max=2.0) + 1.5 * img_edge.clamp(max=0.2)
+        l1 = (((pred - gt).abs() * w_edge) * val).sum() / (
+            (w_edge * val).sum().clamp(min=1))
+
+        k = pred.new_tensor([[0.0, 1.0, 0.0],
+                             [1.0, -4.0, 1.0],
+                             [0.0, 1.0, 0.0]]).view(1, 1, 3, 3)
+        lap_p = F.conv2d(pred, k, padding=1)
+        lap_g = F.conv2d(gt, k, padding=1)
+        lap = (((lap_p - lap_g).abs() * w_edge) * val).sum() / (
+            (w_edge * val).sum().clamp(min=1))
+        return l1 + 0.35 * lap
+
+    def guided_guard_loss(out_dict, gt, val, left):
+        """Keep guided full-res propagation from damaging easy regions.
+
+        The guided head is useful exactly at boundaries, but EPE explodes if it
+        freely perturbs flat road/wall/sky regions. Use GT disparity edges plus
+        image edges as a permissive boundary mask, then penalise final-vs-base
+        changes and high gates away from those boundaries.
+        """
+        if "d_pre_guided" not in out_dict or "guided_gate" not in out_dict:
+            return gt.new_zeros(())
+        d0 = out_dict["d_pre_guided"]
+        d1 = out_dict["d_final"]
+        gate = out_dict["guided_gate"]
+        if d0.shape[-2:] != gt.shape[-2:]:
+            d0 = F.interpolate(d0, size=gt.shape[-2:],
+                               mode="bilinear", align_corners=False)
+        if gate.shape[-2:] != gt.shape[-2:]:
+            gate = F.interpolate(gate, size=gt.shape[-2:],
+                                 mode="bilinear", align_corners=False)
+
+        gx_g = F.pad((gt[..., :, 1:] - gt[..., :, :-1]).abs(),
+                     (0, 1, 0, 0))
+        gy_g = F.pad((gt[..., 1:, :] - gt[..., :-1, :]).abs(),
+                     (0, 0, 0, 1))
+        grey = to_unit_image(left).mean(dim=1, keepdim=True)
+        gx_l = F.pad((grey[..., :, 1:] - grey[..., :, :-1]).abs(),
+                     (0, 1, 0, 0))
+        gy_l = F.pad((grey[..., 1:, :] - grey[..., :-1, :]).abs(),
+                     (0, 0, 0, 1))
+        # Saturate quickly: any real GT/image boundary gets a free pass,
+        # while smooth regions remain protected.
+        boundary = (2.5 * (gx_g + gy_g).clamp(max=1.0)
+                    + 5.0 * (gx_l + gy_l).clamp(max=0.2)).clamp(0.0, 1.0)
+        smooth = (1.0 - boundary) * val
+        denom = smooth.sum().clamp(min=1)
+        delta = (d1 - d0).abs()
+        delta_pen = (delta * smooth).sum() / denom
+        gate_pen = (gate * smooth).sum() / denom
+        return delta_pen + 0.25 * gate_pen
+
+    def run_model(left, right, aux: bool, guided_active: bool):
+        if args.arch == "yolo_ctx_guided":
+            return model(left, right, aux=aux, use_guided=guided_active)
+        return model(left, right, aux=aux)
 
     # AMP autocast for the new (memory-heavy) arches — cuts activation
     # memory ~50% with negligible accuracy impact in our experience.
@@ -465,10 +664,22 @@ def main():
             L = Ls[idx]; R = Rs[idx]; D = Ds[idx]; V = valid[idx]
 
         opt.zero_grad(set_to_none=True)
+        guided_active = not (
+            args.arch == "yolo_ctx_guided"
+            and step < max(1, args.guided_start_step)
+        )
         if use_amp:
             with torch.amp.autocast("cuda", dtype=torch.float16):
-                out_dict = model(L, R, aux=True,
-                                  with_iter_stages=(args.loss_variant == "seq_loss"))
+                # `with_iter_stages` is only accepted by the costlookup /
+                # tilegru designs. raftlike and yolo_ctx don't expose per-
+                # iter stage outputs, so passing the kwarg is a TypeError.
+                if args.arch in ("costlookup", "tilegru"):
+                    out_dict = model(L, R, aux=True,
+                                      with_iter_stages=(
+                                          args.loss_variant == "seq_loss"))
+                else:
+                    out_dict = run_model(L, R, aux=True,
+                                         guided_active=guided_active)
                 d_full = out_dict["d_final"]
                 d_half = out_dict["d_half"]
                 d4 = out_dict["d4"]
@@ -491,7 +702,7 @@ def main():
                         + 0.2 * bad1_hinge(d_full, D, V)
                     )
                     # Phase-2 ablation: optional extra loss term
-                    if args.loss_variant == "seq_loss":
+                    if args.loss_variant in ("seq_loss", "seq_boundary"):
                         loss = loss + 0.3 * seq_loss(out_dict, D, V,
                                                       gamma=args.seq_loss_gamma)
                     elif args.loss_variant == "slope_sup":
@@ -500,8 +711,18 @@ def main():
                         loss = loss + 0.3 * conf_aware_loss(out_dict, D, V)
                     elif args.loss_variant == "edge_smooth":
                         loss = loss + 0.1 * edge_smooth_loss(d_full, L, V)
+                    elif args.loss_variant == "boundary_focus":
+                        loss = loss + 0.35 * boundary_focus_loss(d_full, D, V, L)
+                    if args.loss_variant == "seq_boundary":
+                        loss = loss + 0.25 * boundary_focus_loss(d_full, D, V, L)
                     # Expert-recommended: L_init supervision on the post-init
                     # disparity (d32) with smooth-L1. Implements IGEV's L_init.
+                    if "d4_gev" in out_dict:
+                        loss = loss + 0.15 * ms_l1(out_dict["d4_gev"], D, V, 4.0)
+                    if "d_pre_guided" in out_dict and guided_active:
+                        loss = loss + 0.40 * ms_l1(
+                            out_dict["d_pre_guided"], D, V, 1.0)
+                        loss = loss + 0.20 * guided_guard_loss(out_dict, D, V, L)
                     if args.init_loss_weight > 0:
                         loss = loss + args.init_loss_weight * ms_l1(
                             out_dict["d32"], D, V, 16.0)
@@ -511,7 +732,13 @@ def main():
             scaler.step(opt)
             scaler.update()
         else:
-            out_dict = model(L, R, aux=True)
+            if args.arch in ("costlookup", "tilegru"):
+                out_dict = model(L, R, aux=True,
+                                  with_iter_stages=(
+                                      args.loss_variant == "seq_loss"))
+            else:
+                out_dict = run_model(L, R, aux=True,
+                                     guided_active=guided_active)
             d_full = out_dict["d_final"]
             d_half = out_dict["d_half"]
             d4 = out_dict["d4"]
@@ -530,7 +757,7 @@ def main():
                     + 0.5 * grad_consistency(d_full, D, V)
                     + 0.2 * bad1_hinge(d_full, D, V)
                 )
-                if args.loss_variant == "seq_loss":
+                if args.loss_variant in ("seq_loss", "seq_boundary"):
                     loss = loss + 0.3 * seq_loss(out_dict, D, V,
                                                   gamma=args.seq_loss_gamma)
                 elif args.loss_variant == "slope_sup":
@@ -539,6 +766,16 @@ def main():
                     loss = loss + 0.3 * conf_aware_loss(out_dict, D, V)
                 elif args.loss_variant == "edge_smooth":
                     loss = loss + 0.1 * edge_smooth_loss(d_full, L, V)
+                elif args.loss_variant == "boundary_focus":
+                    loss = loss + 0.35 * boundary_focus_loss(d_full, D, V, L)
+                if args.loss_variant == "seq_boundary":
+                    loss = loss + 0.25 * boundary_focus_loss(d_full, D, V, L)
+                if "d4_gev" in out_dict:
+                    loss = loss + 0.15 * ms_l1(out_dict["d4_gev"], D, V, 4.0)
+                if "d_pre_guided" in out_dict and guided_active:
+                    loss = loss + 0.40 * ms_l1(
+                        out_dict["d_pre_guided"], D, V, 1.0)
+                    loss = loss + 0.20 * guided_guard_loss(out_dict, D, V, L)
                 if args.init_loss_weight > 0:
                     loss = loss + args.init_loss_weight * ms_l1(
                         out_dict["d32"], D, V, 16.0)
@@ -570,8 +807,15 @@ def main():
         now = time.time()
         if (now - last_viz_t) >= args.viz_interval_s or step == args.steps:
             last_viz_t = now
+            if args.viz_rotate:
+                viz_pair = (viz_pair0 + viz_count) % N
+                viz_count += 1
+            else:
+                viz_pair = viz_pair0
+            Lviz, Rviz, Dviz, Vviz = get_viz_batch(viz_pair)
             with torch.no_grad():
-                pred_v = model(Lviz, Rviz, aux=False)
+                pred_v = run_model(Lviz, Rviz, aux=False,
+                                   guided_active=guided_active)
                 mtr_v = stereo_metrics(pred_v, Dviz, Vviz)
             stats = {
                 "step": f"{step}/{args.steps}",
@@ -588,6 +832,7 @@ def main():
                 "elapsed": f"{(now - t0):.0f} s",
                 "peak": f"{peak_mem/1e9:.2f} GB",
                 "arch": args.arch,
+                "pair": str(viz_pair),
             }
             panel = render_panel(Lviz[0], Dviz[0, 0], pred_v[0, 0], stats)
             cv2.imwrite(str(viz_dir / f"step_{step:05d}.png"), panel)
@@ -611,9 +856,13 @@ def main():
             if cpu_residency and device == "cuda":
                 Lc = Ls[sl].to(device, non_blocking=True)
                 Rc = Rs[sl].to(device, non_blocking=True)
-                preds.append(model(Lc, Rc, aux=False).cpu())
+                preds.append(run_model(
+                    Lc, Rc, aux=False,
+                    guided_active=args.guided_start_step <= args.steps).cpu())
             else:
-                preds.append(model(Ls[sl], Rs[sl], aux=False))
+                preds.append(run_model(
+                    Ls[sl], Rs[sl], aux=False,
+                    guided_active=args.guided_start_step <= args.steps))
         all_pred = torch.cat(preds, dim=0)
         # Compute metrics on whichever device the GT lives on
         final_metrics = stereo_metrics(all_pred, Ds, valid)
@@ -637,13 +886,17 @@ def main():
                 L1 = L1.to(device, non_blocking=True)
                 R1 = R1.to(device, non_blocking=True)
             for _ in range(10):
-                _ = model(L1, R1, aux=False)
+                _ = run_model(
+                    L1, R1, aux=False,
+                    guided_active=args.guided_start_step <= args.steps)
             if device == "cuda":
                 torch.cuda.synchronize()
             per_call = []
             for _ in range(100):
                 t = time.time()
-                _ = model(L1, R1, aux=False)
+                _ = run_model(
+                    L1, R1, aux=False,
+                    guided_active=args.guided_start_step <= args.steps)
                 if device == "cuda":
                     torch.cuda.synchronize()
                 per_call.append((time.time() - t) * 1000.0)
