@@ -337,10 +337,11 @@ These papers are absolutely essential for our project goals.
 
 | # | Paper | Authors | Venue/Year | Priority | Why |
 |---|-------|---------|------------|----------|-----|
-| 134 | **DynamicStereo: Consistent Dynamic Depth** | Karaev et al. | CVPR 2023 | **4** | Temporal consistency in stereo |
-| 135 | **TemporalStereo: Efficient Spatial-Temporal** | Zhang et al. | IROS 2023 | **4** | Efficient temporal stereo |
-| 136 | **XR-Stereo: 100+ FPS Video Stereo** | Cheng et al. | WACV 2024 | **4** | Video stereo for XR |
-| 137 | **Temporally Consistent Stereo Matching** | Zeng et al. | ECCV 2024 | **4** | Temporal consistency |
+| 134 | **DynamicStereo: Consistent Dynamic Depth** | Karaev et al. | CVPR 2023 | **4** | Temporal consistency in stereo — collected + tier2 summary (`summaries/tier2/temporal/DynamicStereo.md`); offline SST-attention window model, 1.2 s/frame, no propagated state |
+| 135 | **TemporalStereo: Efficient Spatial-Temporal** | Zhang et al. | IROS 2023 | **4** | Efficient temporal stereo — collected + tier2 summary (`summaries/tier2/temporal/TemporalStereo.md`); pose-warps cached disparity/costs/features into sparse candidates, +4 ms overhead |
+| 136 | **XR-Stereo: 100+ FPS Video Stereo** | Cheng et al. | WACV 2024 | **4** | Video stereo for XR — collected + tier2 summary (`summaries/tier2/temporal/XR-Stereo.md`); warm-starts RAFT GRU with pose-warped disparity+hidden state, 1 iter/frame, 30 fps on Qualcomm XR2 |
+| 137 | **Temporally Consistent Stereo Matching (TC-Stereo)** | Zeng et al. | ECCV 2024 | **4** | Temporal consistency — collected + tier2 summary (`summaries/tier2/temporal/TC-Stereo.md`); pose-projected semi-dense disparity + cost-margin gate + dual-space (disparity-gradient) refinement |
+| 137.1 | **CODD: Temporally Consistent Online Depth in Dynamic Scenes** | Li et al. | WACV 2023 | **4** | Temporal — collected + tier2 summary (`summaries/tier2/temporal/CODD.md`); HITNet + per-pixel SE3 motion net + learned reset/fusion gating (nearest prior for fail-soft temporal fusion), 9.3 M, 25 FPS Titan RTX |
 
 ### Adverse Weather & Challenges
 
