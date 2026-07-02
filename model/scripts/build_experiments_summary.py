@@ -53,19 +53,27 @@ def render_run(run_dir: Path) -> str:
         if meta is None:
             continue
         # Variant name: prefer the meta's own label if present.
-        label = (meta.get("backbone") or meta.get("arch")
-                 or meta.get("loss") or variant_dir.name)
+        # `variant` (arm name) beats `backbone` so multi-arm runs whose
+        # arms share one backbone stay distinguishable.
+        label = (meta.get("variant") or meta.get("backbone")
+                 or meta.get("arch") or meta.get("loss") or variant_dir.name)
         metas.append((label, meta, variant_dir))
 
     if not metas:
         return ""
 
     name = run_dir.name
-    started = metas[0][1].get("started_at", "")
-    sf_size = metas[0][1].get("n_pairs", "?")
-    steps = metas[0][1].get("steps", "?")
-    H = metas[0][1].get("height", "?")
-    W = metas[0][1].get("width", "?")
+    m0 = metas[0][1]
+    a0 = m0.get("args") or {}
+
+    def field(key, default="?"):
+        return m0.get(key, a0.get(key, default))
+
+    started = field("started_at", m0.get("finished", ""))
+    sf_size = field("n_pairs")
+    steps = field("steps")
+    H = field("height")
+    W = field("width")
 
     # Try to identify experiment type from prefix.
     if name.startswith("matched_overfit"):
@@ -80,6 +88,8 @@ def render_run(run_dir: Path) -> str:
         kind = "Indoor finetune"
     elif name.startswith("stereolite_v"):
         kind = "Standalone training run"
+    elif name.startswith("temptile"):
+        kind = "TempTile temporal warm-start A/B (4-arm)"
     else:
         kind = "Unknown"
 
@@ -87,7 +97,7 @@ def render_run(run_dir: Path) -> str:
     out.append(f"## {name}")
     out.append(f"**Type:** {kind}")
     out.append(f"**Started:** {started}  ·  **Config:** {steps} steps, "
-               f"{H}×{W}, {sf_size} pairs, batch={metas[0][1].get('batch','?')}")
+               f"{H}×{W}, {sf_size} pairs, batch={field('batch')}")
     out.append("")
 
     # Table.
@@ -97,10 +107,16 @@ def render_run(run_dir: Path) -> str:
         fm = (meta.get("final_metrics_all")
               or meta.get("final_metrics_all10"))
         params = meta.get("params_train_M",
-                          meta.get("params_total_M", "?"))
+                          meta.get("params_total_M",
+                                   meta.get("params_m", "?")))
         params_s = f"{params:.3f}" if isinstance(params, (int, float)) else str(params)
         bench = meta.get("inference_bench") or {}
         ms = bench.get("ms_mean")
+        if ms is None:
+            # Newer harnesses store latency_ms as a scalar (median) or a
+            # {mean, median, p95} dict.
+            lm = meta.get("latency_ms")
+            ms = lm.get("median") if isinstance(lm, dict) else lm
         ms_s = f"{ms:.1f}" if isinstance(ms, (int, float)) else "-"
         if fm is None:
             out.append(f"| {label} | {params_s} | (running) | | | | | | | | |")
