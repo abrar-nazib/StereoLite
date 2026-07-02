@@ -113,7 +113,7 @@ def build_model(arch: str, backbone: str = "ghost",
                            widener=widener)
         # Phase-2 architecture ablation flags (passed via outer scope).
         for k in ("slope_aware_warp", "selective_gate", "cascade_cv_4",
-                   "context_branch", "init_regress"):
+                   "context_branch", "init_regress", "init_gce"):
             v = _arch_flags.get(k)
             if v is not None:
                 cfg_kwargs[k] = v
@@ -177,6 +177,15 @@ def main():
                     help="Expert-recommended: APC + 2-layer regression head "
                           "in TileInit (costlookup variant only). Pair with "
                           "--init_loss_weight > 0 to actually supervise it.")
+    ap.add_argument("--init_gce", type=int, default=0,
+                    help="Expert-recommended: wire CoEx-style "
+                          "GuidedCostExcitation into TileInit's 3D aggregator "
+                          "(costlookup variant only). Free accuracy per CoEx.")
+    ap.add_argument("--pure_l1", type=int, default=0,
+                    help="Diagnostic: strip the loss to a single full-res L1 "
+                          "term (drops multi-scale, grad consistency, hinges, "
+                          "and all Phase-2 extras). Tests the overfit ceiling "
+                          "of the architecture without regularizer interference.")
     ap.add_argument("--init_loss_weight", type=float, default=0.0,
                     help="Smooth-L1 supervision weight on the post-init "
                           "disparity (out_dict['d32']). Implements the IGEV "
@@ -265,6 +274,7 @@ def main():
     _arch_flags["cascade_cv_4"] = bool(args.cascade_cv_4)
     _arch_flags["context_branch"] = bool(args.context_branch)
     _arch_flags["init_regress"] = bool(args.init_regress)
+    _arch_flags["init_gce"] = bool(args.init_gce)
 
     # Build model.
     model, cfg = build_model(args.arch,
@@ -464,30 +474,37 @@ def main():
                 d4 = out_dict["d4"]
                 d8 = out_dict["d8"]
                 d16 = out_dict["d16"]
-                loss = (
-                    1.0 * ms_l1(d_full, D, V, 1.0)
-                    + 0.5 * ms_l1(d_half, D, V, 2.0)
-                    + 0.3 * ms_l1(d4, D, V, 4.0)
-                    + 0.2 * ms_l1(d8, D, V, 8.0)
-                    + 0.1 * ms_l1(d16, D, V, 16.0)
-                    + 0.5 * grad_consistency(d_full, D, V)
-                    + 0.2 * bad1_hinge(d_full, D, V)
-                )
-                # Phase-2 ablation: optional extra loss term
-                if args.loss_variant == "seq_loss":
-                    loss = loss + 0.3 * seq_loss(out_dict, D, V,
-                                                  gamma=args.seq_loss_gamma)
-                elif args.loss_variant == "slope_sup":
-                    loss = loss + 0.3 * slope_sup_loss(out_dict, D, V)
-                elif args.loss_variant == "conf_aware":
-                    loss = loss + 0.3 * conf_aware_loss(out_dict, D, V)
-                elif args.loss_variant == "edge_smooth":
-                    loss = loss + 0.1 * edge_smooth_loss(d_full, L, V)
-                # Expert-recommended: L_init supervision on the post-init
-                # disparity (d32) with smooth-L1. Implements IGEV's L_init.
-                if args.init_loss_weight > 0:
-                    loss = loss + args.init_loss_weight * ms_l1(
-                        out_dict["d32"], D, V, 16.0)
+                if args.pure_l1:
+                    # Diagnostic: pure full-resolution L1 only. No multi-scale,
+                    # no grad consistency, no hinges, no Phase-2 extras, no
+                    # init loss. Strictly tests the architecture's overfit
+                    # ceiling without regularizer interference.
+                    loss = ms_l1(d_full, D, V, 1.0)
+                else:
+                    loss = (
+                        1.0 * ms_l1(d_full, D, V, 1.0)
+                        + 0.5 * ms_l1(d_half, D, V, 2.0)
+                        + 0.3 * ms_l1(d4, D, V, 4.0)
+                        + 0.2 * ms_l1(d8, D, V, 8.0)
+                        + 0.1 * ms_l1(d16, D, V, 16.0)
+                        + 0.5 * grad_consistency(d_full, D, V)
+                        + 0.2 * bad1_hinge(d_full, D, V)
+                    )
+                    # Phase-2 ablation: optional extra loss term
+                    if args.loss_variant == "seq_loss":
+                        loss = loss + 0.3 * seq_loss(out_dict, D, V,
+                                                      gamma=args.seq_loss_gamma)
+                    elif args.loss_variant == "slope_sup":
+                        loss = loss + 0.3 * slope_sup_loss(out_dict, D, V)
+                    elif args.loss_variant == "conf_aware":
+                        loss = loss + 0.3 * conf_aware_loss(out_dict, D, V)
+                    elif args.loss_variant == "edge_smooth":
+                        loss = loss + 0.1 * edge_smooth_loss(d_full, L, V)
+                    # Expert-recommended: L_init supervision on the post-init
+                    # disparity (d32) with smooth-L1. Implements IGEV's L_init.
+                    if args.init_loss_weight > 0:
+                        loss = loss + args.init_loss_weight * ms_l1(
+                            out_dict["d32"], D, V, 16.0)
             scaler.scale(loss).backward()
             scaler.unscale_(opt)
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -500,27 +517,31 @@ def main():
             d4 = out_dict["d4"]
             d8 = out_dict["d8"]
             d16 = out_dict["d16"]
-            loss = (
-                1.0 * ms_l1(d_full, D, V, 1.0)
-                + 0.5 * ms_l1(d_half, D, V, 2.0)
-                + 0.3 * ms_l1(d4, D, V, 4.0)
-                + 0.2 * ms_l1(d8, D, V, 8.0)
-                + 0.1 * ms_l1(d16, D, V, 16.0)
-                + 0.5 * grad_consistency(d_full, D, V)
-                + 0.2 * bad1_hinge(d_full, D, V)
-            )
-            if args.loss_variant == "seq_loss":
-                loss = loss + 0.3 * seq_loss(out_dict, D, V,
-                                              gamma=args.seq_loss_gamma)
-            elif args.loss_variant == "slope_sup":
-                loss = loss + 0.3 * slope_sup_loss(out_dict, D, V)
-            elif args.loss_variant == "conf_aware":
-                loss = loss + 0.3 * conf_aware_loss(out_dict, D, V)
-            elif args.loss_variant == "edge_smooth":
-                loss = loss + 0.1 * edge_smooth_loss(d_full, L, V)
-            if args.init_loss_weight > 0:
-                loss = loss + args.init_loss_weight * ms_l1(
-                    out_dict["d32"], D, V, 16.0)
+            if args.pure_l1:
+                # Diagnostic: pure full-resolution L1 only.
+                loss = ms_l1(d_full, D, V, 1.0)
+            else:
+                loss = (
+                    1.0 * ms_l1(d_full, D, V, 1.0)
+                    + 0.5 * ms_l1(d_half, D, V, 2.0)
+                    + 0.3 * ms_l1(d4, D, V, 4.0)
+                    + 0.2 * ms_l1(d8, D, V, 8.0)
+                    + 0.1 * ms_l1(d16, D, V, 16.0)
+                    + 0.5 * grad_consistency(d_full, D, V)
+                    + 0.2 * bad1_hinge(d_full, D, V)
+                )
+                if args.loss_variant == "seq_loss":
+                    loss = loss + 0.3 * seq_loss(out_dict, D, V,
+                                                  gamma=args.seq_loss_gamma)
+                elif args.loss_variant == "slope_sup":
+                    loss = loss + 0.3 * slope_sup_loss(out_dict, D, V)
+                elif args.loss_variant == "conf_aware":
+                    loss = loss + 0.3 * conf_aware_loss(out_dict, D, V)
+                elif args.loss_variant == "edge_smooth":
+                    loss = loss + 0.1 * edge_smooth_loss(d_full, L, V)
+                if args.init_loss_weight > 0:
+                    loss = loss + args.init_loss_weight * ms_l1(
+                        out_dict["d32"], D, V, 16.0)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             opt.step()

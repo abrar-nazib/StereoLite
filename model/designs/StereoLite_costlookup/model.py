@@ -118,6 +118,10 @@ class StereoLiteConfig:
     init_regress: bool = False            # add APC + 2-layer head to TileInit;
                                            # supervise d_init with smooth-L1 in the
                                            # trainer (--init_loss_weight > 0).
+    init_gce: bool = False                # wire CoEx GuidedCostExcitation into
+                                           # TileInit's 3D aggregator (between
+                                           # the first and second 3D-conv layers).
+                                           # Free accuracy per CoEx; ~few k params.
 
 
 class StereoLite(nn.Module):
@@ -148,7 +152,8 @@ class StereoLite(nn.Module):
                                    max_disp=self.cfg.init_max_disp,
                                    groups=g,
                                    feat_out=self.cfg.tile_feat_ch,
-                                   regress=self.cfg.init_regress)
+                                   regress=self.cfg.init_regress,
+                                   use_gce=self.cfg.init_gce)
 
         # Context branch (A1) — small parallel encoder mimicking the matching
         # encoder's strides. Provides per-stage context features that get

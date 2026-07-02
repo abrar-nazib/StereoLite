@@ -1,3 +1,6 @@
+tmp
+tmp/
+
 # Paper PDFs (too large for git)
 papers/raw/**/*.pdf
 
@@ -51,3 +54,8 @@ model/teachers/*
 
 # Presentation source files (large; never push to GitHub)
 *.pptx
+
+# External model repos / clones (large, not ours)
+external_models/
+model/scripts/modal/igev_stereo_repo/
+model/scripts/modal/lite_any_stereo_repo/

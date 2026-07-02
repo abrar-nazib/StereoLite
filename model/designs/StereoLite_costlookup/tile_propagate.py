@@ -122,16 +122,33 @@ class TileInit(nn.Module):
     """
 
     def __init__(self, feat_ch: int, max_disp: int = 24, groups: int = 8,
-                 feat_out: int = 16, regress: bool = False):
+                 feat_out: int = 16, regress: bool = False,
+                 use_gce: bool = False):
         super().__init__()
         assert feat_ch % groups == 0
         self.max_disp = max_disp
         self.groups = groups
         self.feat_out = feat_out
         self.regress = regress
-        self.agg = nn.Sequential(
+        self.use_gce = use_gce
+        # Split the aggregator so we can inject CoEx-style guided cost
+        # excitation between the first and second 3D-conv layers when
+        # use_gce=True. This is the agent-recommended "wire the existing
+        # GuidedCostExcitation into TileInit's 3D aggregator" change.
+        self.agg_a = nn.Sequential(
             nn.Conv3d(groups, 16, 3, padding=1, bias=False),
             _safe_gn(16), nn.SiLU(inplace=True),
+        )
+        if use_gce:
+            # Import lazily to avoid circular imports.
+            import sys as _sys
+            from pathlib import Path as _Path
+            _sys.path.insert(0, str(_Path(__file__).resolve().parent.parent))
+            from StereoLite.cost_volume import GuidedCostExcitation
+            self.gce = GuidedCostExcitation(guide_ch=feat_ch, agg_ch=16)
+        else:
+            self.gce = None
+        self.agg_b = nn.Sequential(
             nn.Conv3d(16, 16, 3, padding=1, bias=False),
             _safe_gn(16), nn.SiLU(inplace=True),
             nn.Conv3d(16, 1, 3, padding=1, bias=True),
@@ -172,7 +189,10 @@ class TileInit(nn.Module):
                 fR_s[:, :, :, d:] = fR[:, :, :, :-d]
             fR_g = fR_s.view(B, self.groups, cg, H, W)
             cv[:, :, d] = (fL_g * fR_g).mean(dim=2)
-        logits = self.agg(cv).squeeze(1)            # (B, D, H, W)
+        x = self.agg_a(cv)                          # (B, 16, D, H, W)
+        if self.gce is not None:
+            x = self.gce(x, fL)                     # CoEx-style guided gate
+        logits = self.agg_b(x).squeeze(1)            # (B, D, H, W)
         prob = F.softmax(logits, dim=1)
         d_sa = (prob * self.disp_idx).sum(dim=1, keepdim=True)  # soft-argmin
         conf = prob.max(dim=1, keepdim=True).values
