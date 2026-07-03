@@ -127,7 +127,11 @@ def _groupwise_corr_volume_around(fL: torch.Tensor, fR: torch.Tensor,
     gxs = [(xx.expand(B, H, W) - (d + (i - half_range))) / max(W - 1, 1) * 2 - 1
            for i in range(D)]
     grid = torch.stack([torch.cat(gxs, dim=1), gy.repeat(1, D, 1)], dim=-1)
-    fR_all = F.grid_sample(fR, grid, align_corners=True,
+    # .contiguous(): value-identical; large batches dispatch grid_sample to
+    # cuDNN, which rejects non-contiguous inputs (CUDNN_STATUS_NOT_SUPPORTED,
+    # first seen at batch 40 on A100, 2026-07-04 probe).
+    fR_all = F.grid_sample(fR.contiguous(), grid.contiguous(),
+                           align_corners=True,
                            padding_mode="zeros").view(B, C, D, H, W)
     fL_g = fL.view(B, g, cg, 1, H, W)
     return (fL_g * fR_all.view(B, g, cg, D, H, W)).mean(dim=2)

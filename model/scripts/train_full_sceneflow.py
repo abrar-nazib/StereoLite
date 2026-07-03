@@ -166,6 +166,10 @@ def run_probe(model, loader, device, args):
             print(f"batch {B:3d}: OOM", flush=True)
             rows.append((B, None, None, None, None))
             break
+        except RuntimeError as e:  # kernel/dispatch failures: record, continue
+            print(f"batch {B:3d}: RuntimeError: {e}", flush=True)
+            rows.append((B, None, None, None, None))
+            torch.cuda.empty_cache()
     ok = [r for r in rows if r[1] is not None and r[4] <= 85.0]
     if ok:
         best = max(ok, key=lambda r: r[2])
