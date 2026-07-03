@@ -39,7 +39,8 @@ image = (
                            "**/__pycache__/**"])
 )
 
-RUN_NAME = "blurfix_n500"
+from datetime import datetime
+RUN_NAME = f"{datetime.now():%Y%m%d}_blurfix_n500"  # date_tag convention
 ARMS = {
     "plane": ["--arch", "gev4_opt_narrow_plane", "--slant_w", "0.3"],
     "bimodal": ["--arch", "gev4_opt_narrow_bimodal", "--bimodal_w", "0.4"],
