@@ -90,6 +90,8 @@ def render_run(run_dir: Path) -> str:
         kind = "Standalone training run"
     elif name.startswith("temptile"):
         kind = "TempTile temporal warm-start A/B (4-arm)"
+    elif name.startswith("eff"):
+        kind = "Efficiency-fix A/B (gev4 vs opt vs opt_narrow, 80/20 heldout)"
     else:
         kind = "Unknown"
 
