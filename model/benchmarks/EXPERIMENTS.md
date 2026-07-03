@@ -73,6 +73,16 @@ _Per-variant artefacts: [`benchmarks/temptile_smoke/`](benchmarks/temptile_smoke
 
 _Per-variant artefacts: [`benchmarks/temptile_20260702-234021/`](benchmarks/temptile_20260702-234021/)_
 
+## sharptail_n100
+**Type:** Unknown
+**Started:** 2026-07-03T12:36:34  ·  **Config:** 4000 steps, 384×640, 100 pairs, batch=8
+
+| Variant | Trainable (M) | EPE | RMSE | Median | bad-0.5 | bad-1.0 | bad-2.0 | bad-3.0 | D1-all | Latency (ms) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| gev4_opt_narrow_sharptail | 3.103 | **2.8675** | 6.972 | 0.509 | 45.31% | **32.03%** | 22.11% | 17.37% | 17.03% | 38.9 |
+
+_Per-variant artefacts: [`benchmarks/sharptail_n100/`](benchmarks/sharptail_n100/)_
+
 ## raftlike_sweep_20260501-211601
 **Type:** Unknown
 **Started:** 2026-05-01T21:16:06  ·  **Config:** 3000 steps, 384×640, 20 pairs, batch=8
@@ -93,6 +103,17 @@ _Per-variant artefacts: [`benchmarks/temptile_20260702-234021/`](benchmarks/temp
 | tilegru | 0.776 | **0.7764** | 1.508 | 0.486 | 48.95% | **18.62%** | 6.71% | 3.84% | 3.84% | 37.5 |
 
 _Per-variant artefacts: [`benchmarks/raftlike_sweep_20260501-211601/`](benchmarks/raftlike_sweep_20260501-211601/)_
+
+## prerahi_n100
+**Type:** Unknown
+**Started:** 2026-07-03T11:42:54  ·  **Config:** 4500 steps, 384×640, 100 pairs, batch=8
+
+| Variant | Trainable (M) | EPE | RMSE | Median | bad-0.5 | bad-1.0 | bad-2.0 | bad-3.0 | D1-all | Latency (ms) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| costlookup_y26n | 1.327 | **3.0634** | 7.247 | 0.533 | 45.16% | **31.42%** | 21.90% | 17.45% | 17.09% | 42.2 |
+| costlookup_y26s | 2.208 | **3.0646** | 7.248 | 0.547 | 45.42% | **31.95%** | 21.83% | 17.25% | 16.98% | 38.6 |
+
+_Per-variant artefacts: [`benchmarks/prerahi_n100/`](benchmarks/prerahi_n100/)_
 
 ## matched_overfit_20260430-234721
 **Type:** Matched encoder overfit (ghost vs yolo26n vs yolo26s)

@@ -74,6 +74,18 @@ the 3050. ADOPTED: gev4_opt_narrow as working architecture, conditional on
 full-training re-validation + MB14 zero-shot when the full checkpoint
 arrives (watch item: bad-0.5 +3.1pp at stop-step, inconclusive).
 
+GRAND 9-ARM RESULT (2026-07-03, model/benchmarks/GRAND_COMPARISON_20260703.md,
+pair-set hash-verified across 4 runs): OpenStereo augmentation triplet is
+the largest single lever measured in this project — best val EPE 2.778 ->
+1.921 (-30.8%, 6x noise floor), D1 -22.6%, no plateau in 12k steps, train
+EPE HIGHER (regularization signature). freeze_bn: no effect alone and
+above-noise WORSE combined with aug. Pre-rahi costlookup: -8 to -11% val
+EPE vs gev4 family (y26n kept only as sub-1.5M fallback; its bad-0.5/
+sharpness edge is within noise). Sharptail hybrid: rejected.
+FULL-TRAINING CONFIG (evidence-backed): gev4_opt_narrow + aug ON +
+freeze_bn OFF + full SceneFlow (~35k pairs) + OneCycle + extended step
+budget (12k insufficient under aug).
+
 Write these into Ch4 as calculated estimates with the methodology sentence and
 the asterisk convention; a table footnote states real measurements replace
 them when hardware is available.
