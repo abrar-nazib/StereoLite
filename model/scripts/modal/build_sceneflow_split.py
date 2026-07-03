@@ -16,7 +16,7 @@ streaming decode for .tar.bz2), so the volume's inode budget is untouched.
 Six CPU-only containers run in parallel, one per archive.
 
 Output:
-  local:  model/data/sceneflow_split_v1.json.gz   (checked into the repo)
+  local:  model/configs/sceneflow_split_v1.json.gz   (checked into the repo)
   volume: widener-results:/sceneflow_split/sceneflow_split_v1.json.gz
 
 Blocking .map(); do NOT `modal run -d`.
@@ -179,7 +179,7 @@ def main():
     manifest["sha256_of_lists"] = hashlib.sha256(raw).hexdigest()
     blob = gzip.compress(json.dumps(manifest, indent=1).encode())
 
-    local = Path(__file__).resolve().parents[2] / "data" / "sceneflow_split_v1.json.gz"
+    local = Path(__file__).resolve().parents[2] / "configs" / "sceneflow_split_v1.json.gz"
     local.parent.mkdir(parents=True, exist_ok=True)
     local.write_bytes(blob)
     remote = store_manifest.remote(blob)
