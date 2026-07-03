@@ -87,12 +87,14 @@ def _correlation_lookup_batched(fL: torch.Tensor, fR: torch.Tensor,
     gx_all = torch.cat(gxs, dim=1)                      # (B, D*H, W)
     gy_all = gy.repeat(1, D, 1)                         # (B, D*H, W)
     grid = torch.stack([gx_all, gy_all], dim=-1)        # (B, D*H, W, 2)
-    # .contiguous(): value-identical; large batches dispatch grid_sample to
-    # cuDNN, which rejects non-contiguous inputs (CUDNN_STATUS_NOT_SUPPORTED,
-    # first seen at batch 40 on A100, 2026-07-04 probe).
-    fR_all = F.grid_sample(fR.contiguous(), grid.contiguous(),
-                           align_corners=True,
-                           padding_mode="border")       # (B, C, D*H, W)
+    # cudnn disabled for this op: the stacked-offset grid makes the output
+    # B x C x (D*H) x W, which crosses cuDNN's 32-bit indexing ceiling around
+    # batch 40 at 384x640 (CUDNN_STATUS_NOT_SUPPORTED, A100 probe 2026-07-04).
+    # The native CUDA kernel handles it; values identical.
+    with torch.backends.cudnn.flags(enabled=False):
+        fR_all = F.grid_sample(fR.contiguous(), grid.contiguous(),
+                                align_corners=True,
+                                padding_mode="border")  # (B, C, D*H, W)
     fR_all = fR_all.view(B, C, D, H, W)
 
     fR_w = fR_all[:, :, half_range]                     # offset-0 sample
