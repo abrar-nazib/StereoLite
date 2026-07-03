@@ -42,7 +42,8 @@ image = (
                            "**/__pycache__/**"])
 )
 
-RUN_NAME = "blurfix_n500"
+from datetime import datetime
+RUN_NAME = f"{datetime.now():%Y%m%d}_blurfix_n500"  # date_tag convention
 ARMS = {
     "control500": ["--arch", "gev4_opt_narrow"],
     "bundle1": ["--arch", "gev4_opt_narrow_bundle1",
