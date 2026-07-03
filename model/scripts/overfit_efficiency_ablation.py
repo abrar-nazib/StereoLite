@@ -110,6 +110,17 @@ def build_model(arch: str):
         # blur Fix 3: SMD-Nets bimodal aux head (pair with --bimodal_w 0.4)
         cfg = StereoLiteYoloCtxGEV4Config(narrow_gev=True, gev_half_range=16,
                                           bimodal_head=True)
+    elif arch == "gev4_opt_narrow_pb":
+        # composition: plane render + bimodal aux (pair with --slant_w 0.3
+        # --bimodal_w 0.4)
+        cfg = StereoLiteYoloCtxGEV4Config(narrow_gev=True, gev_half_range=16,
+                                          plane_render=True, bimodal_head=True)
+    elif arch == "gev4_opt_narrow_allin":
+        # composition: bundle1 + plane + bimodal (pair with --trunc_A 1.0
+        # --init_ce_w 0.3 --slant_w 0.3 --bimodal_w 0.4)
+        cfg = StereoLiteYoloCtxGEV4Config(narrow_gev=True, gev_half_range=16,
+                                          init_topk=3, plane_render=True,
+                                          bimodal_head=True)
     else:
         raise ValueError(arch)
     return StereoLiteYoloCtxGEV4(cfg), cfg
@@ -538,6 +549,8 @@ def main():
                              "gev4_opt_narrow_bundle1",
                              "gev4_opt_narrow_plane",
                              "gev4_opt_narrow_bimodal",
+                             "gev4_opt_narrow_pb",
+                             "gev4_opt_narrow_allin",
                              "costlookup_y26n", "costlookup_y26s"])
     ap.add_argument("--trunc_A", type=float, default=0.0,
                     help="HITNet truncated L1 cap (px, per-scale units) on "
@@ -653,7 +666,13 @@ def main():
         if step % args.eval_every == 0:
             vm = evaluate(model, val_pairs, device)
             val_hist.append((step, vm["epe"]))
-            csv_rows.append((step, "", "", "", "", "", "", "", "",
+            # full 8-metric val row (protocol: the deciding metric bad-0.5
+            # needs a direct per-eval noise band, 2026-07-03 harness audit)
+            csv_rows.append((step, "",
+                             f"{vm['epe']:.4f}", f"{vm['rmse']:.4f}",
+                             f"{vm['bad_0.5']:.3f}", f"{vm['bad_1.0']:.3f}",
+                             f"{vm['bad_2.0']:.3f}", f"{vm['bad_3.0']:.3f}",
+                             f"{vm['d1_all']:.3f}",
                              f"{vm['epe']:.4f}", f"{vm['bad_1.0']:.3f}",
                              f"{vm['d1_all']:.3f}", f"{args.lr:g}",
                              f"{time.time()-t0:.1f}"))
@@ -702,6 +721,7 @@ def main():
         steps=step, max_steps=args.max_steps, lr=args.lr, batch=args.batch,
         height=TRAIN_H, width=TRAIN_W, n_pairs=args.n_pairs,
         n_train=len(train_pairs), n_val=len(val_pairs), seed=args.seed,
+        split_protocol="windowed-val w5 buf10 (leak-proof)",
         plateau=dict(min_steps=args.min_steps, patience=args.patience,
                      best_val_epe=best_val, best_step=best_step),
         device="cuda", gpu=torch.cuda.get_device_name(0),
