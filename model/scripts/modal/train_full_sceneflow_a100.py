@@ -82,7 +82,7 @@ BASE_CMD = [
                        "/results": results_vol},
               cpu=12, memory=65536, timeout=2 * 3600, retries=0)
 def probe_remote() -> int:
-    rc = _run(BASE_CMD + ["--probe", "8,16,24,32,40,48",
+    rc = _run(BASE_CMD + ["--probe", "32,40,48",
                           "--out_dir", f"/results/fulltrain/{RUN_NAME}_probe"])
     results_vol.commit()
     return rc
