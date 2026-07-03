@@ -96,6 +96,15 @@ class ShardStream(IterableDataset):
             epoch += 1
 
 
+def _safe_sched_step(sched):
+    """OneCycle raises once stepped past total_steps (possible when NaN-skip
+    steps consumed schedule ticks); ride the floor LR instead of dying."""
+    try:
+        sched.step()
+    except ValueError:
+        pass
+
+
 def to_device(batch, device):
     L = batch["L"].to(device, non_blocking=True).float() / 255.0
     R = batch["R"].to(device, non_blocking=True).float() / 255.0
@@ -203,6 +212,12 @@ def main():
     ap.add_argument("--probe", default=None,
                     help='e.g. "8,16,24,32,40,48": measure + exit')
     ap.add_argument("--final_full_eval", type=int, default=1)
+    ap.add_argument("--auto_extend", type=int, default=1,
+                    help="after OneCycle ends, keep training in low-LR "
+                         "cosine tails while val EPE still improves")
+    ap.add_argument("--extend_leg", type=int, default=5000)
+    ap.add_argument("--extend_cap", type=int, default=20000)
+    ap.add_argument("--extend_lr", type=float, default=1e-4)
     args = ap.parse_args()
 
     torch.manual_seed(args.seed)
@@ -257,15 +272,25 @@ def main():
     print(f"val pairs: {len(val_pairs)} (subset={val_keys is not None})")
 
     start_step, best_val = 0, float("inf")
+    val_log: list = []          # (step, val_epe) — drives auto-extension
+    phase, target, extend_used = "main", args.steps, 0
     ckpt_path = out_dir / "latest.pth"
     if args.resume and ckpt_path.exists():
         ck = torch.load(ckpt_path, map_location=device, weights_only=False)
         model.load_state_dict(ck["model"])
         opt.load_state_dict(ck["opt"])
-        sched.load_state_dict(ck["sched"])
         scaler.load_state_dict(ck["scaler"])
         start_step, best_val = ck["step"], ck["best_val"]
-        print(f"resumed from step {start_step} (best val EPE {best_val:.4f})")
+        val_log = ck.get("val_log", [])
+        phase = ck.get("phase", "main")
+        target = ck.get("target", args.steps)
+        extend_used = ck.get("extend_used", 0)
+        if phase == "tail":  # rebuild the tail scheduler before loading state
+            sched = torch.optim.lr_scheduler.CosineAnnealingLR(
+                opt, T_max=args.extend_leg, eta_min=0.0)
+        sched.load_state_dict(ck["sched"])
+        print(f"resumed from step {start_step} (best val EPE {best_val:.4f}, "
+              f"phase={phase}, target={target})")
 
     meta = {"args": vars(args), "arch": args.arch, "lr_peak": lr,
             "params_train_M": n_params / 1e6,
@@ -287,7 +312,9 @@ def main():
     loss_ema = None
     collage_train_pairs = None  # 3 raw train samples, stashed at step 1
 
-    for step in range(start_step + 1, args.steps + 1):
+    step = start_step
+    while step < target:
+        step += 1
         batch = next(it)
         if collage_train_pairs is None:
             collage_train_pairs = [
@@ -307,7 +334,7 @@ def main():
             nan_streak += 1
             if nan_streak >= 50:
                 raise RuntimeError(f"non-finite loss x{nan_streak} @ {step}")
-            sched.step()
+            _safe_sched_step(sched)
             continue
         nan_streak = 0
         scaler.scale(loss).backward()
@@ -315,7 +342,7 @@ def main():
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         scaler.step(opt)
         scaler.update()
-        sched.step()
+        _safe_sched_step(sched)
         lv = float(loss.detach())
         loss_ema = lv if loss_ema is None else 0.98 * loss_ema + 0.02 * lv
 
@@ -329,9 +356,10 @@ def main():
                 f.write(f"{step},{loss_ema:.5f},{sched.get_last_lr()[0]:.2e},"
                         f"{ms:.1f},,,,,,{time.time()-t0:.0f}\n")
 
-        if step % args.eval_every == 0 or step == args.steps:
+        if step % args.eval_every == 0 or step == target:
             with torch.no_grad():  # fp32 val, same protocol as the ablations
                 vm = evaluate(model, val_pairs, device, bs=8)
+            val_log.append((step, float(vm["epe"])))
             print(f"  VAL @ {step}: epe {vm['epe']:.4f}  "
                   f"bad0.5 {vm['bad_0.5']:.2f}  bad1 {vm['bad_1.0']:.2f}  "
                   f"D1 {vm['d1_all']:.2f}"
@@ -350,7 +378,9 @@ def main():
             torch.save({"model": model.state_dict(),
                         "opt": opt.state_dict(), "sched": sched.state_dict(),
                         "scaler": scaler.state_dict(), "step": step,
-                        "best_val": best_val}, ckpt_path)
+                        "best_val": best_val, "val_log": val_log,
+                        "phase": phase, "target": target,
+                        "extend_used": extend_used}, ckpt_path)
             try:
                 col = make_collage(model, collage_train_pairs, val_pairs[:2],
                                    device, step, args)
@@ -360,7 +390,36 @@ def main():
                 print(f"  collage failed: {e}")
             meta["best_val_epe"] = best_val
             meta["last_step"] = step
+            meta["phase"] = phase
+            meta["extend_used"] = extend_used
             (out_dir / "meta.json").write_text(json.dumps(meta, indent=1))
+
+        # --- auto-extension: after the planned horizon, keep training in
+        # low-LR cosine tails while the val curve still pays. Plateau logic
+        # is only valid here (low, decaying LR), never mid-OneCycle. ---
+        if (step == target and args.auto_extend
+                and extend_used < args.extend_cap):
+            thresh = 0.01 if phase == "main" else 0.005
+            epes = [e for _, e in val_log]
+            improving = (len(epes) < 5
+                         or min(epes[-4:]) < min(epes[:-4]) * (1 - thresh))
+            if improving:
+                target += args.extend_leg
+                extend_used += args.extend_leg
+                phase = "tail"
+                for gp in opt.param_groups:
+                    gp["lr"] = args.extend_lr
+                sched = torch.optim.lr_scheduler.CosineAnnealingLR(
+                    opt, T_max=args.extend_leg, eta_min=0.0)
+                print(f"AUTO-EXTEND: val still improving (>{thresh:.1%} "
+                      f"over last 4 evals) -> +{args.extend_leg} steps at "
+                      f"lr {args.extend_lr:.1e} (target {target}, "
+                      f"extension used {extend_used}/{args.extend_cap})",
+                      flush=True)
+            else:
+                print(f"NO EXTEND: val plateaued "
+                      f"(best {best_val:.4f}); stopping at {step}.",
+                      flush=True)
 
     # final: FULL 4,370-pair test on the best checkpoint (the paper number)
     if args.final_full_eval:
