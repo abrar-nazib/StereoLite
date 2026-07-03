@@ -101,6 +101,15 @@ def build_model(arch: str):
         # --init_ce_w 0.3 for the full bundle)
         cfg = StereoLiteYoloCtxGEV4Config(narrow_gev=True, gev_half_range=16,
                                           init_topk=3)
+    elif arch == "gev4_opt_narrow_plane":
+        # blur Fix 2: plane-equation rendering + edge gate (pair with
+        # --slant_w 0.3 for trustworthy slopes)
+        cfg = StereoLiteYoloCtxGEV4Config(narrow_gev=True, gev_half_range=16,
+                                          plane_render=True)
+    elif arch == "gev4_opt_narrow_bimodal":
+        # blur Fix 3: SMD-Nets bimodal aux head (pair with --bimodal_w 0.4)
+        cfg = StereoLiteYoloCtxGEV4Config(narrow_gev=True, gev_half_range=16,
+                                          bimodal_head=True)
     else:
         raise ValueError(arch)
     return StereoLiteYoloCtxGEV4(cfg), cfg
@@ -375,7 +384,58 @@ def init_ce_loss(logits, gt, valid, scale=16.0, max_disp=24):
     return (nll * m).sum() / m.sum().clamp(min=1)
 
 
-def loss_fn(out, D, V, trunc_A: float = 0.0, init_ce_w: float = 0.0):
+def _box(x, k):
+    return F.avg_pool2d(x, k, stride=1, padding=k // 2)
+
+
+def slant_loss(out, D, V, k: int = 9):
+    """Gated slant supervision (HITNet Eq. 13 semantics): GT slopes from a
+    closed-form local least-squares plane fit over a kxk window (box-filter
+    implementation), supervised ONLY where the predicted disparity is
+    already right (|d_err| < 1 px at 1/4 scale) — boundary tiles straddling
+    two planes are exempt, so slopes aren't pulled toward cross-surface
+    compromises."""
+    D4 = F.interpolate(D, scale_factor=0.25, mode="nearest") / 4.0
+    V4 = F.interpolate(V, scale_factor=0.25, mode="nearest")
+    B, _, H, W = D4.shape
+    xs = torch.arange(W, device=D4.device, dtype=D4.dtype).view(1, 1, 1, W)
+    ys = torch.arange(H, device=D4.device, dtype=D4.dtype).view(1, 1, H, 1)
+    x = xs.expand(B, 1, H, W); y = ys.expand(B, 1, H, W)
+    w = V4
+    sw = _box(w, k).clamp(min=1e-3)
+    mx = _box(w * x, k) / sw; my = _box(w * y, k) / sw
+    md = _box(w * D4, k) / sw
+    cxx = _box(w * x * x, k) / sw - mx * mx
+    cyy = _box(w * y * y, k) / sw - my * my
+    cxd = _box(w * x * D4, k) / sw - mx * md
+    cyd = _box(w * y * D4, k) / sw - my * md
+    sx_gt = cxd / cxx.clamp(min=1e-3)
+    sy_gt = cyd / cyy.clamp(min=1e-3)
+    d_err = (out["d4"] - D4).abs()
+    gate = ((d_err < 1.0) & (V4 > 0.5) & (sw > 0.5)).float()
+    l = ((out["sx4"] - sx_gt).abs() + (out["sy4"] - sy_gt).abs()) * gate
+    return l.sum() / gate.sum().clamp(min=1)
+
+
+def bimodal_nll(bm, D, V, boundary_alpha: float = 4.0):
+    """SMD-Nets bimodal Laplacian NLL with depth-discontinuity-aware
+    weighting: pixels in a dilated GT-edge band get (1+alpha)x weight
+    (sampling-free analogue of DDA sampling)."""
+    pi, mu1, mu2, b1, b2 = bm["pi"], bm["mu1"], bm["mu2"], bm["b1"], bm["b2"]
+    def lap(mu, b):
+        return torch.exp(-(D - mu).abs() / b) / (2 * b)
+    dens = pi * lap(mu1, b1) + (1 - pi) * lap(mu2, b2)
+    nll = -torch.log(dens.clamp(min=1e-8))
+    gx = F.pad((D[..., :, 1:] - D[..., :, :-1]).abs(), (0, 1))
+    gy = F.pad((D[..., 1:, :] - D[..., :-1, :]).abs(), (0, 0, 0, 1))
+    edge = ((gx + gy) > 2.0).float()
+    edge = F.max_pool2d(edge, 9, stride=1, padding=4)   # dilate band
+    w = (1.0 + boundary_alpha * edge) * V
+    return (nll * w).sum() / w.sum().clamp(min=1)
+
+
+def loss_fn(out, D, V, trunc_A: float = 0.0, init_ce_w: float = 0.0,
+            slant_w: float = 0.0, bimodal_w: float = 0.0):
     if trunc_A > 0:
         coarse = (0.3 * ms_l1_trunc(out["d4"], D, V, 4.0, trunc_A)
                   + 0.2 * ms_l1_trunc(out["d8"], D, V, 8.0, trunc_A)
@@ -393,6 +453,10 @@ def loss_fn(out, D, V, trunc_A: float = 0.0, init_ce_w: float = 0.0):
         loss = loss + 0.15 * ms_l1(out["d4_gev"], D, V, 4.0)
     if init_ce_w > 0 and out.get("init_logits") is not None:
         loss = loss + init_ce_w * init_ce_loss(out["init_logits"], D, V)
+    if slant_w > 0 and out.get("sx4") is not None:
+        loss = loss + slant_w * slant_loss(out, D, V)
+    if bimodal_w > 0 and out.get("bimodal") is not None:
+        loss = loss + bimodal_w * bimodal_nll(out["bimodal"], D, V)
     return loss
 
 
@@ -472,6 +536,8 @@ def main():
                     choices=["gev4", "gev4_opt", "gev4_opt_narrow",
                              "gev4_opt_narrow_sharptail",
                              "gev4_opt_narrow_bundle1",
+                             "gev4_opt_narrow_plane",
+                             "gev4_opt_narrow_bimodal",
                              "costlookup_y26n", "costlookup_y26s"])
     ap.add_argument("--trunc_A", type=float, default=0.0,
                     help="HITNet truncated L1 cap (px, per-scale units) on "
@@ -479,6 +545,10 @@ def main():
     ap.add_argument("--init_ce_w", type=float, default=0.0,
                     help="weight of the TileInit distribution-shaping CE "
                          "loss; 0 = off")
+    ap.add_argument("--slant_w", type=float, default=0.0,
+                    help="gated slant-supervision weight (Fix 2); 0 = off")
+    ap.add_argument("--bimodal_w", type=float, default=0.0,
+                    help="bimodal aux-head NLL weight (Fix 3); 0 = off")
     ap.add_argument("--n_pairs", type=int, default=100)
     ap.add_argument("--n_val", type=int, default=20)
     ap.add_argument("--max_steps", type=int, default=12000)
@@ -554,7 +624,8 @@ def main():
         with torch.amp.autocast("cuda"):
             out = model(L, R, aux=True)
             loss = loss_fn(out, D, V, trunc_A=args.trunc_A,
-                           init_ce_w=args.init_ce_w)
+                           init_ce_w=args.init_ce_w,
+                           slant_w=args.slant_w, bimodal_w=args.bimodal_w)
         if not torch.isfinite(loss):
             nan_streak += 1
             if nan_streak >= 50:

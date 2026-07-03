@@ -222,6 +222,20 @@ class StereoLiteYoloCtxGEV4Config:
     iters_2: int = 2
     # ---- blur bundle-1 (docs/deblurring_plan.md Fix 1; ACCURACY-AFFECTING) ----
     init_topk: int = 0            # 3 = CoEx top-k soft-argmin at TileInit
+    # ---- blur Fix 2: plane-equation rendering + learned edge gate ----
+    # Renders full-res disparity from the 1/4 slanted-tile state via the
+    # HITNet plane equation (hard tile-boundary discontinuities), blended
+    # with the ConvexUpsample path by a per-pixel gate conditioned on the
+    # left image + both candidates. Gate bias starts at the convex path
+    # (fail-soft). Requires slant supervision to be trustworthy (harness
+    # --slant_w with robust plane-fit GT + |d_err|<1 gating).
+    plane_render: bool = False
+    # ---- blur Fix 3: SMD-Nets-style bimodal Laplacian aux head ----
+    # 1x1-conv MLP over bilinearly-upsampled 1/4 features + tile state ->
+    # (pi, mu1_off, mu2_off, b1, b2) at full res. AUXILIARY: supervised by
+    # NLL (harness --bimodal_w) but d_final stays the main path; the
+    # bimodal mode-pick output is exposed as "d_bimodal" for eval.
+    bimodal_head: bool = False
 
 
 class StereoLiteYoloCtxGEV4(nn.Module):
@@ -289,6 +303,32 @@ class StereoLiteYoloCtxGEV4(nn.Module):
             # Final learned 4x upsample 1/4 → full, two 2x convex steps
             self.up_final_4_to_2 = ConvexUpsample(feat_ch=ch4, scale=2)
             self.up_final_2_to_1 = ConvexUpsample(feat_ch=ch2, scale=2)
+
+        if self.cfg.plane_render:
+            # per-pixel gate between plane-rendered and convex-upsampled
+            # disparity; input = [left(3), d_plane(1), d_convex(1)]
+            self.plane_gate = nn.Sequential(
+                nn.Conv2d(5, 16, 3, padding=1, bias=False),
+                _gn(16), nn.SiLU(inplace=True),
+                nn.Conv2d(16, 1, 1),
+            )
+            nn.init.constant_(self.plane_gate[-1].bias, -2.0)  # start convex
+        else:
+            self.plane_gate = None
+
+        if self.cfg.bimodal_head:
+            # SMD-Nets-style aux head at full res over bilinearly upsampled
+            # 1/4 features + tile state (continuous-query analogue).
+            bm_in = ch4 + self.cfg.ctx_ch + 4  # fL4 + ctx4 + (d, sx, sy, conf)
+            self.bimodal = nn.Sequential(
+                nn.Conv2d(bm_in, 32, 1, bias=False),
+                _gn(32), nn.SiLU(inplace=True),
+                nn.Conv2d(32, 32, 1, bias=False),
+                _gn(32), nn.SiLU(inplace=True),
+                nn.Conv2d(32, 5, 1),   # pi, mu1_off, mu2_off, log_b1, log_b2
+            )
+        else:
+            self.bimodal = None
 
     def forward(self, left: torch.Tensor, right: torch.Tensor,
                 aux: bool = False):
@@ -367,6 +407,46 @@ class StereoLiteYoloCtxGEV4(nn.Module):
             d_full = F.interpolate(d_full, size=left.shape[-2:],
                                     mode="bilinear", align_corners=True)
 
+        gate_mean_pr = None
+        if self.plane_gate is not None:
+            # HITNet plane-equation rendering: each 1/4 tile spawns its 4x4
+            # full-res patch via d + sx*dx + sy*dy (offsets in 1/4-pixel
+            # units), x4 disparity unit conversion. Nearest upsample keeps
+            # tile-boundary discontinuities HARD.
+            H, W = left.shape[-2:]
+            d_nn = F.interpolate(tile.d, size=(H, W), mode="nearest")
+            sx_nn = F.interpolate(tile.sx, size=(H, W), mode="nearest")
+            sy_nn = F.interpolate(tile.sy, size=(H, W), mode="nearest")
+            xs = torch.arange(W, device=left.device, dtype=d_nn.dtype)
+            ys = torch.arange(H, device=left.device, dtype=d_nn.dtype)
+            offx = ((xs % 4) - 1.5).view(1, 1, 1, W) / 4.0
+            offy = ((ys % 4) - 1.5).view(1, 1, H, 1) / 4.0
+            d_plane = 4.0 * (d_nn + sx_nn * offx + sy_nn * offy)
+            g = torch.sigmoid(self.plane_gate(
+                torch.cat([left, d_plane, d_full], dim=1)))
+            gate_mean_pr = g.mean()
+            d_full = g * d_plane + (1.0 - g) * d_full
+
+        bimodal_out = None
+        if self.bimodal is not None:
+            H, W = left.shape[-2:]
+            up = lambda x: F.interpolate(x, size=(H, W), mode="bilinear",
+                                         align_corners=False)
+            bm_in = torch.cat([up(fL4), up(ctx4), up(tile.d) * 4.0,
+                               up(tile.sx), up(tile.sy), up(tile.conf)],
+                              dim=1)
+            pi_l, mu1o, mu2o, lb1, lb2 = self.bimodal(bm_in).chunk(5, dim=1)
+            base = up(tile.d) * 4.0
+            pi = torch.sigmoid(pi_l)
+            mu1, mu2 = base + mu1o, base + mu2o
+            bimodal_out = {
+                "pi": pi, "mu1": mu1, "mu2": mu2,
+                "b1": F.softplus(lb1) + 0.1,
+                "b2": F.softplus(lb2) + 0.1,
+                # SMD-Nets inference: pick the dominant mode, never average.
+                "d_bimodal": torch.where(pi > 0.5, mu1, mu2),
+            }
+
         if aux:
             return {
                 "d_final": d_full,
@@ -379,6 +459,9 @@ class StereoLiteYoloCtxGEV4(nn.Module):
                 "d16": d16,
                 "d32": d32,
                 "init_logits": self.init_tile.last_logits,
+                "sx4": tile.sx, "sy4": tile.sy,
+                "plane_gate_mean": gate_mean_pr,
+                "bimodal": bimodal_out,
             }
         return d_full
 
