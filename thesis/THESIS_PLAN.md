@@ -37,15 +37,39 @@ Central claim to defend: **runs on edge hardware and provides usable results.**
 
 ## 2. What is missing (gap list)
 
-### A. MUST-HAVE for the edge claim (blockers first)
-| # | Item | Effort | Depends on |
-|---|---|---|---|
-| A1 | **Trained gev4 checkpoint into repo** (exists only on Rahi's machine; repo has meta+csv, no .pth) | 0.5 h | **Rahi — ask today** |
-| A2 | **Edge-device latency** (Jetson/RPi, fp16 + INT8 if possible; tegrastats power/mem). Fallback: soften claim to "designed for edge, real-time on laptop GPU" + Ch5 limitation | 1-2 d | A1 + hardware access |
-| A3 | **MB14 zero-shot on gev4** (adapt `eval_middlebury2014.py` line-61 import; ~$0.05 Modal T4). Decides the whole Ch4/Ch5 narrative — prior chassis collapsed 40.1% D1 here | 2-4 h | A1 |
-| A4 | **Real-camera qualitative panels with gev4** (re-wire `live_stereolite.py`; CCB camera / `data/user_cam_1/`) | 3-6 h | A1 + camera |
-| A5 | Matched-protocol baseline table (gev4 vs IGEV vs LiteAnyStereo on identical MB14 protocol; reference JSONs already exist) | 2-3 h | A3 |
-| A6 | Inference memory measurement (only 7.6 GB TRAINING peak recorded — unusable for edge claims) | 1 h | A1 |
+### A. MUST-HAVE for the edge claim — status as of 2026-07-03 (user-instructed
+### acquisition strategy: calculated edge values NOW marked with an asterisk (*),
+### swapped for real readings when the borrowed Jetson arrives)
+
+| # | Item | Status |
+|---|---|---|
+| A1 | Trained gev4 checkpoint | **INCOMING from Rahi** (confirmed 2026-07-03). The repo's `yolo_ctx_gev4_yolo26s/checkpoint.pth` verified: loads clean (266 tensors, 0 missing), inference OK, but it is the 20-pair OVERFIT checkpoint — pipeline validation only. Fallback if delivery stalls: Modal full Scene Flow training (user pre-authorized, T4 or better; A100 per project rule, ~$10-15, ~1 day) |
+| A2 | Edge-device latency | **Calculated* now, real later.** RTX 3050 MEASURED (2026-07-03, batch 1, 384x640, eager PyTorch): fp32 105.4 ms, fp16 74.7 ms, peak inference memory 0.26-0.35 GB. Orin Nano projection below. Real Jetson readings when the user borrows the device; every projected number carries * in the thesis until swapped |
+| A3 | MB14 zero-shot on gev4 | Run on Modal (user-instructed) as soon as the full checkpoint lands; driver adaptation (legacy import at eval_middlebury2014.py:61) can be prepared beforehand |
+| A4 | Real-camera qualitative panels | **Pipeline VALIDATED** (2026-07-03): gev4 runs end-to-end on `/media/abrar/AbrarSSD/Datasets/user_cam_1/` (60 indoor pairs + FoundationStereo pseudo-GT reference); smoke panels in `model/benchmarks/gev4_camera_smoke/`. Overfit-checkpoint quality is (expectedly) poor vs teacher; regenerate with the full checkpoint, same script |
+| A5 | Matched-protocol baseline table | After A3; IGEV + LiteAnyStereo reference JSONs already exist on the results volume |
+| A6 | Inference memory | **DONE**: 0.26 GB (fp16) / 0.35 GB (fp32) measured on 3050 — replaces the misleading 7.6 GB training peak |
+
+### Jetson Orin Nano projection (*calculated 2026-07-03 — replace with real readings)
+
+Measured anchor: fp16 eager PyTorch on RTX 3050 Laptop = 74.7 ms.
+Method: (i) eager -> TensorRT engine speedup for a launch-bound model,
+conservative x1.8; (ii) fp16 -> INT8 x1.2; (iii) device penalty = mean of
+compute ratio (3050 fp16 ~17.5 TFLOPS vs Orin Nano INT8 dense 20 TOPS ~ x0.9)
+and bandwidth ratio (192 vs 68 GB/s, halved traffic at INT8 ~ x1.4) = x1.15.
+74.7 / 1.8 / 1.2 x 1.15 ~= 40 ms.
+
+| Quantity | Value (asterisked in thesis) |
+|---|---|
+| Orin Nano INT8 TensorRT latency, 384x640 | **~45 ms* (range 35-60 ms*)** |
+| Frame rate | **~22 FPS* (17-29 FPS*)** |
+| With F1/F2/F4/F5 efficiency pass (-15-25%) | **~35 ms* (~28 FPS*)** — near the 33 ms / 30 FPS target |
+| Inference memory (INT8) | **~0.12-0.15 GB*** |
+| Power envelope | 7-15 W (device spec, not projection) |
+
+Write these into Ch4 as calculated estimates with the methodology sentence and
+the asterisk convention; a table footnote states real measurements replace
+them when hardware is available.
 
 ### B. Chapter completeness (see SKILL §3-§5)
 - B1 `thesis/book/` tree from template + format decisions (0.5 d, no deps).
@@ -93,21 +117,25 @@ ablation-study-expert protocol) and the biggest lever if it holds.
 
 ## 4. Writing plan (phases; ~3-4 weeks calendar)
 
-### Phase 0 — unblock (today)
-1. Ask **Rahi** for the full gev4 checkpoint (A1).
-2. Ask **supervisor** about similarity + AI report process (B10) and Jetson/edge
-   hardware availability (A2).
+### Phase 0 — unblock (status 2026-07-03)
+1. ~~Ask Rahi for the checkpoint~~ **DONE — checkpoints incoming.**
+2. Ask **supervisor** about similarity + AI report process (B10). Jetson: user
+   borrowing from a friend; calculated* values stand in until then.
 3. Create `thesis/book/` from the template with the resolved format (B1).
 
 ### Phase 1 — evidence sprint (week 1; parallel with Phase 2 writing)
-4. A3 MB14 zero-shot (decides narrative) → A5 baseline table → A6 memory.
-5. A4 real-camera panels with gev4.
-6. Efficiency pass F1+F2+F5+F7 (bitwise-safe) → re-measure latency (T4 + local
-   + edge device when available) → before/after table.
-7. If hardware: A2 edge latency (+ C4 power). Else: lock the fallback wording NOW,
-   before Ch1 is drafted.
-8. Optional stretch: F3 GEV-narrowing A/B (ablation protocol, MB14-checked), C6
-   point-cloud figure.
+4. Prepare the MB14 driver for gev4 now; RUN on Modal the moment the full
+   checkpoint lands (A3) → A5 baseline table. A6 memory: DONE.
+5. A4: regenerate camera panels with the full checkpoint (script validated).
+6. **Efficiency pass — TEST-FIRST protocol (user-instructed):** implement
+   F1+F2+F5+F7 in a scratch copy; prove output equivalence vs the original
+   (max |delta| == 0 for bitwise items, < 1e-4 px for F4) on real pairs;
+   bench before/after on the 3050 AND Modal T4; only then commit to the
+   architecture folder. F3 (GEV narrowing) additionally needs a matched
+   overfit A/B + MB14 zero-shot check under the ablation-study-expert
+   protocol before adoption.
+7. Real Jetson readings when the borrowed device arrives; swap all * values.
+8. Optional stretch: C6 point-cloud figure from the camera panels.
 
 ### Phase 2 — chapters (weeks 1-3; no dependency on Phase 1 except Ch4 numbers)
 Order: **Ch3 → Ch2 → Ch4 → Ch1 → Ch5 → frontmatter/abstract last.**
