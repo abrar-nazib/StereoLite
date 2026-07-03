@@ -68,6 +68,24 @@ def build_model(arch: str):
             StereoLiteYoloCtxGEV4, StereoLiteYoloCtxGEV4Config)
         cfg = StereoLiteYoloCtxGEV4Config()
         return StereoLiteYoloCtxGEV4(cfg), cfg
+    if arch.startswith("costlookup"):
+        # The exact pre-rahi project leader ("gce_in_tileinit_combo",
+        # EPE 0.811 on the legacy 100-pair protocol): costlookup chassis
+        # + extend_to_full + cascade_cv_4 + slope_aware_warp + init_gce.
+        # y26n uses the ghostconv widener (the validated pairing);
+        # y26s runs the native encoder (its historical comparison point).
+        from StereoLite_costlookup.model import (
+            StereoLite, StereoLiteConfig)
+        common = dict(extend_to_full=True, cascade_cv_4=True,
+                      slope_aware_warp=True, init_gce=True)
+        if arch == "costlookup_y26n":
+            cfg = StereoLiteConfig(backbone="yolo26n", widener="ghostconv",
+                                   **common)
+        elif arch == "costlookup_y26s":
+            cfg = StereoLiteConfig(backbone="yolo26s", widener=None, **common)
+        else:
+            raise ValueError(arch)
+        return StereoLite(cfg), cfg
     from StereoLite_yolo_ctx_gev4_opt.model import (
         StereoLiteYoloCtxGEV4, StereoLiteYoloCtxGEV4Config)
     if arch == "gev4_opt":
@@ -266,7 +284,8 @@ def make_collage(model, train_pairs, val_pairs, device, step, args):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--arch", required=True,
-                    choices=["gev4", "gev4_opt", "gev4_opt_narrow"])
+                    choices=["gev4", "gev4_opt", "gev4_opt_narrow",
+                             "costlookup_y26n", "costlookup_y26s"])
     ap.add_argument("--n_pairs", type=int, default=100)
     ap.add_argument("--n_val", type=int, default=20)
     ap.add_argument("--max_steps", type=int, default=12000)
