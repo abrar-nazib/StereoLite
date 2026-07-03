@@ -96,6 +96,11 @@ def build_model(arch: str):
         # narrow core + pre-rahi costlookup tail (1/2 refine + plane-eq up)
         cfg = StereoLiteYoloCtxGEV4Config(narrow_gev=True, gev_half_range=16,
                                           sharp_tail=True)
+    elif arch == "gev4_opt_narrow_bundle1":
+        # blur bundle-1 arch side: top-k=3 init (pair with --trunc_A 1.0
+        # --init_ce_w 0.3 for the full bundle)
+        cfg = StereoLiteYoloCtxGEV4Config(narrow_gev=True, gev_half_range=16,
+                                          init_topk=3)
     else:
         raise ValueError(arch)
     return StereoLiteYoloCtxGEV4(cfg), cfg
@@ -131,31 +136,80 @@ def _load_pair(seq: str, t: int):
 
 
 def load_or_build_pairs(args):
-    """100 random (seq, frame) samples, 80 train / 20 val, cacheable."""
+    """Random (seq, frame) samples with a LEAK-PROOF train/val split.
+
+    Val = randomly-placed contiguous windows inside sequences; a
+    +-`buffer` frame zone around every val window is excluded from the
+    train pool. This prevents the near-duplicate-neighbor leak (val frame
+    t with train frames t-1/t+1 from the same sequence), while both the
+    window placement and the train sampling stay random (user spec,
+    2026-07-03).
+    """
     if args.pairs_cache and Path(args.pairs_cache).exists():
         blob = torch.load(args.pairs_cache, map_location="cpu",
                           weights_only=False)
         print(f"pairs cache: {args.pairs_cache} "
-              f"({len(blob['train'])} train / {len(blob['val'])} val)")
+              f"({len(blob['train'])} train / {len(blob['val'])} val)"
+              + (f" split={blob.get('split_protocol', 'legacy-random')}"))
         return blob["train"], blob["val"]
+
     rng = random.Random(args.seed)
-    samples = []
-    seen = set()
-    while len(samples) < args.n_pairs:
+    win, buffer = 5, 10
+    n_windows = max(args.n_val // win, 1)
+
+    def frame_exists(s, t):
+        return ((DATA_ROOT / "frames_finalpass" / s / "left" / f"{t:04d}.png").exists()
+                and (DATA_ROOT / "frames_finalpass" / s / "right" / f"{t:04d}.png").exists()
+                and (DATA_ROOT / "disparity" / s / "left" / f"{t:04d}.pfm").exists())
+
+    # discover per-sequence frame ranges (Driving frames are 1..N contiguous)
+    seq_max = {}
+    for s in ALL_SEQS:
+        hi = 0
+        for probe in (800, 500, 400, 300, 200, 100):
+            if frame_exists(s, probe):
+                hi = probe
+                break
+        while frame_exists(s, hi + 1):
+            hi += 1
+        seq_max[s] = hi
+
+    # place val windows randomly (non-overlapping incl. buffers)
+    val_windows = []
+    tries = 0
+    while len(val_windows) < n_windows and tries < 10000:
+        tries += 1
         s = rng.choice(ALL_SEQS)
-        t = rng.randint(1, 290)
-        if (s, t) in seen:
-            continue
-        if not (DATA_ROOT / "frames_finalpass" / s / "left" / f"{t:04d}.png").exists():
+        start = rng.randint(1, max(seq_max[s] - win, 1))
+        clash = any(s == s2 and abs(start - st2) < win + 2 * buffer
+                    for s2, st2 in val_windows)
+        if not clash:
+            val_windows.append((s, start))
+    val_keys = [(s, st + i) for s, st in val_windows for i in range(win)]
+    excluded = {(s, t) for s, st in val_windows
+                for t in range(st - buffer, st + win + buffer)}
+
+    n_train = args.n_pairs - len(val_keys)
+    train_keys, seen = [], set(val_keys) | excluded
+    while len(train_keys) < n_train and len(seen) < sum(seq_max.values()):
+        s = rng.choice(ALL_SEQS)
+        t = rng.randint(1, seq_max[s])
+        if (s, t) in seen or not frame_exists(s, t):
+            seen.add((s, t))
             continue
         seen.add((s, t))
-        samples.append(_load_pair(s, t))
-    n_train = args.n_pairs - args.n_val
-    train, val = samples[:n_train], samples[n_train:]
+        train_keys.append((s, t))
+
+    print(f"loading {len(train_keys)} train + {len(val_keys)} val pairs "
+          f"({n_windows} val windows of {win}, buffer {buffer}) ...")
+    train = [_load_pair(s, t) for s, t in train_keys]
+    val = [_load_pair(s, t) for s, t in val_keys]
     if args.pairs_cache:
         Path(args.pairs_cache).parent.mkdir(parents=True, exist_ok=True)
         torch.save(dict(train=train, val=val, seed=args.seed,
-                        n_pairs=args.n_pairs, n_val=args.n_val),
+                        n_pairs=args.n_pairs, n_val=len(val_keys),
+                        split_protocol=f"windowed-val w{win} buf{buffer}",
+                        val_windows=val_windows),
                    args.pairs_cache)
         print(f"pairs cache written: {args.pairs_cache}")
     return train, val
@@ -289,16 +343,56 @@ def bad1_hinge(pred, gt, valid):
         valid.sum().clamp(min=1)
 
 
-def loss_fn(out, D, V):
+def ms_l1_trunc(pred, gt, valid, scale, A=1.0):
+    """HITNet-style truncated L1 (Eq. 12): per-scale error capped at A px
+    (in that scale's units) — a boundary tile committed to one surface is
+    not pulled toward the mean by the other surface's gradient."""
+    gt = F.interpolate(gt, scale_factor=1.0 / scale, mode="nearest") / scale
+    valid = F.interpolate(valid, scale_factor=1.0 / scale, mode="nearest")
+    if pred.shape[-2:] != gt.shape[-2:]:
+        pred = F.interpolate(pred, size=gt.shape[-2:], mode="bilinear",
+                             align_corners=True)
+    err = (pred - gt).abs().clamp(max=A)
+    return (err * valid).sum() / valid.sum().clamp(min=1)
+
+
+def init_ce_loss(logits, gt, valid, scale=16.0, max_disp=24):
+    """Distribution-shaping CE on the TileInit volume: subpixel-aware
+    two-bin target at the GT disparity (deviation from HITNet's
+    contrastive-on-raw-costs Eq. 10 — we shape aggregated logits with CE,
+    same peakedness intent, documented in docs/deblurring_plan.md)."""
+    gt_s = F.interpolate(gt, scale_factor=1.0 / scale, mode="nearest") / scale
+    v = F.interpolate(valid, scale_factor=1.0 / scale, mode="nearest")
+    v = (v > 0.5) & (gt_s[:, 0:1] < max_disp - 1)
+    gt_c = gt_s[:, 0].clamp(0, max_disp - 1 - 1e-4)
+    lo = gt_c.floor().long()
+    w_hi = gt_c - lo.float()
+    logp = F.log_softmax(logits, dim=1)
+    nll = -(logp.gather(1, lo.unsqueeze(1)).squeeze(1) * (1 - w_hi)
+            + logp.gather(1, (lo + 1).clamp(max=max_disp - 1)
+                          .unsqueeze(1)).squeeze(1) * w_hi)
+    m = v[:, 0]
+    return (nll * m).sum() / m.sum().clamp(min=1)
+
+
+def loss_fn(out, D, V, trunc_A: float = 0.0, init_ce_w: float = 0.0):
+    if trunc_A > 0:
+        coarse = (0.3 * ms_l1_trunc(out["d4"], D, V, 4.0, trunc_A)
+                  + 0.2 * ms_l1_trunc(out["d8"], D, V, 8.0, trunc_A)
+                  + 0.1 * ms_l1_trunc(out["d16"], D, V, 16.0, trunc_A))
+    else:
+        coarse = (0.3 * ms_l1(out["d4"], D, V, 4.0)
+                  + 0.2 * ms_l1(out["d8"], D, V, 8.0)
+                  + 0.1 * ms_l1(out["d16"], D, V, 16.0))
     loss = (1.0 * ms_l1(out["d_final"], D, V, 1.0)
             + 0.5 * ms_l1(out["d_half"], D, V, 2.0)
-            + 0.3 * ms_l1(out["d4"], D, V, 4.0)
-            + 0.2 * ms_l1(out["d8"], D, V, 8.0)
-            + 0.1 * ms_l1(out["d16"], D, V, 16.0)
+            + coarse
             + 0.5 * grad_consistency(out["d_final"], D, V)
             + 0.2 * bad1_hinge(out["d_final"], D, V))
     if "d4_gev" in out:
         loss = loss + 0.15 * ms_l1(out["d4_gev"], D, V, 4.0)
+    if init_ce_w > 0 and out.get("init_logits") is not None:
+        loss = loss + init_ce_w * init_ce_loss(out["init_logits"], D, V)
     return loss
 
 
@@ -377,7 +471,14 @@ def main():
     ap.add_argument("--arch", required=True,
                     choices=["gev4", "gev4_opt", "gev4_opt_narrow",
                              "gev4_opt_narrow_sharptail",
+                             "gev4_opt_narrow_bundle1",
                              "costlookup_y26n", "costlookup_y26s"])
+    ap.add_argument("--trunc_A", type=float, default=0.0,
+                    help="HITNet truncated L1 cap (px, per-scale units) on "
+                         "the d4/d8/d16 terms; 0 = off")
+    ap.add_argument("--init_ce_w", type=float, default=0.0,
+                    help="weight of the TileInit distribution-shaping CE "
+                         "loss; 0 = off")
     ap.add_argument("--n_pairs", type=int, default=100)
     ap.add_argument("--n_val", type=int, default=20)
     ap.add_argument("--max_steps", type=int, default=12000)
@@ -452,7 +553,8 @@ def main():
         opt.zero_grad(set_to_none=True)
         with torch.amp.autocast("cuda"):
             out = model(L, R, aux=True)
-            loss = loss_fn(out, D, V)
+            loss = loss_fn(out, D, V, trunc_A=args.trunc_A,
+                           init_ce_w=args.init_ce_w)
         if not torch.isfinite(loss):
             nan_streak += 1
             if nan_streak >= 50:
