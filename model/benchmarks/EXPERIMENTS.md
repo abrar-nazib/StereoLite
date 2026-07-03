@@ -257,3 +257,14 @@ _Per-variant artefacts: [`benchmarks/ablation_phase1_20260502-142629/`](benchmar
 | gev4_opt_narrow_plane | 2.963 | **1.8259** | 5.091 | 0.420 | 42.91% | **28.07%** | 17.35% | 12.73% | 12.19% | 15.0 |
 
 _Per-variant artefacts: [`benchmarks/20260703_blurfix_n500/`](benchmarks/20260703_blurfix_n500/)_
+
+## 20260703_blurfix_compose
+**Type:** Blur-fix A/B (control / bundle1 / plane / bimodal, 450/50 windowed split)
+**Started:** 2026-07-03T16:35:20  ·  **Config:** 12500 steps, 384×640, 500 pairs, batch=8
+
+| Variant | Trainable (M) | EPE | RMSE | Median | bad-0.5 | bad-1.0 | bad-2.0 | bad-3.0 | D1-all | Latency (ms) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| gev4_opt_narrow_allin | 2.970 | **1.8534** | 5.122 | 0.470 | 46.58% | **28.79%** | 17.84% | 12.95% | 11.93% | 17.2 |
+| gev4_opt_narrow_pb | 2.970 | **1.8470** | 5.166 | 0.449 | 44.40% | **29.00%** | 18.01% | 12.78% | 11.62% | 25.5 |
+
+_Per-variant artefacts: [`benchmarks/20260703_blurfix_compose/`](benchmarks/20260703_blurfix_compose/)_
