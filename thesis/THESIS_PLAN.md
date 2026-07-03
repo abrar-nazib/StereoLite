@@ -7,6 +7,14 @@ Lecturer, Dept. of Mechatronics Engineering. Format authority:
 
 Central claim to defend: **runs on edge hardware and provides usable results.**
 
+**State of play (rewritten 2026-07-04).** All ablation gates are closed.
+The working architecture is **`gev4_opt_narrow_plane`** (efficiency-optimized
+gev4 + narrow GEV + plane-equation rendering with gated slant supervision)
+and the full-training recipe is locked (Section 3b). Rahi's full checkpoint
+is NOT coming; the Modal full Scene Flow training run is now the critical
+path that produces the thesis checkpoint. Everything downstream (MB14
+zero-shot, camera panels, baseline table, Ch4 numbers) waits on that one run.
+
 ---
 
 ## 1. What we already have (asset inventory, verified on disk)
@@ -17,6 +25,12 @@ Central claim to defend: **runs on edge hardware and provides usable results.**
 | Full 89k-step Scene Flow Driving training run (4200 train / 200 val): final val EPE 0.963 px, D1 7.88%, 2.9623 M params, RTX 4070 | `model/checkpoints/yolo_ctx_gev4_full_retry_es/{meta.json,train.csv}` | Ch4 core result |
 | 20-pair overfit reference: EPE 0.261, 24.6 ms / 40.7 FPS RTX 4070 | `model/benchmarks/yolo_ctx_gev4_yolo26s/` | Ch4 capacity check |
 | ~10-variant architecture ablation story (gate/gev4/guided/sharp/hrrefine/sru/init4/geomctx) | `model/benchmarks/EXPERIMENTS.md` | Ch4 design justification (PO4) |
+| Efficiency A/B (gev4 vs opt vs opt_narrow, 80/20, equivalence-proven 1.74x fp32) | `model/benchmarks/20260703_eff_gev4_n100/` (see `GRAND_COMPARISON_20260703.md`) | Ch3 optimization section (PO3/PO5) |
+| 9-arm grand comparison: augmentation triplet -30.8% val EPE (largest lever measured), freeze_bn rejected, pre-rahi costlookup closed out | `model/benchmarks/GRAND_COMPARISON_20260703.md` | Ch4 training-recipe justification |
+| Blur study: 2 root causes diagnosed (decode low-pass + L1/soft-argmin mean regression), literature-grounded fixes, corpus report | `docs/deblurring_plan.md` | Ch4 discussion (PO2/PO4) |
+| Blur-fix A/B on 500-pair leak-proof windowed split: bundle1 -9.8% bad-0.5, **plane -22.5% (ADOPTED)**, bimodal -21.9%/best D1 | `model/benchmarks/20260703_blurfix_n500/` | Ch4 boundary-sharpness section |
+| Composition A/B (pb / allin): REJECTED — neither beat plane alone on bad-0.5 (44.4 / 46.6 vs 42.9; criterion < 39.5 unmet); fixes anti-synergize | `model/benchmarks/20260703_blurfix_compose/` | Ch4 negative-result evidence (PO4) |
+| OpenStereo findings report (StereoBase = IGEV + recipe; aug triplet provenance) | `docs/openstereo_findings.md` | Ch2/Ch4 |
 | PDF-verified baseline numbers (HITNet, BGNet, CoEx, RAFT, IGEV, LightStereo, ...) | `papers/verified_performance.md` | Ch2/Ch4 tables |
 | 72 verified BibTeX entries | `review_paper/references.bib` | all chapters |
 
@@ -43,11 +57,11 @@ Central claim to defend: **runs on edge hardware and provides usable results.**
 
 | # | Item | Status |
 |---|---|---|
-| A1 | Trained gev4 checkpoint | **INCOMING from Rahi** (confirmed 2026-07-03). The repo's `yolo_ctx_gev4_yolo26s/checkpoint.pth` verified: loads clean (266 tensors, 0 missing), inference OK, but it is the 20-pair OVERFIT checkpoint — pipeline validation only. Fallback if delivery stalls: Modal full Scene Flow training (user pre-authorized, T4 or better; A100 per project rule, ~$10-15, ~1 day) |
-| A2 | Edge-device latency | **Calculated* now, real later.** RTX 3050 MEASURED (2026-07-03, batch 1, 384x640, eager PyTorch): fp32 105.4 ms, fp16 74.7 ms, peak inference memory 0.26-0.35 GB. Orin Nano projection below. Real Jetson readings when the user borrows the device; every projected number carries * in the thesis until swapped |
-| A3 | MB14 zero-shot on gev4 | Run on Modal (user-instructed) as soon as the full checkpoint lands; driver adaptation (legacy import at eval_middlebury2014.py:61) can be prepared beforehand |
-| A4 | Real-camera qualitative panels | **Pipeline VALIDATED** (2026-07-03): gev4 runs end-to-end on `/media/abrar/AbrarSSD/Datasets/user_cam_1/` (60 indoor pairs + FoundationStereo pseudo-GT reference); smoke panels in `model/benchmarks/gev4_camera_smoke/`. Overfit-checkpoint quality is (expectedly) poor vs teacher; regenerate with the full checkpoint, same script |
-| A5 | Matched-protocol baseline table | After A3; IGEV + LiteAnyStereo reference JSONs already exist on the results volume |
+| A1 | Trained gev4 checkpoint | **NOT coming from Rahi** (his `checkpoint.pth` is the 20-pair overfit; pipeline validation only). **WE TRAIN IT** — Modal A100 full Scene Flow run with the locked config (Section 3b). ~$10-15, ~1 day wall clock. This is the single critical-path item |
+| A2 | Edge-device latency | **Calculated* now, real later.** RTX 3050 MEASURED (2026-07-03, batch 1, 384x640, eager PyTorch): gev4 fp32 106.7 / fp16 75.4 ms; **gev4_opt_narrow fp32 61.4 / fp16 49.8 ms (1.74x)**; plane variant ~62.5 ms fp32 (rendering overhead ~1 ms). Orin Nano projection below. Real Jetson readings when the user borrows the device; every projected number carries * in the thesis until swapped |
+| A3 | MB14 zero-shot on the trained checkpoint | Run on Modal immediately after A1 finishes; driver adaptation (legacy import at eval_middlebury2014.py:61) can be prepared during training |
+| A4 | Real-camera qualitative panels | **Pipeline VALIDATED** (2026-07-03): gev4 runs end-to-end on `/media/abrar/AbrarSSD/Datasets/user_cam_1/` (60 indoor pairs + FoundationStereo pseudo-GT reference); smoke panels in `model/benchmarks/gev4_camera_smoke/`. Regenerate with the trained checkpoint, same script |
+| A5 | Matched-protocol baseline table | After A3; IGEV + LiteAnyStereo reference JSONs already exist on the results volume; add LightStereo-S from the OpenStereo zoo |
 | A6 | Inference memory | **DONE**: 0.26 GB (fp16) / 0.35 GB (fp32) measured on 3050 — replaces the misleading 7.6 GB training peak |
 
 ### Jetson Orin Nano projection (*calculated 2026-07-03 — replace with real readings)
@@ -67,28 +81,49 @@ and bandwidth ratio (192 vs 68 GB/s, halved traffic at INT8 ~ x1.4) = x1.15.
 | Inference memory (INT8) | **~0.12-0.15 GB*** |
 | Power envelope | 7-15 W (device spec, not projection) |
 
-Efficiency A/B RESULT (eff_gev4_n100, 2026-07-03, comparison.md): safe
-fixes accuracy-equivalent (+0.45% best-val EPE, within noise); narrow GEV
-holds accuracy (-2.0% best-val EPE, within noise band) at 1.74x fp32 on
-the 3050. ADOPTED: gev4_opt_narrow as working architecture, conditional on
-full-training re-validation + MB14 zero-shot when the full checkpoint
-arrives (watch item: bad-0.5 +3.1pp at stop-step, inconclusive).
-
-GRAND 9-ARM RESULT (2026-07-03, model/benchmarks/GRAND_COMPARISON_20260703.md,
-pair-set hash-verified across 4 runs): OpenStereo augmentation triplet is
-the largest single lever measured in this project — best val EPE 2.778 ->
-1.921 (-30.8%, 6x noise floor), D1 -22.6%, no plateau in 12k steps, train
-EPE HIGHER (regularization signature). freeze_bn: no effect alone and
-above-noise WORSE combined with aug. Pre-rahi costlookup: -8 to -11% val
-EPE vs gev4 family (y26n kept only as sub-1.5M fallback; its bad-0.5/
-sharpness edge is within noise). Sharptail hybrid: rejected.
-FULL-TRAINING CONFIG (evidence-backed): gev4_opt_narrow + aug ON +
-freeze_bn OFF + full SceneFlow (~35k pairs) + OneCycle + extended step
-budget (12k insufficient under aug).
-
 Write these into Ch4 as calculated estimates with the methodology sentence and
 the asterisk convention; a table footnote states real measurements replace
 them when hardware is available.
+
+### 3b. Ablation verdicts + LOCKED full-training config (all gates closed 2026-07-04)
+
+Chronology of evidence (all under the ablation-study-expert protocol, all in
+`EXPERIMENTS.md`):
+
+1. **Efficiency A/B** (eff_gev4_n100): safe fixes accuracy-equivalent
+   (+0.45% best-val EPE, noise); narrow GEV holds accuracy (-2.0%, noise)
+   at 1.74x fp32. ADOPTED gev4_opt_narrow. The earlier bad-0.5 watch item
+   is superseded by the plane fix below.
+2. **Grand 9-arm** (GRAND_COMPARISON_20260703.md, pair-set hash-verified
+   across 4 runs): OpenStereo augmentation triplet = largest single lever
+   in project history (best val EPE 2.778 -> 1.921, -30.8%, 6x noise floor,
+   D1 -22.6%, train EPE HIGHER = regularization signature). freeze_bn: no
+   effect alone, above-noise WORSE with aug — rejected. Pre-rahi costlookup
+   8-11% behind gev4 family — closed (its plane-upsample sharpness insight
+   was harvested into the plane fix). Sharptail hybrid rejected.
+3. **Blur-fix round 1+2** (20260703_blurfix_n500, 500-pair leak-proof
+   windowed split, control bad-0.5 = 55.4): bundle1 -9.8% bad-0.5;
+   **plane rendering + gated slant supervision -22.5% (42.9) — decisive,
+   sharpest collages of the project**; bimodal aux head -21.9% + best D1
+   via training signal alone.
+4. **Composition round** (20260703_blurfix_compose): pb (plane+bimodal)
+   bad-0.5 44.4, allin (+bundle1) 46.6 — both WORSE than plane alone;
+   pre-registered win criterion (< 39.5) unmet. Fixes anti-synergize
+   (compete for the same boundary pixels). **ADOPT plane alone**; bimodal
+   and bundle1 dropped. Negative result goes in Ch4.
+
+**LOCKED FULL-TRAINING CONFIG (every element evidence-backed):**
+
+| Element | Choice | Evidence |
+|---|---|---|
+| Architecture | `gev4_opt_narrow_plane` (--slant_w 0.3) | items 1 + 3 |
+| Augmentation | OpenStereo triplet ON | item 2 |
+| freeze_bn | OFF | item 2 |
+| Data | full Scene Flow (~35k pairs), held-out val | scale-up from n500 protocol |
+| Schedule | OneCycle, extended budget (12k insufficient under aug) | item 2 |
+| GPU | A100 (full-data training per project rule; T4/L40S are for ablations) | Modal rules |
+| Input contract | [0,1] at the model boundary (F6 landmine settled) | Section 3 F6 |
+| Post-run gates | MB14 zero-shot (mandatory), camera panels, 3050 bench | CLAUDE.md lesson |
 
 ### B. Chapter completeness (see SKILL §3-§5)
 - B1 `thesis/book/` tree from template + format decisions (0.5 d, no deps).
@@ -121,40 +156,44 @@ Compute anatomy at 384×640: total ≈ 47 GMAC; the 1/4 GEV block alone ≈ 35-4
 | F4 | Static channels (fL + ctx ≈ 44% of GRU input at 1/4) re-convolved every iteration; hoist once per scale (RAFT's precomputed-context trick) | ~8-10% total MACs + biggest per-iter allocs gone | none (mathematically exact) |
 | F5 | Fuse conv_z+conv_r and the 4 output heads (same inputs) | 1-3% latency | **none, bitwise** |
 | F7 | Dead stage lists at inference, discarded zeros feat, dead `_norm_feat`, rebuilt upsample constants | few MB + launches | none |
-| F3 | GEV narrows from full 64 bins to ~±16 around tile.d (validated cascade_cv_4 pattern) | **~25-30% of total MACs, ~100 MB activations** | needs matched A/B + MB14 check |
+| F3 | GEV narrows from full 64 bins to ~±16 around tile.d (validated cascade_cv_4 pattern) | **~25-30% of total MACs, ~100 MB activations** | **VALIDATED** (matched A/B: -2.0% best-val EPE, within noise; MB14 re-check rides on the full-training checkpoint) |
 | F6 | **Normalization contract landmine**: overfit harness feeds [0,1], full trainer feeds [0,255]; gev4 ctx stream double-divides (stem runs at GroupNorm's eps floor); checkpoints not portable across pipelines; INT8 hazard | correctness, not speed | settle ONE contract before any retrain/export |
 | F8 | Export blockers: F.unfold in ConvexUpsample (replace with 9 shifted slices — identical), GroupNorm on NPU toolchains, Conv3d on NPUs | export-time | flag now |
 
-**Thesis-shaping insight:** F1+F2+F4+F5+F7 are retrain-free and together worth
-~15-25% on-device latency. Implemented + measured before/after ON THE EDGE
+**Thesis-shaping insight:** F1-F7 are now all implemented, equivalence-proven,
+and measured (1.74x fp32 on the 3050). Measured again before/after ON THE EDGE
 DEVICE, they become a Ch3/Ch4 section ("optimization of the network for edge
 inference") that directly evidences PO3/PO4/PO5 — the optimization work IS
-thesis content, not a detour. F3 is a proper ablation (run under the
-ablation-study-expert protocol) and the biggest lever if it holds.
+thesis content, not a detour. The blur study (diagnose -> literature ->
+controlled fix -> composition negative result) is a second such section and
+the most contribution-shaped piece of the thesis.
 
 ---
 
 ## 4. Writing plan (phases; ~3-4 weeks calendar)
 
-### Phase 0 — unblock (status 2026-07-03)
-1. ~~Ask Rahi for the checkpoint~~ **DONE — checkpoints incoming.**
-2. Ask **supervisor** about similarity + AI report process (B10). Jetson: user
-   borrowing from a friend; calculated* values stand in until then.
-3. Create `thesis/book/` from the template with the resolved format (B1).
+### Phase 0 — unblock (status 2026-07-04)
+1. ~~Efficiency pass (test-first)~~ **DONE** — F1-F7 implemented,
+   equivalence-proven, adopted (gev4_opt_narrow).
+2. ~~Ablation gates~~ **DONE** — aug/freeze_bn/blur-fix/composition all
+   closed; config locked (Section 3b).
+3. Ask **supervisor** about similarity + AI report process (B10) — external
+   clock, START NOW. Jetson: user borrowing from a friend; calculated*
+   values stand in until then.
+4. Create `thesis/book/` from the template with the resolved format (B1).
 
 ### Phase 1 — evidence sprint (week 1; parallel with Phase 2 writing)
-4. Prepare the MB14 driver for gev4 now; RUN on Modal the moment the full
-   checkpoint lands (A3) → A5 baseline table. A6 memory: DONE.
-5. A4: regenerate camera panels with the full checkpoint (script validated).
-6. **Efficiency pass — TEST-FIRST protocol (user-instructed):** implement
-   F1+F2+F5+F7 in a scratch copy; prove output equivalence vs the original
-   (max |delta| == 0 for bitwise items, < 1e-4 px for F4) on real pairs;
-   bench before/after on the 3050 AND Modal T4; only then commit to the
-   architecture folder. F3 (GEV narrowing) additionally needs a matched
-   overfit A/B + MB14 zero-shot check under the ablation-study-expert
-   protocol before adoption.
-7. Real Jetson readings when the borrowed device arrives; swap all * values.
-8. Optional stretch: C6 point-cloud figure from the camera panels.
+5. **LAUNCH the full Scene Flow training run** (A1, locked config, Modal
+   A100, date_tag run folder). THE critical-path item; everything in Ch4
+   waits on it. Prepare + dry-run the trainer before burning A100 hours
+   (input contract F6, checkpoint/resume, val cadence, collages).
+6. While it trains: adapt the MB14 driver for gev4_opt_narrow_plane (A3);
+   scaffold the baseline table (A5, incl. LightStereo-S).
+7. When the checkpoint lands: MB14 zero-shot (mandatory gate) → baseline
+   table → regenerate camera panels (A4) → 3050 latency re-bench of the
+   trained model.
+8. Real Jetson readings when the borrowed device arrives; swap all * values.
+9. Optional stretch: C6 point-cloud figure from the camera panels.
 
 ### Phase 2 — chapters (weeks 1-3; no dependency on Phase 1 except Ch4 numbers)
 Order: **Ch3 → Ch2 → Ch4 → Ch1 → Ch5 → frontmatter/abstract last.**
@@ -188,13 +227,19 @@ Compile loop per SKILL §8; checklist §9 per chapter; page-level orphan check;
 similarity/AI reports attached; supervisor review pass.
 
 ### Risk register
-1. **Checkpoint unavailable** → only the overfit checkpoint exists; thesis
-   quality drops a grade band. Mitigate: ask today; worst case re-train on
-   Modal A100 (~$10-15, 1 day — legitimate A100 use).
+1. **Full-training run fails or underdelivers** (the n500 protocol trains at
+   val EPE ~1.8; full data + longer schedule must land near the 0.963 px of
+   the 89k-step reference run or better) → budget one relaunch; keep the
+   reference run's numbers as the documented floor.
 2. **gev4 collapses on MB14** (prior chassis did) → narrative shifts to
    "in-domain + real-camera usable; cross-domain identified and analyzed as
    limitation with the KD path forward". Still a defensible thesis; know early.
+   Mitigation already in place: augmentation triplet is the single strongest
+   known generalization lever.
 3. **No edge hardware** → fallback wording locked before Ch1; C3 INT8/ONNX
    study partially substitutes.
 4. **AI report friction** → disclosure is mandatory; start the conversation
    with the supervisor now, not at submission.
+5. **Anti-synergy resurfaces at scale** (plane fix validated at n500, not
+   35k) → the full trainer logs bad-0.5 at every val; if the plane arm's
+   edge disappears, the control config is one flag away.
