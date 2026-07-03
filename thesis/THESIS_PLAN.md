@@ -61,11 +61,18 @@ and bandwidth ratio (192 vs 68 GB/s, halved traffic at INT8 ~ x1.4) = x1.15.
 
 | Quantity | Value (asterisked in thesis) |
 |---|---|
-| Orin Nano INT8 TensorRT latency, 384x640 | **~45 ms* (range 35-60 ms*)** |
-| Frame rate | **~22 FPS* (17-29 FPS*)** |
-| With F1/F2/F4/F5 efficiency pass (-15-25%) | **~35 ms* (~28 FPS*)** — near the 33 ms / 30 FPS target |
+| Orin Nano INT8 TensorRT latency, 384x640 (original gev4, anchor 74.7 ms fp16) | **~45 ms* (range 35-60 ms*)** |
+| gev4_opt (safe fixes, MEASURED 3050 fp16 57.9 ms) | **~35 ms* (~29 FPS*)** |
+| **gev4_opt_narrow (MEASURED 3050 fp16 49.8 ms / fp32 61.4 ms, 1.74x)** | **~30 ms* (~33 FPS*) — AT the real-time target** |
 | Inference memory (INT8) | **~0.12-0.15 GB*** |
 | Power envelope | 7-15 W (device spec, not projection) |
+
+Efficiency A/B RESULT (eff_gev4_n100, 2026-07-03, comparison.md): safe
+fixes accuracy-equivalent (+0.45% best-val EPE, within noise); narrow GEV
+holds accuracy (-2.0% best-val EPE, within noise band) at 1.74x fp32 on
+the 3050. ADOPTED: gev4_opt_narrow as working architecture, conditional on
+full-training re-validation + MB14 zero-shot when the full checkpoint
+arrives (watch item: bad-0.5 +3.1pp at stop-step, inconclusive).
 
 Write these into Ch4 as calculated estimates with the methodology sentence and
 the asterisk convention; a table footnote states real measurements replace
