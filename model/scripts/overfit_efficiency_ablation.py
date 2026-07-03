@@ -166,6 +166,93 @@ def batchify(pairs, idxs, device):
 
 
 # ---------------------------------------------------------------------------
+# OpenStereo-style train-time augmentation (docs/openstereo_findings.md #1).
+# Ported from external_models/OpenStereo stereo_trans.py semantics:
+#   - StereoColorJitter: b/c/s in [0.6,1.4], hue +-0.5; ASYMMETRIC_PROB 0.2
+#   - RandomErase: p=0.5, 1-2 rects 50-100 px, RIGHT image only, mean fill
+#   - RandomScale: 2^U(-0.2,0.4) p=0.8 + anisotropic stretch 2^U(-.2,.2)
+#     on x, disparity multiplied by scale_x; recrop to TRAIN_HxTRAIN_W
+# Applied on [0,1] float tensors, train batches only.
+# ---------------------------------------------------------------------------
+
+def _color_jitter(img, rng):
+    b = rng.uniform(0.6, 1.4)
+    c = rng.uniform(0.6, 1.4)
+    s = rng.uniform(0.6, 1.4)
+    mean = img.mean(dim=(-1, -2), keepdim=True)
+    grey = img.mean(dim=-3, keepdim=True)
+    out = ((img * b - mean * b) * c + mean * b)          # brightness+contrast
+    out = out * s + grey * (1 - s)                        # saturation
+    return out.clamp(0, 1)
+
+
+def augment_batch(L, R, D, V, rng):
+    B, _, H, W = L.shape
+    for b in range(B):
+        # -- color jitter (asymmetric 20% of the time) --
+        if rng.random() < 0.8:
+            if rng.random() < 0.2:
+                L[b] = _color_jitter(L[b], rng)
+                R[b] = _color_jitter(R[b], rng)
+            else:
+                jb = rng.uniform(0.6, 1.4); jc = rng.uniform(0.6, 1.4)
+                js = rng.uniform(0.6, 1.4)
+                for img in (L, R):
+                    mean = img[b].mean(dim=(-1, -2), keepdim=True)
+                    grey = img[b].mean(dim=-3, keepdim=True)
+                    o = ((img[b] * jb - mean * jb) * jc + mean * jb)
+                    img[b] = (o * js + grey * (1 - js)).clamp(0, 1)
+        # -- right-image eraser --
+        if rng.random() < 0.5:
+            mean_c = R[b].mean(dim=(-1, -2), keepdim=True)
+            for _ in range(rng.randint(1, 2)):
+                eh = rng.randint(50, 100); ew = rng.randint(50, 100)
+                y0 = rng.randint(0, max(H - eh, 1))
+                x0 = rng.randint(0, max(W - ew, 1))
+                R[b, :, y0:y0+eh, x0:x0+ew] = mean_c
+        # -- random scale + anisotropic stretch, disparity *= scale_x --
+        if rng.random() < 0.8:
+            sc = 2.0 ** rng.uniform(-0.2, 0.4)
+            stx = 2.0 ** rng.uniform(-0.2, 0.2)
+            sx_f, sy_f = sc * stx, sc
+            nH, nW = max(int(H * sy_f), H // 2), max(int(W * sx_f), W // 2)
+            def rs(x, mode):
+                return F.interpolate(x[b:b+1], size=(nH, nW), mode=mode,
+                                     align_corners=False if mode == "bilinear" else None)
+            Lz = rs(L, "bilinear"); Rz = rs(R, "bilinear")
+            Dz = rs(D, "nearest") * (nW / W)
+            Vz = rs(V, "nearest")
+            if nH >= H and nW >= W:
+                y0 = rng.randint(0, nH - H); x0 = rng.randint(0, nW - W)
+                L[b] = Lz[0, :, y0:y0+H, x0:x0+W]
+                R[b] = Rz[0, :, y0:y0+H, x0:x0+W]
+                D[b] = Dz[0, :, y0:y0+H, x0:x0+W]
+                V[b] = Vz[0, :, y0:y0+H, x0:x0+W]
+            else:  # downscale: pad back to full size, pad region invalid
+                pl = torch.zeros_like(L[b]); pr = torch.zeros_like(R[b])
+                pd = torch.zeros_like(D[b]); pv = torch.zeros_like(V[b])
+                hh, ww = min(nH, H), min(nW, W)
+                pl[:, :hh, :ww] = Lz[0, :, :hh, :ww]
+                pr[:, :hh, :ww] = Rz[0, :, :hh, :ww]
+                pd[:, :hh, :ww] = Dz[0, :, :hh, :ww]
+                pv[:, :hh, :ww] = Vz[0, :, :hh, :ww]
+                L[b], R[b], D[b], V[b] = pl, pr, pd, pv
+    V = (V * ((D > 0) & (D < MAX_DISP)).float())
+    return L, R, D, V
+
+
+def freeze_bn(model):
+    n = 0
+    for m in model.modules():
+        if isinstance(m, torch.nn.modules.batchnorm._BatchNorm):
+            m.eval()
+            for p in m.parameters():
+                p.requires_grad = False
+            n += 1
+    return n
+
+
+# ---------------------------------------------------------------------------
 # Loss (identical across arms)
 # ---------------------------------------------------------------------------
 
@@ -301,6 +388,11 @@ def main():
     ap.add_argument("--run_name", default=None)
     ap.add_argument("--pairs_cache", default=None)
     ap.add_argument("--dump_pairs_only", type=int, default=0)
+    ap.add_argument("--aug", type=int, default=0,
+                    help="OpenStereo triplet on train batches (asym jitter, "
+                         "right eraser, scale/stretch w/ disparity rescale)")
+    ap.add_argument("--freeze_bn", type=int, default=0,
+                    help="freeze all encoder BatchNorm (OpenStereo FREEZE_BN)")
     args = ap.parse_args()
 
     torch.manual_seed(args.seed); np.random.seed(args.seed)
@@ -318,8 +410,21 @@ def main():
 
     model, cfg = build_model(args.arch)
     model = model.to(device)
+    if args.freeze_bn:
+        nbn = freeze_bn(model)
+        print(f"freeze_bn: {nbn} BatchNorm modules frozen")
+        # evaluate()/make_collage() call model.train() on exit, which would
+        # flip BN back to train mode — make the freeze sticky.
+        _orig_train = model.train
+        def _train_keep_bn(mode: bool = True):
+            _orig_train(mode)
+            if mode:
+                freeze_bn(model)
+            return model
+        model.train = _train_keep_bn
     n_train_p = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"params: {n_train_p/1e6:.4f} M")
+    aug_rng = random.Random(args.seed + 7)
 
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-5)
     scaler = torch.amp.GradScaler("cuda")
@@ -337,6 +442,8 @@ def main():
         step += 1
         idxs = [random.randrange(len(train_pairs)) for _ in range(args.batch)]
         L, R, D, V = batchify(train_pairs, idxs, device)
+        if args.aug:
+            L, R, D, V = augment_batch(L, R, D, V, aug_rng)
         opt.zero_grad(set_to_none=True)
         with torch.amp.autocast("cuda"):
             out = model(L, R, aux=True)
