@@ -92,6 +92,10 @@ def build_model(arch: str):
         cfg = StereoLiteYoloCtxGEV4Config()
     elif arch == "gev4_opt_narrow":
         cfg = StereoLiteYoloCtxGEV4Config(narrow_gev=True, gev_half_range=16)
+    elif arch == "gev4_opt_narrow_sharptail":
+        # narrow core + pre-rahi costlookup tail (1/2 refine + plane-eq up)
+        cfg = StereoLiteYoloCtxGEV4Config(narrow_gev=True, gev_half_range=16,
+                                          sharp_tail=True)
     else:
         raise ValueError(arch)
     return StereoLiteYoloCtxGEV4(cfg), cfg
@@ -372,6 +376,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--arch", required=True,
                     choices=["gev4", "gev4_opt", "gev4_opt_narrow",
+                             "gev4_opt_narrow_sharptail",
                              "costlookup_y26n", "costlookup_y26s"])
     ap.add_argument("--n_pairs", type=int, default=100)
     ap.add_argument("--n_val", type=int, default=20)

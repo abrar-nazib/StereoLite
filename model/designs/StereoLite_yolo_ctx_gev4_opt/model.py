@@ -213,6 +213,13 @@ class StereoLiteYoloCtxGEV4Config:
     opt_static_ctx: bool = True   # F4: hoist static (fL, ctx) conv work
     narrow_gev: bool = False      # F3: GEV around tile.d (ACCURACY-AFFECTING)
     gev_half_range: int = 16      # F3 bins = 2*hr+1 (33 vs original 64)
+    # ---- sharp tail (pre-rahi costlookup output path; ACCURACY-AFFECTING) ----
+    # True: drop ConvexUpsample; plane-upsample 1/4 -> 1/2, run TileRefineCtx
+    # at 1/2 for iters_2 passes, plane-upsample 1/2 -> full. Targets the
+    # bad-0.5 / visual-sharpness axis (hard plane-equation discontinuities,
+    # finest matching evidence at 1/2 instead of 1/4) at a latency cost.
+    sharp_tail: bool = False
+    iters_2: int = 2
 
 
 class StereoLiteYoloCtxGEV4(nn.Module):
@@ -267,9 +274,18 @@ class StereoLiteYoloCtxGEV4(nn.Module):
         self.up_16_to_8 = TileUpsample(scale_factor=2)
         self.up_8_to_4 = TileUpsample(scale_factor=2)
 
-        # Final learned 4x upsample 1/4 → full, two 2x convex steps
-        self.up_final_4_to_2 = ConvexUpsample(feat_ch=ch4, scale=2)
-        self.up_final_2_to_1 = ConvexUpsample(feat_ch=ch2, scale=2)
+        if self.cfg.sharp_tail:
+            # costlookup-style tail: refine at 1/2, plane-eq to full.
+            self.refine_2 = TileRefineCtx(feat_ch=ch2, **mk)
+            self.up_4_to_2 = TileUpsample(scale_factor=2)
+            self.up_2_to_1 = TileUpsample(scale_factor=2)
+            self.up_final_4_to_2 = None
+            self.up_final_2_to_1 = None
+        else:
+            self.refine_2 = None
+            # Final learned 4x upsample 1/4 → full, two 2x convex steps
+            self.up_final_4_to_2 = ConvexUpsample(feat_ch=ch4, scale=2)
+            self.up_final_2_to_1 = ConvexUpsample(feat_ch=ch2, scale=2)
 
     def forward(self, left: torch.Tensor, right: torch.Tensor,
                 aux: bool = False):
@@ -325,10 +341,25 @@ class StereoLiteYoloCtxGEV4(nn.Module):
         st4 = self.refine_4.precompute_static(fL4, ctx4)
         for _ in range(self.cfg.iters_4):
             tile = self.refine_4(tile, fL4, fR4, ctx4, static=st4)
+        d4_out = tile.d
 
-        # --- Final convex upsample 1/4 → 1/2 → full ---
-        d_half = self.up_final_4_to_2(tile.d, fL4)
-        d_full = self.up_final_2_to_1(d_half, fL2)
+        if self.cfg.sharp_tail:
+            # --- costlookup tail: plane-up to 1/2, refine at 1/2 with real
+            #     stereo evidence, plane-equation upsample to full (hard
+            #     tile-boundary discontinuities, no convex blending) ---
+            ctx2 = F.interpolate(ctx4, size=fL2.shape[-2:], mode="bilinear",
+                                 align_corners=False)
+            tile = self.up_4_to_2(tile, target_hw=fL2.shape[-2:])
+            st2 = self.refine_2.precompute_static(fL2, ctx2)
+            for _ in range(self.cfg.iters_2):
+                tile = self.refine_2(tile, fL2, fR2, ctx2, static=st2)
+            d_half = tile.d
+            tile_full = self.up_2_to_1(tile, target_hw=left.shape[-2:])
+            d_full = tile_full.d
+        else:
+            # --- Final convex upsample 1/4 → 1/2 → full ---
+            d_half = self.up_final_4_to_2(d4_out, fL4)
+            d_full = self.up_final_2_to_1(d_half, fL2)
         if d_full.shape[-2:] != left.shape[-2:]:
             d_full = F.interpolate(d_full, size=left.shape[-2:],
                                     mode="bilinear", align_corners=True)
@@ -337,7 +368,7 @@ class StereoLiteYoloCtxGEV4(nn.Module):
             return {
                 "d_final": d_full,
                 "d_half": d_half,
-                "d4": tile.d,
+                "d4": d4_out,
                 "d4_gev": d_gev4,
                 "gev4_w": gev_w,
                 "d8": d8,
