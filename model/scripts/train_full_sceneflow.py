@@ -105,6 +105,26 @@ def _safe_sched_step(sched):
         pass
 
 
+def _atomic_save(obj, path: Path):
+    """torch.save via tmp+rename so the background volume committer can never
+    snapshot a half-written checkpoint."""
+    import os
+    tmp = path.with_suffix(".tmp")
+    torch.save(obj, tmp)
+    os.replace(tmp, path)
+
+
+def _make_tail_sched(opt, lr: float, leg: int):
+    """Fresh cosine tail lr -> 0. initial_lr must be set explicitly: the
+    scheduler reads base_lrs from it, and setdefault keeps OneCycle's stale
+    warmup floor otherwise."""
+    for gp in opt.param_groups:
+        gp["lr"] = lr
+        gp["initial_lr"] = lr
+    return torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=leg,
+                                                      eta_min=0.0)
+
+
 def to_device(batch, device):
     L = batch["L"].to(device, non_blocking=True).float() / 255.0
     R = batch["R"].to(device, non_blocking=True).float() / 255.0
@@ -274,6 +294,7 @@ def main():
     start_step, best_val = 0, float("inf")
     val_log: list = []          # (step, val_epe) — drives auto-extension
     phase, target, extend_used = "main", args.steps, 0
+    leg_prev_best = float("inf")   # best val EPE when the current tail began
     ckpt_path = out_dir / "latest.pth"
     if args.resume and ckpt_path.exists():
         ck = torch.load(ckpt_path, map_location=device, weights_only=False)
@@ -285,9 +306,9 @@ def main():
         phase = ck.get("phase", "main")
         target = ck.get("target", args.steps)
         extend_used = ck.get("extend_used", 0)
+        leg_prev_best = ck.get("leg_prev_best", float("inf"))
         if phase == "tail":  # rebuild the tail scheduler before loading state
-            sched = torch.optim.lr_scheduler.CosineAnnealingLR(
-                opt, T_max=args.extend_leg, eta_min=0.0)
+            sched = _make_tail_sched(opt, args.extend_lr, args.extend_leg)
         sched.load_state_dict(ck["sched"])
         print(f"resumed from step {start_step} (best val EPE {best_val:.4f}, "
               f"phase={phase}, target={target})")
@@ -372,15 +393,16 @@ def main():
                         f"{vm['d1_all']:.3f},{time.time()-t0:.0f}\n")
             if vm["epe"] < best_val:
                 best_val = vm["epe"]
-                torch.save({"model": model.state_dict(), "step": step,
-                            "val_metrics": vm, "cfg": args.arch},
-                           out_dir / "best.pth")
-            torch.save({"model": model.state_dict(),
-                        "opt": opt.state_dict(), "sched": sched.state_dict(),
-                        "scaler": scaler.state_dict(), "step": step,
-                        "best_val": best_val, "val_log": val_log,
-                        "phase": phase, "target": target,
-                        "extend_used": extend_used}, ckpt_path)
+                _atomic_save({"model": model.state_dict(), "step": step,
+                              "val_metrics": vm, "cfg": args.arch},
+                             out_dir / "best.pth")
+            _atomic_save({"model": model.state_dict(),
+                          "opt": opt.state_dict(), "sched": sched.state_dict(),
+                          "scaler": scaler.state_dict(), "step": step,
+                          "best_val": best_val, "val_log": val_log,
+                          "phase": phase, "target": target,
+                          "extend_used": extend_used,
+                          "leg_prev_best": leg_prev_best}, ckpt_path)
             try:
                 col = make_collage(model, collage_train_pairs, val_pairs[:2],
                                    device, step, args)
@@ -399,21 +421,26 @@ def main():
         # is only valid here (low, decaying LR), never mid-OneCycle. ---
         if (step == target and args.auto_extend
                 and extend_used < args.extend_cap):
-            thresh = 0.01 if phase == "main" else 0.005
-            epes = [e for _, e in val_log]
-            improving = (len(epes) < 5
-                         or min(epes[-4:]) < min(epes[:-4]) * (1 - thresh))
+            if phase == "main":
+                # window rule: did best-val improve >1% within the last 4
+                # evals of the main schedule?
+                epes = [e for _, e in val_log]
+                improving = (len(epes) < 5
+                             or min(epes[-4:]) < min(epes[:-4]) * 0.99)
+                reason = ">1% gain in the last 4 main-phase evals"
+            else:
+                # leg rule: did THIS tail beat the best it started from by
+                # >0.5%? (window rule would double-count the main finish)
+                improving = best_val < leg_prev_best * 0.995
+                reason = ">0.5% gain within the last tail"
             if improving:
+                leg_prev_best = best_val
                 target += args.extend_leg
                 extend_used += args.extend_leg
                 phase = "tail"
-                for gp in opt.param_groups:
-                    gp["lr"] = args.extend_lr
-                sched = torch.optim.lr_scheduler.CosineAnnealingLR(
-                    opt, T_max=args.extend_leg, eta_min=0.0)
-                print(f"AUTO-EXTEND: val still improving (>{thresh:.1%} "
-                      f"over last 4 evals) -> +{args.extend_leg} steps at "
-                      f"lr {args.extend_lr:.1e} (target {target}, "
+                sched = _make_tail_sched(opt, args.extend_lr, args.extend_leg)
+                print(f"AUTO-EXTEND ({reason}) -> +{args.extend_leg} steps "
+                      f"at lr {args.extend_lr:.1e} (target {target}, "
                       f"extension used {extend_used}/{args.extend_cap})",
                       flush=True)
             else:
