@@ -1,0 +1,122 @@
+\documentclass[12pt, oneside, a4paper]{report}
+
+\usepackage{amsmath,amsfonts,amssymb} %ams packages
+\usepackage[T1]{fontenc} %for font encoding
+\usepackage[varg]{txfonts} % text font
+
+
+\usepackage{graphicx} %for graphics
+\usepackage[left=1.3in, right=.7in, top=1in, bottom=1in]{geometry} %page margins setting
+	\graphicspath{{images/}} %graphics path
+\usepackage{setspace} %for line spacing
+\usepackage{nomencl} %to print list of symbols
+	\makenomenclature	
+
+
+\usepackage[hidelinks]{hyperref}	%to create various links
+
+					
+%\usepackage[style=ieee]{biblatex}
+%\addbibresource{Reference}
+\usepackage[titletoc]{appendix}	 %to print appendix
+%\usepackage{fancyhdr} %for fancy header/footer
+%	\pagestyle{fancy}		
+	
+\usepackage{caption}
+\usepackage{subcaption} %for sub figure and subtable
+\usepackage{xcolor} %to access various colors
+\usepackage{lipsum}
+\usepackage{emptypage}
+\usepackage[nottoc]{tocbibind} %to create toc, lot, lof, bib, ind
+
+
+ \renewcommand{\contentsname}{List of Contents} 
+ \renewcommand{\bibname}{References}
+ \renewcommand{\nomname}{List of Symbols \& Abbreviations}
+ 
+ \newcommand{\nm}[2]{\nomenclature{#1}{#2}}
+ \newcommand{\vc}[1]{\underline{#1}}
+
+\begin{document}
+
+\newgeometry{left=.3in, right=.2in, top=0in, bottom=0in}
+\pagenumbering{gobble}  % to remove page number at title
+\clearpage
+\thispagestyle{empty}
+
+%\include{frontmatter/title}
+
+\restoregeometry
+%\cleardoublepage
+%\phantomsection
+
+\pagenumbering{roman}
+
+%\addcontentsline{toc}{chapter}{Declaration}
+\include{frontmatter/declaration}
+
+
+%\cleardoublepage
+%\phantomsection
+%\addcontentsline{toc}{chapter}{Acknowledgements}
+\include{frontmatter/acknowledgments}
+
+\addcontentsline{toc}{chapter}{Abstract}
+\include{frontmatter/abstract}
+
+\tableofcontents
+\listoffigures
+\listoftables
+
+\mbox{}
+\addcontentsline{toc}{chapter}{List of Symbols \& Abbreviations}
+\printnomenclature
+\cleardoublepage
+
+\pagenumbering{arabic}
+
+\include{mainmatter/ch1}
+%\include{mainmatter/ch2}
+%\include{mainmatter/ch3}
+%\include{mainmatter/ch4}
+%\include{mainmatter/ch5}
+%\include{mainmatter/ch6}
+
+\cleardoublepage
+\phantomsection
+%\addcontentsline{toc}{chapter}{References}
+%\bibliographystyle{plainnat}
+%\bibliography{mybib}
+
+
+\bibliographystyle{IEEEtran}
+\bibliography{Reference}
+
+
+\cleardoublepage 
+\phantomsection 
+\begin{appendices}
+%\include{backmatter/app1}
+%\include{backmatter/app2}
+\end{appendices}
+
+\end{document}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -66,3 +66,14 @@ model/teachers/*
 external_models/
 model/scripts/modal/igev_stereo_repo/
 model/scripts/modal/lite_any_stereo_repo/
+# Thesis LaTeX build artifacts (keep .tex / .bib / .pdf sources)
+thesis/**/*.aux
+thesis/**/*.log
+thesis/**/*.bbl
+thesis/**/*.blg
+thesis/**/*.lof
+thesis/**/*.lot
+thesis/**/*.nlo
+thesis/**/*.out
+thesis/**/*.toc
+thesis/**/*.synctex.gz
