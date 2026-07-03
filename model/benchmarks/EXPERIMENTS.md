@@ -83,6 +83,18 @@ _Per-variant artefacts: [`benchmarks/temptile_20260702-234021/`](benchmarks/temp
 
 _Per-variant artefacts: [`benchmarks/sharptail_n100/`](benchmarks/sharptail_n100/)_
 
+## recipe_n100
+**Type:** Unknown
+**Started:** 2026-07-03T11:58:05  ·  **Config:** 12000 steps, 384×640, 100 pairs, batch=8
+
+| Variant | Trainable (M) | EPE | RMSE | Median | bad-0.5 | bad-1.0 | bad-2.0 | bad-3.0 | D1-all | Latency (ms) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| gev4_opt_narrow | 2.962 | **2.0122** | 5.019 | 0.464 | 44.54% | **29.48%** | 18.59% | 13.88% | 13.07% | 31.1 |
+| gev4_opt_narrow | 2.958 | **2.1377** | 5.336 | 0.466 | 44.57% | **28.94%** | 18.88% | 14.37% | 13.63% | 31.7 |
+| gev4_opt_narrow | 2.958 | **2.8339** | 6.867 | 0.514 | 45.67% | **32.09%** | 22.02% | 17.05% | 16.64% | 29.0 |
+
+_Per-variant artefacts: [`benchmarks/recipe_n100/`](benchmarks/recipe_n100/)_
+
 ## raftlike_sweep_20260501-211601
 **Type:** Unknown
 **Started:** 2026-05-01T21:16:06  ·  **Config:** 3000 steps, 384×640, 20 pairs, batch=8
@@ -114,6 +126,16 @@ _Per-variant artefacts: [`benchmarks/raftlike_sweep_20260501-211601/`](benchmark
 | costlookup_y26s | 2.208 | **3.0646** | 7.248 | 0.547 | 45.42% | **31.95%** | 21.83% | 17.25% | 16.98% | 38.6 |
 
 _Per-variant artefacts: [`benchmarks/prerahi_n100/`](benchmarks/prerahi_n100/)_
+
+## phase3_combined_20260502-165700
+**Type:** Unknown
+**Started:** 2026-05-02T09:44:25  ·  **Config:** 9000 steps, 384×640, 100 pairs, batch=4
+
+| Variant | Trainable (M) | EPE | RMSE | Median | bad-0.5 | bad-1.0 | bad-2.0 | bad-3.0 | D1-all | Latency (ms) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| costlookup | 1.322 | **0.8246** | 2.524 | 0.143 | 23.71% | **15.85%** | 9.76% | 6.85% | 6.73% | 53.1 |
+
+_Per-variant artefacts: [`benchmarks/phase3_combined_20260502-165700/`](benchmarks/phase3_combined_20260502-165700/)_
 
 ## matched_overfit_20260430-234721
 **Type:** Matched encoder overfit (ghost vs yolo26n vs yolo26s)
@@ -212,3 +234,26 @@ _Per-variant artefacts: [`benchmarks/arch_ablation_20260501-122340/`](benchmarks
 | current | 0.538 | (running) | | | | | | | | |
 
 _Per-variant artefacts: [`benchmarks/arch_ablation_20260501-122133/`](benchmarks/arch_ablation_20260501-122133/)_
+
+## ablation_phase1_20260502-142629
+**Type:** Unknown
+**Started:** 2026-05-02T07:56:07  ·  **Config:** 15000 steps, 384×640, 100 pairs, batch=4
+
+| Variant | Trainable (M) | EPE | RMSE | Median | bad-0.5 | bad-1.0 | bad-2.0 | bad-3.0 | D1-all | Latency (ms) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| costlookup | 1.254 | **0.7658** | 2.370 | 0.141 | 22.74% | **15.10%** | 9.09% | 6.24% | 6.10% | 25.4 |
+
+_Per-variant artefacts: [`benchmarks/ablation_phase1_20260502-142629/`](benchmarks/ablation_phase1_20260502-142629/)_
+
+## 20260703_blurfix_n500
+**Type:** Blur-fix A/B (control / bundle1 / plane / bimodal, 450/50 windowed split)
+**Started:** 2026-07-03T15:12:49  ·  **Config:** 14500 steps, 384×640, 500 pairs, batch=8
+
+| Variant | Trainable (M) | EPE | RMSE | Median | bad-0.5 | bad-1.0 | bad-2.0 | bad-3.0 | D1-all | Latency (ms) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| gev4_opt_narrow_bimodal | 2.969 | **1.7794** | 5.008 | 0.419 | 43.26% | **27.84%** | 17.05% | 12.29% | 11.53% | 25.2 |
+| gev4_opt_narrow_bundle1 | 2.962 | **1.9819** | 5.408 | 0.546 | 49.95% | **31.66%** | 18.44% | 12.84% | 12.14% | 21.9 |
+| gev4_opt_narrow | 2.962 | **2.0062** | 5.246 | 0.600 | 55.36% | **32.64%** | 18.59% | 13.31% | 12.57% | 22.2 |
+| gev4_opt_narrow_plane | 2.963 | **1.8259** | 5.091 | 0.420 | 42.91% | **28.07%** | 17.35% | 12.73% | 12.19% | 15.0 |
+
+_Per-variant artefacts: [`benchmarks/20260703_blurfix_n500/`](benchmarks/20260703_blurfix_n500/)_
