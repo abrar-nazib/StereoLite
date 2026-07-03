@@ -220,6 +220,8 @@ class StereoLiteYoloCtxGEV4Config:
     # finest matching evidence at 1/2 instead of 1/4) at a latency cost.
     sharp_tail: bool = False
     iters_2: int = 2
+    # ---- blur bundle-1 (docs/deblurring_plan.md Fix 1; ACCURACY-AFFECTING) ----
+    init_topk: int = 0            # 3 = CoEx top-k soft-argmin at TileInit
 
 
 class StereoLiteYoloCtxGEV4(nn.Module):
@@ -242,7 +244,8 @@ class StereoLiteYoloCtxGEV4(nn.Module):
         self.init_tile = TileInit(feat_ch=ch16,
                                    max_disp=self.cfg.init_max_disp,
                                    groups=g,
-                                   feat_out=self.cfg.tile_feat_ch)
+                                   feat_out=self.cfg.tile_feat_ch,
+                                   topk=self.cfg.init_topk)
 
         # Per-scale refine heads — one instance per scale because channel
         # counts differ; weights are not shared.
@@ -375,6 +378,7 @@ class StereoLiteYoloCtxGEV4(nn.Module):
                 "d8_cv": d16,
                 "d16": d16,
                 "d32": d32,
+                "init_logits": self.init_tile.last_logits,
             }
         return d_full
 

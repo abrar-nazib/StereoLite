@@ -119,15 +119,24 @@ def _groupwise_corr_volume_padded(fL: torch.Tensor, fR: torch.Tensor,
 
 
 class TileInit(nn.Module):
-    """Cost-volume init at 1/16 (F1-optimized volume construction)."""
+    """Cost-volume init at 1/16 (F1-optimized volume construction).
+
+    `topk` > 0 enables CoEx-style top-k soft-argmin (softmax + expectation
+    over only the k best-scoring bins per pixel) — commits to a dominant
+    mode at bimodal boundary pixels instead of the between-modes mean.
+    Must be trained in (CoEx: retrofitting k at eval time degrades).
+    The post-aggregation logits are stashed on `self.last_logits` so the
+    trainer can add a distribution-shaping init loss (blur bundle-1).
+    """
 
     def __init__(self, feat_ch: int, max_disp: int = 24, groups: int = 8,
-                 feat_out: int = 16):
+                 feat_out: int = 16, topk: int = 0):
         super().__init__()
         assert feat_ch % groups == 0
         self.max_disp = max_disp
         self.groups = groups
         self.feat_out = feat_out
+        self.topk = topk
         self.agg = nn.Sequential(
             nn.Conv3d(groups, 16, 3, padding=1, bias=False),
             _safe_gn(16), nn.SiLU(inplace=True),
@@ -140,14 +149,23 @@ class TileInit(nn.Module):
             torch.arange(max_disp, dtype=torch.float32).view(1, max_disp, 1, 1),
             persistent=False,
         )
+        self.last_logits = None
 
     def forward(self, fL: torch.Tensor, fR: torch.Tensor) -> TileState:
         B, C, H, W = fL.shape
         cv = _groupwise_corr_volume_padded(fL, fR, self.max_disp, self.groups)
         logits = self.agg(cv).squeeze(1)
-        prob = F.softmax(logits, dim=1)
-        d = (prob * self.disp_idx).sum(dim=1, keepdim=True)
-        conf = prob.max(dim=1, keepdim=True).values
+        self.last_logits = logits
+        if self.topk and self.topk < self.max_disp:
+            # top-k soft-argmin: expectation over the k best bins only.
+            vals, idx = logits.topk(self.topk, dim=1)
+            prob_k = F.softmax(vals, dim=1)
+            d = (prob_k * idx.to(prob_k.dtype)).sum(dim=1, keepdim=True)
+            conf = prob_k.max(dim=1, keepdim=True).values
+        else:
+            prob = F.softmax(logits, dim=1)
+            d = (prob * self.disp_idx).sum(dim=1, keepdim=True)
+            conf = prob.max(dim=1, keepdim=True).values
         sx = torch.zeros_like(d)
         sy = torch.zeros_like(d)
         feat = torch.zeros((B, self.feat_out, H, W), device=fL.device,
