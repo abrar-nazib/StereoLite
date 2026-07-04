@@ -100,11 +100,18 @@ def probe_remote() -> int:
 @app.function(image=image, gpu="A100-80GB",
               volumes={"/shards": shards_vol, "/cache": cache_vol,
                        "/results": results_vol},
-              cpu=12, memory=65536, timeout=24 * 3600, retries=0)
+              cpu=12, memory=65536, timeout=24 * 3600,
+              retries=modal.Retries(max_retries=5, initial_delay=10.0,
+                                    backoff_coefficient=1.0))
 def train_remote(batch: int, steps: int, lr: str, eval_every: int,
                  run_name: str, input_mode: str, ckpt_every: int,
                  track_train: int, track_val: int, yjitter: int,
                  auto_extend: int) -> int:
+    # retries>0 is SAFE and REQUIRED here (changed 2026-07-04): a retry
+    # replays the same inputs (incl. run_name) into a fresh container and
+    # --resume continues from latest.pth, losing at most eval_every steps.
+    # With retries=0 a worker reclaim ("Runner has been shutting down for
+    # too long") killed the whole app at step 5600 despite --detach.
     import threading
     import time
 
@@ -159,7 +166,14 @@ def train(batch: int = 32, steps: int = 60000, lr: str = "auto",
           f"ckpt_every={ckpt_every}, track={track_train}+{track_val} "
           f"(~{est_h:.0f} h rough) — keep client alive; "
           f"relaunch with the same run_name to resume.")
-    rc = train_remote.remote(batch, steps, lr, eval_every, rn, input_mode,
-                             ckpt_every, track_train, track_val, yjitter,
-                             auto_extend)
-    print(f"train rc={rc}")
+    # spawn + `modal run --detach`: the client submits the job and exits;
+    # the detached app keeps running the input with no local process in the
+    # loop. Combined with retries+resume above, the run survives client
+    # disconnects AND worker reclaims without a human relaunch.
+    call = train_remote.spawn(batch, steps, lr, eval_every, rn, input_mode,
+                              ckpt_every, track_train, track_val, yjitter,
+                              auto_extend)
+    print(f"spawned function call {call.object_id}; safe to close this "
+          f"client. Progress: volume train.csv under fulltrain/{rn}. "
+          f"Poll: modal app list / modal volume get widener-results "
+          f"fulltrain/{rn}/train.csv")
