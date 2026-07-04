@@ -652,19 +652,51 @@ def main():
 
     # final: FULL 4,370-pair test on the best checkpoint (the paper number).
     # native mode: native axis (the run's protocol axis).
+    #
+    # STREAMED shard-by-shard: decoding all 4,370 native pairs at once is ~70 GB
+    # and OOM-stalls a 64 GB container before it prints a number (2026-07-05
+    # incident). We hold at most one shard's worth of decoded pairs in RAM,
+    # accumulate one metric dict per image, and macro-average over the full set
+    # (identical statistic to a single evaluate() pass). See
+    # modal/eval_full_testset.py for the standalone version.
     if args.final_full_eval:
         ck = torch.load(out_dir / "best.pth", map_location=device,
                         weights_only=False)
         model.load_state_dict(ck["model"])
-        full_pairs = load_test_pairs(shards_dir, None, native=native)
-        print(f"FULL TEST: {len(full_pairs)} pairs "
-              f"(axis={'native' if native else 'resized'}) ...")
+        model.eval()
+        ebs = args.val_bs or (4 if native else 8)
+        test_shards = sorted(shards_dir.glob("test_ft3d_*.pkl"))
+        print(f"FULL TEST: streaming {len(test_shards)} shards "
+              f"(axis={'native' if native else 'resized'}, bs={ebs}) ...",
+              flush=True)
+        agg, n_pairs = [], 0
         with torch.no_grad():
-            fm = evaluate(model, full_pairs, device,
-                          bs=args.val_bs or (4 if native else 8))
-        print("FINAL full-test metrics: "
+            for sp in test_shards:
+                with open(sp, "rb") as f:
+                    recs = pickle.load(f)
+                for i in range(0, len(recs), ebs):
+                    window = [decode_record(r, native=native)
+                              for r in recs[i:i + ebs]]
+                    idxs = list(range(len(window)))
+                    L, R, D, V = batchify(window, idxs, device)
+                    pred = _forward_pad16(model, L, R)
+                    for b in range(pred.shape[0]):
+                        agg.append(stereo_metrics(pred[b:b+1], D[b:b+1],
+                                                  V[b:b+1]))
+                    n_pairs += len(window)
+                    del window, L, R, D, V, pred
+        model.train()
+        # nanmean: frames with an empty valid mask (gt>0 & gt<192 empty) give
+        # nan EPE/bad-* and must be excluded, not poison the macro-average.
+        keys = list(agg[0].keys())
+        nan_cnt = {k: int(np.sum(np.isnan([a[k] for a in agg]))) for k in keys}
+        fm = {k: float(np.nanmean([a[k] for a in agg])) for k in keys}
+        print(f"FINAL full-test metrics ({n_pairs} pairs, degenerate "
+              f"excluded: { {k: c for k, c in nan_cnt.items() if c} }): "
               + "  ".join(f"{k}={v:.4f}" for k, v in fm.items()), flush=True)
         meta["final_metrics_all"] = fm
+        meta["final_n_pairs"] = n_pairs
+        meta["final_degenerate_frames"] = {k: c for k, c in nan_cnt.items() if c}
         meta["final_axis"] = "native_960x540_pad16" if native else "resized"
         meta["final_best_step"] = ck["step"]
         meta["finished"] = datetime.now().isoformat(timespec="seconds")
