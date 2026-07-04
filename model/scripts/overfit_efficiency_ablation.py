@@ -243,6 +243,77 @@ def batchify(pairs, idxs, device):
     return L, R, D, V
 
 
+def batchify_native_crop(pairs, idxs, device, rng):
+    """Native-scale random crops of TRAIN_HxTRAIN_W (input_mode=native_crop).
+
+    Pixels stay at native 960x540 sampling; disparity stays in native px.
+    Same crop applied to L/R/D of a sample (stereo geometry is preserved
+    under y/x translation of both views by the same offset)."""
+    Ls, Rs, Ds = [], [], []
+    for i in idxs:
+        p = pairs[i]
+        H, W = p["L"].shape[-2:]
+        y0 = rng.randint(0, H - TRAIN_H)
+        x0 = rng.randint(0, W - TRAIN_W)
+        Ls.append(p["L"][:, y0:y0 + TRAIN_H, x0:x0 + TRAIN_W])
+        Rs.append(p["R"][:, y0:y0 + TRAIN_H, x0:x0 + TRAIN_W])
+        Ds.append(p["D"][:, y0:y0 + TRAIN_H, x0:x0 + TRAIN_W])
+    L = torch.stack(Ls).to(device).float() / 255.0
+    R = torch.stack(Rs).to(device).float() / 255.0
+    D = torch.stack(Ds).to(device).float()
+    V = ((D > 0) & (D < MAX_DISP)).float()
+    return L, R, D, V
+
+
+def batchify_native_full(pairs, idxs, device):
+    """Full native frames (input_mode=native_full): replicate-pad images to
+    /16 dims (960x540 -> 960x544), zero-pad disparity so the pad band is
+    masked out of every loss term via V=0."""
+    L = torch.stack([pairs[i]["L"] for i in idxs]).to(device).float() / 255.0
+    R = torch.stack([pairs[i]["R"] for i in idxs]).to(device).float() / 255.0
+    D = torch.stack([pairs[i]["D"] for i in idxs]).to(device).float()
+    H, W = L.shape[-2:]
+    ph, pw = (-H) % 16, (-W) % 16
+    if ph or pw:
+        L = F.pad(L, (0, pw, 0, ph), mode="replicate")
+        R = F.pad(R, (0, pw, 0, ph), mode="replicate")
+        D = F.pad(D, (0, pw, 0, ph))
+    V = ((D > 0) & (D < MAX_DISP)).float()
+    return L, R, D, V
+
+
+def downscale_pair(p):
+    """Native pair -> resized pair, byte-identical to _load_pair's transform
+    (INTER_AREA on images, INTER_NEAREST + x-scale on disparity)."""
+    out = dict(seq=p["seq"], t=p["t"])
+    for k in ("L", "R"):
+        im = p[k].permute(1, 2, 0).numpy()          # HWC RGB uint8
+        im = cv2.resize(im, (TRAIN_W, TRAIN_H), interpolation=cv2.INTER_AREA)
+        out[k] = torch.from_numpy(im).permute(2, 0, 1).contiguous()
+    d = p["D"][0].float().numpy()
+    d = cv2.resize(d, (TRAIN_W, TRAIN_H), interpolation=cv2.INTER_NEAREST)
+    d = d * (TRAIN_W / d0_native_w(p))
+    out["D"] = torch.from_numpy(d)[None].to(torch.float16)
+    return out
+
+
+def d0_native_w(p):
+    return p["L"].shape[-1]
+
+
+def _forward_pad16(model, L, R):
+    """Forward with replicate-pad to /16 dims, crop prediction back.
+    No-op when H and W are already multiples of 16 (e.g. 384x640).
+    Needed for native 960x540 frames (540 -> 544)."""
+    H, W = L.shape[-2:]
+    ph, pw = (-H) % 16, (-W) % 16
+    if ph == 0 and pw == 0:
+        return model(L, R)
+    Lp = F.pad(L, (0, pw, 0, ph), mode="replicate")
+    Rp = F.pad(R, (0, pw, 0, ph), mode="replicate")
+    return model(Lp, Rp)[..., :H, :W]
+
+
 # ---------------------------------------------------------------------------
 # OpenStereo-style train-time augmentation (docs/openstereo_findings.md #1).
 # Ported from external_models/OpenStereo stereo_trans.py semantics:
@@ -482,7 +553,7 @@ def evaluate(model, pairs, device, bs=4):
     for i in range(0, len(pairs), bs):
         idxs = list(range(i, min(i + bs, len(pairs))))
         L, R, D, V = batchify(pairs, idxs, device)
-        pred = model(L, R)
+        pred = _forward_pad16(model, L, R)
         for b in range(pred.shape[0]):
             agg.append(stereo_metrics(pred[b:b+1], D[b:b+1], V[b:b+1]))
     model.train()
@@ -517,7 +588,7 @@ def make_collage(model, train_pairs, val_pairs, device, step, args):
     tiles.append(gt_tile)
     for split, p in picks:
         L, R, D, V = batchify([p], [0], device)
-        pred = model(L, R)
+        pred = _forward_pad16(model, L, R)
         m = stereo_metrics(pred, D, V)
         dnp = pred[0, 0].float().cpu().numpy()
         g = D[0, 0].cpu().numpy()
@@ -582,16 +653,50 @@ def main():
                          "right eraser, scale/stretch w/ disparity rescale)")
     ap.add_argument("--freeze_bn", type=int, default=0,
                     help="freeze all encoder BatchNorm (OpenStereo FREEZE_BN)")
+    ap.add_argument("--input_mode",
+                    choices=["resize", "native_crop", "native_full"],
+                    default="resize",
+                    help="resize: full frame downscaled to 640x384 (legacy "
+                         "protocol); native_crop: random 384x640 crops of "
+                         "native 960x540 frames, native disparity; "
+                         "native_full: whole native frames padded to /16")
+    ap.add_argument("--native_cache", default=None,
+                    help="pairs cache holding NATIVE-resolution pairs (same "
+                         "keys/split as the windowed cache). Required for "
+                         "input_mode=native_crop and for the dual-axis final "
+                         "eval; when given, training pairs are derived from "
+                         "it (downscaled on the fly in resize mode)")
     args = ap.parse_args()
 
     torch.manual_seed(args.seed); np.random.seed(args.seed)
     random.seed(args.seed)
     device = "cuda"
 
-    train_pairs, val_pairs = load_or_build_pairs(args)
+    native_val = None
+    resized_val = None
+    if args.native_cache:
+        blob = torch.load(args.native_cache, map_location="cpu",
+                          weights_only=False)
+        nat_train, nat_val = blob["train"], blob["val"]
+        print(f"native cache: {args.native_cache} "
+              f"({len(nat_train)} train / {len(nat_val)} val, "
+              f"{nat_train[0]['L'].shape[-2]}x{nat_train[0]['L'].shape[-1]})")
+        native_val = nat_val
+        resized_val = [downscale_pair(p) for p in nat_val]
+        if args.input_mode in ("native_crop", "native_full"):
+            train_pairs, val_pairs = nat_train, nat_val
+        else:
+            train_pairs = [downscale_pair(p) for p in nat_train]
+            val_pairs = resized_val
+    else:
+        if args.input_mode != "resize":
+            raise SystemExit(f"--input_mode {args.input_mode} requires "
+                             "--native_cache")
+        train_pairs, val_pairs = load_or_build_pairs(args)
     if args.dump_pairs_only:
         print("pairs cache dumped; exiting."); return
-    print(f"[{args.arch}] {len(train_pairs)} train / {len(val_pairs)} val")
+    print(f"[{args.arch}] {len(train_pairs)} train / {len(val_pairs)} val "
+          f"(input_mode={args.input_mode})")
 
     run = args.run_name or f"efficiency_{datetime.now():%Y%m%d-%H%M%S}"
     out_dir = Path(args.out_root) / run / args.arch
@@ -614,6 +719,8 @@ def main():
     n_train_p = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"params: {n_train_p/1e6:.4f} M")
     aug_rng = random.Random(args.seed + 7)
+    crop_rng = random.Random(args.seed + 13)
+    eval_bs = 2 if args.input_mode in ("native_crop", "native_full") else 4
 
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-5)
     scaler = torch.amp.GradScaler("cuda")
@@ -630,7 +737,13 @@ def main():
     while step < args.max_steps:
         step += 1
         idxs = [random.randrange(len(train_pairs)) for _ in range(args.batch)]
-        L, R, D, V = batchify(train_pairs, idxs, device)
+        if args.input_mode == "native_crop":
+            L, R, D, V = batchify_native_crop(train_pairs, idxs, device,
+                                              crop_rng)
+        elif args.input_mode == "native_full":
+            L, R, D, V = batchify_native_full(train_pairs, idxs, device)
+        else:
+            L, R, D, V = batchify(train_pairs, idxs, device)
         if args.aug:
             L, R, D, V = augment_batch(L, R, D, V, aug_rng)
         opt.zero_grad(set_to_none=True)
@@ -664,7 +777,7 @@ def main():
                              f"{args.lr:g}", f"{time.time()-t0:.1f}"))
 
         if step % args.eval_every == 0:
-            vm = evaluate(model, val_pairs, device)
+            vm = evaluate(model, val_pairs, device, bs=eval_bs)
             val_hist.append((step, vm["epe"]))
             # full 8-metric val row (protocol: the deciding metric bad-0.5
             # needs a direct per-eval noise band, 2026-07-03 harness audit)
@@ -697,15 +810,48 @@ def main():
                 break
 
     # final metrics on both splits + latency
-    final_train = evaluate(model, train_pairs, device)
-    final_val = evaluate(model, val_pairs, device)
+    final_train = evaluate(model, train_pairs, device, bs=eval_bs)
+    final_val = evaluate(model, val_pairs, device, bs=eval_bs)
+
+    # dual-axis final eval: same 50 val frames on BOTH input protocols,
+    # so resize-trained and native-trained arms share two comparable axes
+    final_val_native = final_val_resized = None
+    if native_val is not None:
+        final_val_native = evaluate(model, native_val, device, bs=2)
+        final_val_resized = evaluate(model, resized_val, device, bs=4)
+        model.eval()
+        tiles = []
+        with torch.no_grad():
+            for p in native_val[:3]:
+                Lb, Rb, Db, Vb = batchify([p], [0], device)
+                pred = _forward_pad16(model, Lb, Rb)
+                m = stereo_metrics(pred, Db, Vb)
+                g = Db[0, 0].cpu().numpy()
+                vmax = max(np.percentile(g[g > 0], 99), 1.0)
+                gt_t = _annot(_colorize_disp(g, vmax=vmax),
+                              [f"GT (native) {p['seq'].split('/')[0][:4]}#{p['t']}"],
+                              color=(255, 255, 255))
+                pr_t = _annot(_colorize_disp(pred[0, 0].float().cpu().numpy(),
+                                             vmax=vmax),
+                              [f"pred  EPE {m['epe']:.3f}  med {m['median_ae']:.3f}",
+                               f"bad0.5 {m['bad_0.5']:.1f}  bad1 {m['bad_1.0']:.1f}",
+                               f"bad2 {m['bad_2.0']:.1f}  D1 {m['d1_all']:.1f}"],
+                              color=(0, 200, 255))
+                tiles.append(np.concatenate([gt_t, pr_t], axis=1))
+        cv2.imwrite(str(out_dir / "final_native_collage.png"),
+                    np.concatenate(tiles, axis=0))
+        model.train()
+
     Lb, Rb, _, _ = batchify(val_pairs, [0], device)
+    lat_hw = tuple(Lb.shape[-2:])
     model.eval()
     with torch.no_grad():
-        for _ in range(10): model(Lb, Rb)
+        for _ in range(10): _forward_pad16(model, Lb, Rb)
         torch.cuda.synchronize(); ts = []
         for _ in range(50):
-            s0 = time.perf_counter(); model(Lb, Rb); torch.cuda.synchronize()
+            s0 = time.perf_counter()
+            _forward_pad16(model, Lb, Rb)
+            torch.cuda.synchronize()
             ts.append((time.perf_counter() - s0) * 1000)
     lat = {"mean": float(np.mean(ts)), "median": float(np.median(ts)),
            "p95": float(np.percentile(ts, 95))}
@@ -713,7 +859,13 @@ def main():
           "  ".join(f"{k}={v:.3f}" for k, v in final_val.items()))
     print(f"FINAL[train] [{args.arch}] " +
           "  ".join(f"{k}={v:.3f}" for k, v in final_train.items()))
-    print(f"latency: {lat['median']:.1f} ms median  |  stopped @ {step}")
+    if final_val_native is not None:
+        print(f"FINAL[val-native] [{args.arch}] " +
+              "  ".join(f"{k}={v:.3f}" for k, v in final_val_native.items()))
+        print(f"FINAL[val-resized] [{args.arch}] " +
+              "  ".join(f"{k}={v:.3f}" for k, v in final_val_resized.items()))
+    print(f"latency: {lat['median']:.1f} ms median ({lat_hw[0]}x{lat_hw[1]})"
+          f"  |  stopped @ {step}")
 
     meta = dict(
         run=run, arch=args.arch, variant=args.arch,
@@ -739,9 +891,13 @@ def main():
                    [dict(split="val", seq=p["seq"], t=p["t"])
                     for p in val_pairs],
         peak_gpu_mem_GB=round(torch.cuda.max_memory_allocated()/1e9, 3),
+        input_mode=args.input_mode,
         final_metrics_all=final_val,
         final_metrics_train=final_train,
+        final_metrics_val_native=final_val_native,
+        final_metrics_val_resized=final_val_resized,
         latency_ms=lat,
+        latency_input_hw=list(lat_hw),
         args=vars(args),
     )
     (out_dir / "meta.json").write_text(json.dumps(meta, indent=2))

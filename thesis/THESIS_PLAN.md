@@ -7,13 +7,36 @@ Lecturer, Dept. of Mechatronics Engineering. Format authority:
 
 Central claim to defend: **runs on edge hardware and provides usable results.**
 
-**State of play (rewritten 2026-07-04).** All ablation gates are closed.
-The working architecture is **`gev4_opt_narrow_plane`** (efficiency-optimized
-gev4 + narrow GEV + plane-equation rendering with gated slant supervision)
-and the full-training recipe is locked (Section 3b). Rahi's full checkpoint
-is NOT coming; the Modal full Scene Flow training run is now the critical
-path that produces the thesis checkpoint. Everything downstream (MB14
-zero-shot, camera panels, baseline table, Ch4 numbers) waits on that one run.
+**State of play (rewritten 2026-07-04, updated same day).** All ablation
+gates are closed. The working architecture is **`gev4_opt_narrow_plane`**
+(efficiency-optimized gev4 + narrow GEV + plane-equation rendering with gated
+slant supervision) and the full-training recipe is locked (Section 3b).
+Rahi's full checkpoint is NOT coming; the Modal full Scene Flow training run
+is the critical path that produces the thesis checkpoint. Everything
+downstream (MB14 zero-shot, camera panels, baseline table, Ch4 numbers)
+waits on that one run.
+
+**Input-protocol correction (2026-07-04).** The first full run
+(`20260703_fullsf_gev4onp`, legacy 640x384 global-downscale input) reached
+val EPE 0.7630 at step 32k before a Modal preemption that crossed midnight
+UTC restarted it into a fresh out_dir (date-stamped run-name bug, now fixed:
+run_name is a replayed function input). In parallel, the
+`20260704_native_vs_resize_n500` ablation showed the downscale protocol
+cripples native-resolution inference (control at native axis: EPE 6.67, D1
+35.8% vs native_crop 2.87 / 16.5%, with zero cost on the resized axis).
+Verdict: the resized run is NOT completed or relaunched. The thesis
+checkpoint comes from a **native-crop rerun** (Section 3b). The salvaged
+resized-protocol model is kept as an ablation asset:
+
+- `model/checkpoints/fullsf_gev4onp_best_ep32k_epe0763.pth` (best, step 32k,
+  resized-axis val EPE 0.7630) and `fullsf_gev4onp_latest_ep38k.pth`
+  (resumable, step 38k).
+- **Planned Ch4 ablation:** run native-resolution (960x540 pad16) inference
+  with this resized-trained checkpoint and compare against the native-crop
+  full checkpoint on the same 400-pair FT3D-TEST subset plus MB14. This
+  scales the n500 protocol finding ("resize training cannot serve native
+  inference") to full-data evidence, and doubles as the justification for
+  the input-protocol choice in Ch3.
 
 ---
 
@@ -112,6 +135,17 @@ Chronology of evidence (all under the ablation-study-expert protocol, all in
    (compete for the same boundary pixels). **ADOPT plane alone**; bimodal
    and bundle1 dropped. Negative result goes in Ch4.
 
+5. **Native-vs-resize input protocol** (20260704_native_vs_resize_n500,
+   L40S, 3 arms, dual-axis final eval): random native 384x640 crops beat
+   the legacy global downscale by -32% bad-0.5 / -37% bad-1 / -57% EPE on
+   the native axis while tying it on the resized axis; whole-native-frame
+   training loses on the resized axis and is ~3x slower per step. Crop
+   protocol verified against published practice (OpenStereo RandomCrop,
+   RAFT/IGEV augmentor): co-located windows in both views, no horizontal
+   right-image shift exists in any surveyed method; vertical jitter of the
+   right crop (+-2 px) is a RAFT-family default but OFF in OpenStereo
+   SceneFlow configs and OFF in our validated arm.
+
 **LOCKED FULL-TRAINING CONFIG (every element evidence-backed):**
 
 | Element | Choice | Evidence |
@@ -119,11 +153,13 @@ Chronology of evidence (all under the ablation-study-expert protocol, all in
 | Architecture | `gev4_opt_narrow_plane` (--slant_w 0.3) | items 1 + 3 |
 | Augmentation | OpenStereo triplet ON | item 2 |
 | freeze_bn | OFF | item 2 |
+| Input protocol | random native 384x640 co-located crops (`--input_mode native_crop`); val axis = native 960x540 pad16 with a resized-axis eval logged alongside | item 5 |
 | Data | full Scene Flow (~35k pairs), held-out val | scale-up from n500 protocol |
-| Schedule | OneCycle, extended budget (12k insufficient under aug) | item 2 |
+| Schedule | OneCycle, 60k steps, val every 1k | item 2 + 20260703 run trajectory (best at 32k of 40k under resize; native crops see more pixels per epoch) |
+| Data preservation | per-1k model checkpoints (`checkpoints/step_*.pth`) + best/latest separate; 100 tracked images (50 train + 50 val) with per-image uint16 disparity PNG + full 8-metric JSON per eval | 2026-07-04 preemption incident: never lose training state again |
 | GPU | A100 (full-data training per project rule; T4/L40S are for ablations) | Modal rules |
 | Input contract | [0,1] at the model boundary (F6 landmine settled) | Section 3 F6 |
-| Post-run gates | MB14 zero-shot (mandatory), camera panels, 3050 bench | CLAUDE.md lesson |
+| Post-run gates | MB14 zero-shot (mandatory), resized-checkpoint native-inference ablation, camera panels, 3050 bench | CLAUDE.md lesson + input-protocol correction above |
 
 ### B. Chapter completeness (see SKILL §3-§5)
 - B1 `thesis/book/` tree from template + format decisions (0.5 d, no deps).
@@ -186,7 +222,10 @@ the most contribution-shaped piece of the thesis.
 5. **LAUNCH the full Scene Flow training run** (A1, locked config, Modal
    A100, date_tag run folder). THE critical-path item; everything in Ch4
    waits on it. Prepare + dry-run the trainer before burning A100 hours
-   (input contract F6, checkpoint/resume, val cadence, collages).
+   (input contract F6, checkpoint/resume, val cadence, tracked images).
+   Status 2026-07-04: first attempt (resize protocol) preempted at 38k,
+   best 0.7630@32k salvaged; native-crop relaunch is the production run
+   (60k steps, per-1k checkpoints + tracked-image archive).
 6. While it trains: adapt the MB14 driver for gev4_opt_narrow_plane (A3);
    scaffold the baseline table (A5, incl. LightStereo-S).
 7. When the checkpoint lands: MB14 zero-shot (mandatory gate) → baseline

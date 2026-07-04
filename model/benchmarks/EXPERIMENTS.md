@@ -245,6 +245,26 @@ _Per-variant artefacts: [`benchmarks/arch_ablation_20260501-122133/`](benchmarks
 
 _Per-variant artefacts: [`benchmarks/ablation_phase1_20260502-142629/`](benchmarks/ablation_phase1_20260502-142629/)_
 
+## 20260704_native_vs_resize_n500
+**Type:** Input protocol A/B/C — resize vs native_crop vs native_full (450/50 native split)
+**Started:** 2026-07-04T00:26:15  ·  **Config:** ≤20000 steps, 500 pairs, batch=8, L40S
+
+> WARNING: the auto-table below reads each arm's `final_metrics_all`, which is
+> its OWN training axis (control=resized 640×384, natives=native 960×540) and is
+> NOT cross-comparable. Rows in launch order: control / native_crop / native_full.
+> Use the dual-axis eval in [`comparison.md`](benchmarks/20260704_native_vs_resize_n500/comparison.md)
+> for the real comparison. **Verdict: native_crop wins** — beats control on the
+> native axis (EPE 6.67→2.87, bad-1 58.7→36.8, D1 35.8→16.5) at zero cost on the
+> resized axis; native_full ≈ crop but loses the resized axis and stopped early.
+
+| Variant (arm) | Trainable (M) | EPE | RMSE | Median | bad-0.5 | bad-1.0 | bad-2.0 | bad-3.0 | D1-all | Latency (ms) |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| control (resize, 640×384 axis) | 2.963 | **1.7835** | 4.914 | 0.465 | 45.89% | **29.91%** | 17.91% | 12.68% | 11.44% | 15.4 |
+| native_crop (960×540 axis) | 2.963 | **2.8695** | 7.720 | 0.551 | 49.04% | **36.75%** | 25.54% | 19.59% | 16.47% | 32.0 |
+| native_full (960×540 axis) | 2.963 | **2.9669** | 7.973 | 0.643 | 53.63% | **38.68%** | 26.26% | 19.88% | 16.74% | 24.9 |
+
+_Per-variant artefacts: [`benchmarks/20260704_native_vs_resize_n500/`](benchmarks/20260704_native_vs_resize_n500/)_
+
 ## 20260703_blurfix_n500
 **Type:** Blur-fix A/B (control / bundle1 / plane / bimodal, 450/50 windowed split)
 **Started:** 2026-07-03T15:12:49  ·  **Config:** 14500 steps, 384×640, 500 pairs, batch=8
