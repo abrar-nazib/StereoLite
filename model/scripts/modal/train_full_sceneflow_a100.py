@@ -48,7 +48,16 @@ image = (
                            "**/__pycache__/**"])
 )
 
-RUN_NAME = f"{datetime.now():%Y%m%d}_fullsf_gev4onp"  # date_tag convention
+RUN_NAME = f"{datetime.now():%Y%m%d}_fullsf_gev4onp_nc"  # default only; see note
+# _nc = native_crop input protocol (20260704_native_vs_resize_n500 winner).
+
+# NOTE: run_name must be a FUNCTION INPUT, not read from this module-level
+# constant, so that a Modal preemption restart (which replays the same input
+# args into a fresh container) reuses the SAME out_dir and --resume picks up
+# latest.pth. The old code used RUN_NAME directly inside train_remote; a
+# preemption that crossed midnight UTC recomputed datetime.now() to the next
+# day, produced a NEW out_dir, and silently restarted training from step 0
+# (2026-07-04 incident: lost 38k A100 steps). Do not revert to the constant.
 
 
 def _run(cmd: list[str]) -> int:
@@ -92,10 +101,15 @@ def probe_remote() -> int:
               volumes={"/shards": shards_vol, "/cache": cache_vol,
                        "/results": results_vol},
               cpu=12, memory=65536, timeout=24 * 3600, retries=0)
-def train_remote(batch: int, steps: int, lr: str, eval_every: int) -> int:
+def train_remote(batch: int, steps: int, lr: str, eval_every: int,
+                 run_name: str, input_mode: str, ckpt_every: int,
+                 track_train: int, track_val: int, yjitter: int,
+                 auto_extend: int) -> int:
     import threading
     import time
 
+    # run_name is an input arg (NOT module-level datetime) so a preemption
+    # restart replays the same value and --resume finds the same out_dir.
     # background committer so checkpoints/logs are visible + safe mid-run
     stop = threading.Event()
 
@@ -108,7 +122,10 @@ def train_remote(batch: int, steps: int, lr: str, eval_every: int) -> int:
     rc = _run(BASE_CMD + [
         "--batch", str(batch), "--steps", str(steps), "--lr", lr,
         "--eval_every", str(eval_every), "--workers", "10", "--resume", "1",
-        "--out_dir", f"/results/fulltrain/{RUN_NAME}",
+        "--input_mode", input_mode, "--ckpt_every", str(ckpt_every),
+        "--track_train", str(track_train), "--track_val", str(track_val),
+        "--yjitter", str(yjitter), "--auto_extend", str(auto_extend),
+        "--out_dir", f"/results/fulltrain/{run_name}",
     ])
     stop.set()
     time.sleep(1)
@@ -125,11 +142,24 @@ def probe():
 
 
 @app.local_entrypoint()
-def train(batch: int = 32, steps: int = 100000, lr: str = "auto",
-          eval_every: int = 2000):
+def train(batch: int = 32, steps: int = 60000, lr: str = "auto",
+          eval_every: int = 1000, run_name: str = "",
+          input_mode: str = "native_crop", ckpt_every: int = 1000,
+          track_train: int = 50, track_val: int = 50, yjitter: int = 0,
+          auto_extend: int = 0):
+    # auto_extend defaults OFF for the native-crop production run
+    # (user decision 2026-07-04: hard stop at 60k).
+    # run_name defaults to today's date-tag for a fresh run; pass an existing
+    # dir name to RESUME it (e.g. run_name=20260703_fullsf_gev4onp to continue
+    # a run that a midnight preemption orphaned under the old date).
+    rn = run_name or RUN_NAME
     est_h = steps * batch / 30 / 3600  # rough @30 samples/s, refine via probe
-    print(f"FULL TRAINING run={RUN_NAME}: batch={batch}, steps={steps}, "
-          f"lr={lr} (~{est_h:.0f} h rough) — keep client alive; "
-          f"relaunch to resume.")
-    rc = train_remote.remote(batch, steps, lr, eval_every)
+    print(f"FULL TRAINING run={rn}: batch={batch}, steps={steps}, lr={lr}, "
+          f"input_mode={input_mode}, yjitter={yjitter}, "
+          f"ckpt_every={ckpt_every}, track={track_train}+{track_val} "
+          f"(~{est_h:.0f} h rough) — keep client alive; "
+          f"relaunch with the same run_name to resume.")
+    rc = train_remote.remote(batch, steps, lr, eval_every, rn, input_mode,
+                             ckpt_every, track_train, track_val, yjitter,
+                             auto_extend)
     print(f"train rc={rc}")
