@@ -7,6 +7,51 @@ Lecturer, Dept. of Mechatronics Engineering. Format authority:
 
 Central claim to defend: **runs on edge hardware and provides usable results.**
 
+## PRODUCTION RUN COMPLETE (2026-07-05) — thesis checkpoint acquired
+
+The native-crop full Scene Flow run `20260704_fullsf_gev4onp_nc` finished all
+60,000 steps. This is the thesis checkpoint (critical-path item A1, now done).
+
+**Publishable headline number (report this, NOT the val-subset EPE):**
+full FlyingThings3D-TEST, all 4,370 pairs, native 960x540 pad16 axis, on
+`best.pth` (step 53,000):
+
+| EPE | bad-1.0 | bad-2.0 | bad-3.0 | D1-all | RMSE | median AE |
+|---|---|---|---|---|---|---|
+| **0.7807** | 8.92% | 5.34% | **4.00%** | **3.40%** | 3.64 | 0.13 |
+
+- 4 degenerate frames (zero valid pixels: all GT > 192 px) excluded via nanmean.
+- best.pth = step 53k, not 60k: LR floored (3.2e-9) and val flat at 0.80 to 0.81
+  for the last ~7k steps, so the cosine tail gave diminishing returns.
+  **Architecture is frozen for the thesis; more steps would not help.**
+- The 400-pair val-subset best was 0.7896; the full test came in slightly better
+  (0.7807), so there is no negative selection surprise. The val number is a
+  model-selection statistic and belongs only in the training-curve discussion.
+- Model: 2.9631 M params. Config: `gev4_opt_narrow_plane --slant_w 0.3`,
+  native_crop input, OneCycle 60k, bf16, batch 32, A100-80GB.
+
+**Where the data lives (nothing lost):**
+- Modal volume `widener-results:/fulltrain/20260704_fullsf_gev4onp_nc/`
+  (best.pth, latest.pth, checkpoints/step_*.pth x60, images/, train.csv, meta.json).
+- Local mirror `model/benchmarks/20260704_fullsf_gev4onp_nc/` (3.8 GB, gitignored):
+  best.pth, latest.pth, 60 per-1k checkpoints, 100 tracked-image folders
+  (each: gt.png + left.png + info.json + step_XXXXXX.{png,json} with 8-metric
+  JSON per 1k), train.csv, viz/, meta.json (`final_metrics_all` written).
+- Final number reproducible via `model/scripts/modal/eval_full_testset.py`.
+
+**Incident + fix (2026-07-05):** the in-run final 4,370-pair eval OOM-stalled a
+64 GB container by decoding all pairs at once (~70 GB), so it hung after step
+60k and never wrote `final_metrics_all` (the "hang"). Stopped the app; the
+number was produced by a streaming eval (`modal/eval_full_testset.py`). Both the
+trainer's final block and the standalone driver now stream shard-by-shard and
+use nanmean; the bug cannot recur.
+
+**Remaining post-run gates (unchanged):** MB14 zero-shot on this checkpoint
+(mandatory), resized-checkpoint native-inference ablation, real-camera panels,
+RTX 3050 latency bench, Jetson Orin Nano reading when the borrowed board arrives.
+
+---
+
 **State of play (rewritten 2026-07-04, updated same day).** All ablation
 gates are closed. The working architecture is **`gev4_opt_narrow_plane`**
 (efficiency-optimized gev4 + narrow GEV + plane-equation rendering with gated
