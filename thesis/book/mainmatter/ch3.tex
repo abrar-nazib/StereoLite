@@ -1,0 +1,323 @@
+% =====================================================================
+% CHAPTER 3: Methodology  (~22 pages)
+% WRITING SESSION INSTRUCTIONS (keep until the chapter is done):
+%   - Read thesis/WRITING_PLAN.md section 5 FIRST.
+%   - Single source of truth: model/designs/StereoLite_yolo_ctx_gev4/
+%     FINAL_MODEL_ARCHITECTURE.md (sections 3-11 blocks, 12 loss, 16
+%     metrics, 18 pre-vetted claim wording). Cross-check against the
+%     TRAINED code in model/designs/StereoLite_yolo_ctx_gev4_opt/.
+%   - Register: method sections ASSERT in flat present tense; tensor
+%     dims inline in prose; every equation gets a purpose clause before
+%     and a where-clause after (patterns.md section 6).
+%   - The equations below are PRE-PLACED and verified against the arch
+%     doc; do not renumber or hand-number them; reference with \eqref.
+%   - Model name: "StereoLite" thesis-wide; the internal variant slug
+%     (gev4_opt_narrow_plane) appears only in Appendix A.
+%   - POs: PO2 (formulation), PO3 (design, 3.2-3.9 + 3.12), PO5 (modern
+%     tools, 3.14). CEP K5/K8 reinforced.
+% =====================================================================
+\chapter{Methodology}
+
+\section{Problem Formulation and Design Requirements}
+% Sources: WRITING_PLAN 5.1 row 3.1; THESIS_PLAN envelope memory.
+% Content: rectified pair -> dense disparity; design requirements as the
+% hard envelope (< 3 M params, real-time on 4 to 6 TOPS, < 200 MB
+% inference memory, INT8-exportable ops); research questions RQ1
+% (accuracy at budget), RQ2 (zero-shot generalization), RQ3 (edge
+% latency), RQ4 (tolerance to imperfect rectification, objective 2);
+% assumptions (rectified input, max disparity 192 px).
+\todo{Write per WRITING\_PLAN section 5.1 row 3.1.}
+
+\section{System Overview}
+% Narrate the full pipeline once against Fig 3.1; one paragraph per
+% stage; name the inherited-and-modified mechanisms with their Ch2
+% ancestry: group-wise cost (\eqref{eq:gwc_lit}), ConvGRU + convex
+% upsampling (RAFT-Stereo), GEV (IGEV), tile-plane hypotheses (HITNet).
+\todo{Write per WRITING\_PLAN section 5.1 row 3.2.}
+
+\begin{figure}[!htbp]
+\centering
+% Export figures/fig_3_1_architecture.drawio as cropped PDF from draw.io
+% and place as figures/fig_3_1_architecture.pdf. Preview PNG exists.
+\todo{insert fig\_3\_1\_architecture (full StereoLite pipeline; consider sidewaysfigure)}
+\caption{\textbf{Overview of the proposed StereoLite architecture.} \todo{one dataflow sentence tracing left to right; name stages (1) to (5)}}
+\label{fig:architecture}
+\end{figure}
+
+\section{Shared Feature Encoder and Context Encoder}
+% Source: FINAL_MODEL_ARCHITECTURE sections 4 + 5. YOLO26s layers 0-6,
+% shared weights via batch concatenation; f4 128 / f8 256 / f16 256 ch;
+% the separate left-only context encoder (GhostConv + SE, 32 ch out) and
+% WHY matching features must not double as recurrent context.
+\todo{Write per WRITING\_PLAN section 5.1 row 3.3.}
+
+\begin{figure}[!htbp]
+\centering
+\todo{insert fig\_3\_2\_encoders (encoder + context encoder detail; drawio)}
+\caption{\textbf{Feature and context encoders.} \todo{caption with channel counts and strides}}
+\label{fig:encoders}
+\end{figure}
+
+\section{Tile Initialization and Cost Volume}
+% Source: FINAL_MODEL_ARCHITECTURE section 6. Introduce the tile state
+% T = (d, sx, sy, h, c) here.
+\todo{Purpose clause, then \eqref{eq:gwc}; then the 3-D regularization
+(8-16-16-1) and soft-argmax init \eqref{eq:softargmax_init}; initial
+slopes zero; hidden state replaced by ctx16; 24 hypotheses cover roughly
+0 to 368 full-resolution pixels.}
+
+\begin{equation}
+C(g,d,y,x) \;=\; \frac{1}{C/G}\sum_{c=1}^{C/G}
+  f_{L}^{\,g,c}(y,x)\; f_{R}^{\,g,c}(y,\,x-d)
+\label{eq:gwc}
+\end{equation}
+\todo{where-clause: $G=8$ feature groups, $d \in \{0,\dots,23\}$ disparity
+hypotheses at $1/16$ scale, $f_{L}^{\,g,c}$ the $c$-th channel of group
+$g$ of the left feature map.}
+
+\begin{equation}
+d_{0} \;=\; \sum_{d} p(d)\, d, \qquad
+c_{0} \;=\; \max_{d}\, p(d)
+\label{eq:softargmax_init}
+\end{equation}
+\todo{where-clause: $p(d)$ the softmax over the regularized volume along
+the disparity dimension.}
+
+\begin{figure}[!htbp]
+\centering
+\todo{insert fig\_3\_3\_tile\_init (volume construction + 3-D aggregation + soft-argmax; drawio)}
+\caption{\textbf{Tile-state initialization.} \todo{caption}}
+\label{fig:tile_init}
+\end{figure}
+
+\section{Recurrent Tile Refinement}
+% Source: FINAL_MODEL_ARCHITECTURE section 7. Separate unshared
+% TileRefine modules at 1/16, 1/8, 1/4 (channel counts differ); warp +
+% local correlation lookup (half range 2, five offsets); the gated
+% residual head (four sigmoid gates); softplus non-negativity; schedule
+% 2/3/3 = eight updates.
+\todo{Write per WRITING\_PLAN section 5.1 row 3.5, using
+\eqref{eq:gru_input} and \eqref{eq:convgru}.}
+
+\begin{equation}
+x \;=\; \bigl[\, f_{L},\; \mathcal{W}(f_{R};\,d),\; d,\; s_{x},\; s_{y},\;
+  c,\; \mathrm{corr},\; \mathrm{ctx} \,\bigr]
+\label{eq:gru_input}
+\end{equation}
+\todo{where-clause: $\mathcal{W}$ the disparity warp of the right
+features, $\mathrm{corr}$ the five-offset local correlation, and
+$\mathrm{ctx}$ the scale-matched context map.}
+
+\begin{equation}
+\begin{aligned}
+z &= \sigma\!\bigl(\mathrm{Conv}([h,\,x])\bigr), &
+r &= \sigma\!\bigl(\mathrm{Conv}([h,\,x])\bigr),\\
+q &= \tanh\!\bigl(\mathrm{Conv}([r \odot h,\,x])\bigr), &
+h' &= (1-z) \odot h + z \odot q,
+\end{aligned}
+\label{eq:convgru}
+\end{equation}
+\todo{where-clause: $h$ the 32-channel persistent hidden state, $\odot$
+the element-wise product.}
+
+\begin{figure}[!htbp]
+\centering
+\todo{insert fig\_3\_4\_refinement (one unrolled iteration: warp, lookup, GRU, gated update; drawio)}
+\caption{\textbf{One recurrent refinement iteration.} \todo{caption}}
+\label{fig:refinement}
+\end{figure}
+
+\section{Plane-Aware Cross-Scale Propagation}
+% Source: FINAL_MODEL_ARCHITECTURE section 8. Slopes are USED, not just
+% stored; contrast with plain bilinear upsampling.
+\todo{Write per WRITING\_PLAN section 5.1 row 3.6, around
+\eqref{eq:plane_prop}.}
+
+\begin{equation}
+d_{\mathrm{child}} \;=\; 2\,\mathcal{B}(d_{\mathrm{parent}})
+  \;+\; 2\,s_{x}\,\Delta x \;+\; 2\,s_{y}\,\Delta y,
+\qquad \Delta x, \Delta y \in \{-0.25,\, +0.25\}
+\label{eq:plane_prop}
+\end{equation}
+\todo{where-clause: $\mathcal{B}$ bilinear resampling; the factor two
+accounts for the disparity unit change across scales.}
+
+\begin{figure}[!htbp]
+\centering
+\todo{insert fig\_3\_5\_plane\_prop (parent tile to four children with slope terms; small drawio)}
+\caption{\textbf{Plane-aware propagation between scales.} \todo{caption}}
+\label{fig:plane_prop}
+\end{figure}
+
+\section{Geometry Encoding Volume and Fail-Soft Fusion}
+% Source: FINAL_MODEL_ARCHITECTURE section 9 + the narrow-band variant
+% (the trained configuration): the volume samples 33 hypotheses in a
+% +-16 band around the current tile disparity (efficiency finding F3,
+% validated accuracy-neutral). Three 3x3x3 convolutions, 16 channels.
+\todo{Write per WRITING\_PLAN section 5.1 row 3.7, around
+\eqref{eq:gev_expect} and \eqref{eq:failsoft}; explain the bias-init
+argument (initial gate weight ~0.018, training starts at the stable
+baseline and must learn where GEV information helps).}
+
+\begin{equation}
+d_{\mathrm{gev}} = \sum_{d} p(d)\, d, \qquad
+c_{\mathrm{gev}} = \max_{d}\, p(d), \qquad
+g_{\mathrm{gev}} = \phi\Bigl(\sum_{d} G(d)\, p(d)\Bigr)
+\label{eq:gev_expect}
+\end{equation}
+\todo{where-clause: $G$ the regularized 3-D geometry feature, $\phi$ a
+projection to a 16-channel 2-D expected-geometry map.}
+
+\begin{equation}
+\begin{aligned}
+w &= \sigma\!\Bigl(F\bigl([\mathrm{ctx}_{4},\, g_{\mathrm{gev}},\, c,\,
+  c_{\mathrm{gev}},\, \lvert d_{\mathrm{gev}} - d \rvert,\, d]\bigr)\Bigr),\\
+d_{\mathrm{fused}} &= \mathrm{softplus}\bigl(d + w\,(d_{\mathrm{gev}} - d)\bigr),
+\end{aligned}
+\label{eq:failsoft}
+\end{equation}
+\todo{where-clause: $F$ the fusion network with final-layer bias
+initialized to $-4$; slopes attenuate by $(1-w)$; confidence becomes the
+maximum of the two estimates.}
+
+\begin{figure}[!htbp]
+\centering
+\todo{insert fig\_3\_6\_gev\_fusion (narrow band around tile d + gate; drawio)}
+\caption{\textbf{Geometry encoding volume and fail-soft fusion.} \todo{caption}}
+\label{fig:gev_fusion}
+\end{figure}
+
+\section{Plane Rendering and Learned Convex Upsampling}
+% Source: FINAL_MODEL_ARCHITECTURE section 10 + the plane-render fix
+% (blur-fix ablation 20260703_blurfix_n500: bad-0.5 -22.5 percent,
+% selected over bimodal and bundle1; composition was WORSE than plane
+% alone: report that in Ch4, cite here).
+\todo{Write per WRITING\_PLAN section 5.1 row 3.8: two 2x stages with
+nine-weight softmax masks from fL4 then fL2; plane-equation rendering
+with the edge gate; the known limitation (cannot invent high-frequency
+structure absent at 1/4).}
+
+\begin{figure}[!htbp]
+\centering
+\todo{insert fig\_3\_7\_upsample (convex upsample mechanics; drawio)}
+\caption{\textbf{Learned convex upsampling.} \todo{caption}}
+\label{fig:upsample}
+\end{figure}
+
+\section{Training Objective}
+% Source: FINAL_MODEL_ARCHITECTURE section 12 + trainer loss_fn.
+% Valid pixels: finite GT in (0, 320) px. Lower scales resized to full
+% resolution and scaled before comparison.
+\todo{Name each term's job in one sentence each around \eqref{eq:loss};
+the gated slant supervision (weight 0.3) pairs with plane rendering.}
+
+\begin{equation}
+\begin{aligned}
+\mathcal{L} \;=\;& 1.00\,\mathcal{L}_{1}(d_{\mathrm{full}})
+ + 0.50\,\mathcal{L}_{1}(d_{1/2})
+ + 0.30\,\mathcal{L}_{1}(d_{1/4})
+ + 0.20\,\mathcal{L}_{1}(d_{1/8})
+ + 0.10\,\mathcal{L}_{1}(d_{1/16})\\
+&+ 0.15\,\mathcal{L}_{1}(d_{\mathrm{gev}})
+ + 0.50\,\mathcal{L}_{\mathrm{grad}}
+ + 0.20\,\mathcal{L}_{\mathrm{thr}}
+ + 0.20\,\mathcal{L}_{\mathrm{D1}}
+ + 0.02\,\mathcal{L}_{\mathrm{smooth}}
+ + 0.30\,\mathcal{L}_{\mathrm{slant}}
+\end{aligned}
+\label{eq:loss}
+\end{equation}
+\todo{where-clause defining each term: $\mathcal{L}_{1}$ masked mean
+absolute error, $\mathcal{L}_{\mathrm{grad}}$ Sobel gradient
+consistency, $\mathcal{L}_{\mathrm{thr}}$ threshold hinge stack,
+$\mathcal{L}_{\mathrm{D1}}$ the D1-relative hinge,
+$\mathcal{L}_{\mathrm{smooth}}$ edge-aware smoothness,
+$\mathcal{L}_{\mathrm{slant}}$ the gated slant supervision.}
+
+\begin{figure}[!htbp]
+\centering
+\todo{insert fig\_3\_8\_supervision (which outputs receive which terms at which scales; drawio)}
+\caption{\textbf{Multi-scale supervision.} \todo{caption}}
+\label{fig:supervision}
+\end{figure}
+
+\section{Datasets and Training Protocol}
+% Sources: run meta.json args block; 20260704_native_vs_resize_n500
+% comparison.md; the grand-comparison augmentation evidence.
+% Content: SceneFlow canonical split (35,454 train = FT3D-TRAIN + Monkaa
+% + Driving finalpass; 4,370 test = FT3D-TEST); native 384x640 co-located
+% random crops (cite the native-vs-resize ablation, Ch4); OpenStereo
+% augmentation triplet (asymmetric color jitter, right-only random erase,
+% random scale); OneCycle 60k steps peak 8e-4, batch 32, bf16, A100;
+% input contract [0,1]; validation on a fixed 400-pair FT3D-TEST subset
+% at the native 960x540 pad-16 axis.
+\todo{Write per WRITING\_PLAN section 5.1 row 3.10.}
+
+\begin{figure}[!htbp]
+\centering
+\todo{insert fig\_3\_10\_input\_protocol (native-crop vs global-resize illustration)}
+\caption{\textbf{Native-crop input protocol.} \todo{caption}}
+\label{fig:input_protocol}
+\end{figure}
+
+\begin{table}[!htbp]
+\centering
+\caption{\textbf{Training configuration.} \todo{protocol sentence}}
+\label{tab:train_config}
+% Source: meta.json args block, verbatim values.
+\todo{optimizer, schedule, steps, batch, crop, augmentation, precision, hardware}
+\end{table}
+
+\section{Design-Space Exploration Methodology}
+% Sources: model/benchmarks/OVERFIT_METHODOLOGY.md; the ablation-study-
+% expert protocol. Content: matched-overfit harness (fixed pairs, fixed
+% seed, full 8-metric reporting), controlled single-knob ablations,
+% pre-registered win criteria, cross-dataset gate after every training
+% run. This section is methodology (PO4 setup); its RESULTS are Ch4.
+\todo{Write per WRITING\_PLAN section 5.1 row 3.11.}
+
+\section{Optimization of the Network for Edge Inference}
+% Source: THESIS_PLAN section 3 (F1-F8 findings table). This is thesis
+% content evidencing PO3/PO5: cost-volume zero-copy views, grid-sample
+% batching, static-channel hoisting, head fusion, dead-code removal,
+% narrow GEV band; equivalence-proof discipline (bitwise or matched A/B
+% per fix); export blockers identified (F.unfold, GroupNorm, Conv3d) and
+% their mitigations.
+\todo{Write per WRITING\_PLAN section 5.1 row 3.12.}
+
+\begin{table}[!htbp]
+\centering
+\caption{\textbf{Inference optimizations and their equivalence status.} \todo{protocol sentence}}
+\label{tab:efficiency_findings}
+% Source: THESIS_PLAN section 3 table, reworded for the thesis.
+\todo{rows F1 to F7: finding, saving, accuracy risk / proof}
+\end{table}
+
+\section{Evaluation Metrics}
+% Source: FINAL_MODEL_ARCHITECTURE section 16.
+\todo{Introduce \eqref{eq:metrics}; add RMSE and median absolute error in
+prose; state the latency and memory measurement protocol (batch 1,
+384x640, warm-up, fp16/fp32, device named per measurement).}
+
+\begin{equation}
+\begin{aligned}
+\mathrm{EPE} &= \frac{1}{\lvert V \rvert} \sum_{p \in V}
+  \bigl\lvert \hat{d}(p) - d^{*}(p) \bigr\rvert, \qquad
+\mathrm{bad}\text{-}t = \frac{100}{\lvert V \rvert}\,
+  \Bigl\lvert \bigl\{ p \in V :
+  \lvert \hat{d}(p) - d^{*}(p) \rvert > t \bigr\} \Bigr\rvert,\\
+\mathrm{D1} &= \frac{100}{\lvert V \rvert}\, \Bigl\lvert \bigl\{ p \in V :
+  \lvert \hat{d}(p) - d^{*}(p) \rvert > 3 \;\wedge\;
+  \lvert \hat{d}(p) - d^{*}(p) \rvert > 0.05\, d^{*}(p) \bigr\} \Bigr\rvert
+\end{aligned}
+\label{eq:metrics}
+\end{equation}
+\todo{where-clause: $V$ the valid-pixel set, $\hat{d}$ the prediction,
+$d^{*}$ the ground truth, $t \in \{0.5, 1, 2, 3\}$ px.}
+
+\section{Implementation and Deployment Environment}
+% Sources: meta.json; THESIS_PLAN section 2A. PyTorch 2.11 cu128; Modal
+% A100-80GB training, T4 evaluation; RTX 3050 local bench; CCB stereo
+% camera rig; target device class Jetson Orin Nano (borrowed board
+% pending; projections carry asterisks).
+\todo{Write per WRITING\_PLAN section 5.1 row 3.14.}

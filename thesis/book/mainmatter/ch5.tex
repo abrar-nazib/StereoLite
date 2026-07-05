@@ -1,0 +1,39 @@
+% =====================================================================
+% CHAPTER 5: Conclusions and Future Work  (~5 pages)
+% WRITING SESSION INSTRUCTIONS (keep until the chapter is done):
+%   - Read thesis/WRITING_PLAN.md section 7 FIRST.
+%   - Register: contribution list per patterns.md section 3 (3 to 4 "We"
+%     bullets, LAST bullet is the result claim); limitations hedge
+%     HONESTLY (name real limits); at most ONE reserved forward claim
+%     ("we believe ... will be useful as ...").
+%   - Mirror the two Chapter 1 objectives ONE-TO-ONE: objective, what was
+%     done, the number that proves it.
+%   - PO demonstrated: PO12 (life-long learning) in future work.
+% =====================================================================
+\chapter{Conclusions and Future Work}
+
+\section{Summary of Findings and Contributions}
+\todo{Answer objective 1 (efficient AI-refined pipeline on
+resource-limited platforms): 2.96 M parameters, SceneFlow test EPE 0.78,
+zero-shot MB14 D1 10.9 percent, 49.8 ms fp16 on RTX 3050, projected
+~30 ms* Orin Nano INT8. Answer objective 2 (tolerance to rectification
+imperfection): the Section 4.5 sweep result, stated at whatever strength
+the measurements support. Then the contribution bullets; use
+FINAL\_MODEL\_ARCHITECTURE section 18 recommended wording.}
+
+\section{Limitations}
+\todo{Honest list: no on-device Jetson measurement yet (projections
+carry asterisks); single training run without seed variance; the gap to
+KD-trained models on MB14 (6.9 vs 10.9 D1); maximum disparity capped at
+192 px at inference resolution; synthetic-only supervision; no KITTI
+leaderboard submission; thin and distant structures limited by the 1/4
+prediction resolution.}
+
+\section{Future Work}
+\todo{(a) three-stage knowledge distillation from a foundation teacher
+(the LiteAnyStereo evidence says the training pipeline is the biggest
+remaining lever); (b) INT8/TensorRT export and real Orin Nano
+measurement (export blockers already identified in Section 3.12);
+(c) completing the zero-shot quartet with KITTI and ETH3D; (d) temporal
+extension of the tile-plane state; (e) publication path. One reserved
+forward claim maximum.}
