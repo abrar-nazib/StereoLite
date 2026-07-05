@@ -1,73 +1,124 @@
 % =====================================================================
-% CHAPTER 3: Methodology  (~22 pages)
-% WRITING SESSION INSTRUCTIONS (keep until the chapter is done):
-%   - Read thesis/WRITING_PLAN.md section 5 FIRST.
-%   - Single source of truth: model/designs/StereoLite_yolo_ctx_gev4/
-%     FINAL_MODEL_ARCHITECTURE.md (sections 3-11 blocks, 12 loss, 16
-%     metrics, 18 pre-vetted claim wording). Cross-check against the
-%     TRAINED code in model/designs/StereoLite_yolo_ctx_gev4_opt/.
-%   - Register: method sections ASSERT in flat present tense; tensor
-%     dims inline in prose; every equation gets a purpose clause before
-%     and a where-clause after (patterns.md section 6).
-%   - The equations below are PRE-PLACED and verified against the arch
-%     doc; do not renumber or hand-number them; reference with \eqref.
-%   - Model name: "StereoLite" thesis-wide; the internal variant slug
-%     (gev4_opt_narrow_plane) appears only in Appendix A.
-%   - POs: PO2 (formulation), PO3 (design, 3.2-3.9 + 3.12), PO5 (modern
-%     tools, 3.14). CEP K5/K8 reinforced.
+% CHAPTER 3: Design of StereoLite  (9-chapter template restructure)
+% Sources: old mainmatter/ch3.tex sections
+%   Problem Formulation (RQs + assumptions) -> 3.2
+%   Design-Space Exploration Methodology    -> 3.5
+%   System Overview                         -> 3.6 + 3.7 (split)
+%   Summary of Design Decisions             -> 3.8
+%   Block sections                          -> 3.9.1 - 3.9.7
+%   Evaluation Metrics + fig:param_budget   -> 3.10
+% Excluded (owned by other writers): Training Objective, Datasets and
+% Training Protocol, Optimization for Edge Inference, Implementation
+% and Deployment Environment (now Chapter 7).
+% Hard-coded chapter refs updated: results -> Chapter 8,
+% training/optimization -> Chapter 7, literature -> Chapter 2.
+% All \label names unchanged; equations byte-identical.
 % =====================================================================
-\chapter{Methodology}
+\chapter{Design of StereoLite}
 
-\section{Problem Formulation and Design Requirements}
-% Sources: WRITING_PLAN 5.1 row 3.1; THESIS_PLAN envelope memory.
-% Content: rectified pair -> dense disparity; design requirements as the
-% hard envelope (< 3 M params, real-time on 4 to 6 TOPS, < 200 MB
-% inference memory, INT8-exportable ops); research questions RQ1
-% (accuracy at budget), RQ2 (zero-shot generalization), RQ3 (edge
-% latency), RQ4 (tolerance to imperfect rectification, objective 2);
-% assumptions (rectified input, max disparity 192 px).
+\section{Introduction}
+This chapter presents the design of StereoLite, the compact stereo
+matching network developed in this thesis. It first states the problem
+and the research questions, then fixes the hardware envelope the design
+must satisfy and the criteria by which candidate designs are judged.
+The controlled exploration methodology that produced the final
+architecture is described next, followed by the system model, the
+conceptual design and its literature ancestry, the record of
+preliminary design decisions, and a block-by-block detailed design with
+all governing equations. The chapter closes with the performance
+indices used to assess the design. Training procedure and inference
+optimization are treated in Chapter 7, and all experimental results in
+Chapter 8.
+
+\FloatBarrier
+\section{Problem Statements}
 Stereo matching takes a pair of rectified images and produces a dense
 disparity map, from which metric depth follows directly through the
 calibrated relation of \eqref{eq:depth_from_disparity}. This thesis
 addresses that task under a hardware budget rather than an accuracy
-budget alone. The design requirements follow from the class of edge
-accelerators found on mobile robots and drones: the network must be
-compact enough for on-device memory, must run in real time on a device
-of roughly four to six tera-operations per second, must keep a small
-inference working set, and must use operators that quantize cleanly to
-eight-bit integer arithmetic. These requirements frame four research
-questions. The first asks whether a network within a few million
-parameters can reach competitive in-domain accuracy on synthetic data.
-The second asks whether it generalizes zero-shot to an unseen real
-domain. The third asks whether it meets the real-time latency target on
-the intended device class. The fourth asks whether it tolerates the
-small vertical misalignments that arise when rectification is imperfect,
-which is the second objective of this thesis. We assume rectified
-binocular input and a maximum disparity of 192 pixels at the inference
-resolution, and we train on synthetic data with dense ground truth.
+budget alone; the requirements of edge-deployable stereo matching that
+motivate this budget are reviewed in Chapter 2, and the resulting hard
+envelope is stated in the next section. These requirements frame four
+research questions. The first asks whether a network within a few
+million parameters can reach competitive in-domain accuracy on
+synthetic data. The second asks whether it generalizes zero-shot to an
+unseen real domain. The third asks whether it meets the real-time
+latency target on the intended device class. The fourth asks whether it
+tolerates the small vertical misalignments that arise when
+rectification is imperfect, which is the second objective of this
+thesis. We assume rectified binocular input and a maximum disparity of
+192 pixels at the inference resolution, and we train on synthetic data
+with dense ground truth.
 
-\section{System Overview}
-% Narrate the full pipeline once against Fig 3.1; one paragraph per
-% stage; name the inherited-and-modified mechanisms with their Ch2
-% ancestry: group-wise cost (\eqref{eq:gwc_lit}), ConvGRU + convex
-% upsampling (RAFT-Stereo), GEV (IGEV), tile-plane hypotheses (HITNet).
+\FloatBarrier
+\section{Design Requirements and Requisites}
+\label{sec:design_requirements}
+The design requirements follow from the class of edge accelerators
+found on mobile robots and drones. They form a hard envelope, and a
+candidate design that violates any one of them is rejected regardless
+of its accuracy:
+\begin{itemize}
+  \item \textbf{Under 3 million parameters.} The network must be
+    compact enough for on-device memory and storage; parameter count is
+    also the first-order proxy for the download and update footprint of
+    a deployed model.
+  \item \textbf{Real time on a 4 to 6 TOPS accelerator.} The intended
+    device class delivers roughly four to six tera-operations per
+    second, so the network must complete a forward pass within the
+    frame budget of a live camera stream on such a device.
+  \item \textbf{Under 200 megabytes of inference working set.} Peak
+    activation memory during inference must stay small enough to
+    coexist with the rest of a robot's software stack on a
+    shared-memory edge board.
+  \item \textbf{INT8-exportable operators.} Every operator on the
+    inference path must quantize cleanly to eight-bit integer
+    arithmetic, since the accelerators in this class reach their rated
+    throughput only under integer execution.
+\end{itemize}
+
+\FloatBarrier
+\section{Design Criteria}
+Within the envelope of the previous section, candidate designs are
+judged on balance rather than on any single number. Every design
+decision is evaluated on the full eight-metric stereo set, comprising
+the end-point error, the root-mean-square error, the median absolute
+error, the bad-0.5, bad-1, bad-2, and bad-3 rates, and the D1-all rate,
+together with inference latency and peak memory; these quantities are
+defined formally in Section \ref{sec:design_assessment}. A variant that
+improves one metric while degrading the others, or that buys accuracy
+with latency the envelope cannot afford, is not accepted. Because
+in-domain gains can mask a loss of generalization, a cross-dataset
+zero-shot evaluation is mandatory after every training run. Finally,
+all comparisons are made under equal conditions: the same training
+pairs, the same random seed, and the same step budget, so that a
+measured difference is attributable to the design change alone.
+
+\FloatBarrier
+\section{Design Steps}
+The architectural choices in this chapter were made under a controlled
+matched-overfit methodology rather than by intuition. Each candidate is
+trained on a fixed set of SceneFlow pairs with a fixed seed, deterministic
+convolution kernels, an identical step budget, and an identical evaluation
+protocol, and all eight stereo metrics together with an inference-latency
+benchmark are reported for every arm. Single knobs are varied one at a
+time, the winning criterion is registered before a run, and every
+candidate is checked against a held-out cross-dataset evaluation, so that
+an in-domain gain that fails to transfer is not mistaken for progress. The
+results of these studies appear in Chapter 8; this section states the
+protocol that produced them.
+
+\FloatBarrier
+\section{Modeling of Proposed System}
 Figure \ref{fig:architecture} gives the complete pipeline. The proposed
 model, StereoLite, is a coarse-to-fine tile-hypothesis network with light
-recurrent refinement. It inherits three mechanisms from the iterative and
-3D-cost-volume literature and adapts each to the edge budget. The matching
-cost is a group-wise correlation volume in the manner of GwcNet
-\cite{guo2019gwcnet}, restricted to a single coarse scale. The refinement
-operator is a convolutional gated recurrent unit and the final upsampling
-is a learned convex combination, both adapted from RAFT-Stereo
-\cite{lipson2021raftstereo} but run for only a handful of iterations at
-coarse resolution. A quarter-resolution geometry encoding volume, in the
-spirit of IGEV-Stereo \cite{xu2023igev}, supplies a global disparity
-proposal that a learned gate blends into the recurrent estimate. Slanted
-tile planes, following the HITNet paradigm \cite{tankovich2021hitnet},
-carry a local surface hypothesis across scales so that disparity remains
-sub-pixel without rebuilding a cost volume at every level. A shared
-feature encoder feeds the matching path, and a separate left-image
-context encoder feeds the recurrent state.
+recurrent refinement. A shared feature encoder processes both views and a
+separate left-image context encoder feeds the recurrent state; a
+group-wise cost volume at the coarsest scale initializes a slanted tile
+state; convolutional GRU updates refine the state across three scales
+with plane-aware propagation between them; a narrow-band geometry
+encoding volume corrects the estimate through a learned fail-soft gate;
+and plane rendering with learned convex upsampling recovers the
+full-resolution disparity.
 
 \begin{figure}[!htbp]
 \centering
@@ -101,18 +152,78 @@ Full & $384\times 640$ & 3 & input and output\\
 \end{tabular}
 \end{table}
 
-\section{Shared Feature Encoder and Context Encoder}
-% Source: FINAL_MODEL_ARCHITECTURE sections 4 + 5. YOLO26s layers 0-6,
-% shared weights via batch concatenation; f4 128 / f8 256 / f16 256 ch;
-% the separate left-only context encoder (GhostConv + SE, 32 ch out) and
-% WHY matching features must not double as recurrent context.
+\FloatBarrier
+\section{Modeling of Conceptual Design}
+Conceptually, the pipeline is an assembly of five stages, each of which
+adapts a mechanism from the literature reviewed in Chapter 2 to the edge
+budget. The matching
+cost is a group-wise correlation volume in the manner of GwcNet
+\cite{guo2019gwcnet}, restricted to a single coarse scale. The refinement
+operator is a convolutional gated recurrent unit and the final upsampling
+is a learned convex combination, both adapted from RAFT-Stereo
+\cite{lipson2021raftstereo} but run for only a handful of iterations at
+coarse resolution. A quarter-resolution geometry encoding volume, in the
+spirit of IGEV-Stereo \cite{xu2023igev}, supplies a global disparity
+proposal that a learned gate blends into the recurrent estimate. Slanted
+tile planes, following the HITNet paradigm \cite{tankovich2021hitnet},
+carry a local surface hypothesis across scales so that disparity remains
+sub-pixel without rebuilding a cost volume at every level. A shared
+feature encoder feeds the matching path, and a separate left-image
+context encoder feeds the recurrent state. The detailed design of each
+stage follows in Section \ref{sec:detailed_design}.
+
+\FloatBarrier
+\section{Preliminary Design}
+The final architecture was reached through a sequence of preliminary
+variants, each accepted or rejected under the methodology of the design
+steps above. Every load-bearing decision in this chapter is tied to a
+controlled study in Chapter 8 or to published evidence in Chapter 2.
+Table \ref{tab:design_evidence} collects the mapping so that the design
+can be audited decision by decision; it is the record of the
+preliminary designs, including the rejected ones, that shaped the final
+system.
+
+\begin{table}[!htbp]
+\centering
+\caption{\textbf{Design decisions and their evidence.} Each architectural or training choice with the study or literature that justifies it.}
+\label{tab:design_evidence}
+\small
+\begin{tabular}{p{4.6cm}p{7.6cm}}
+\toprule
+Decision & Evidence\\
+\midrule
+YOLO26s shared encoder & encoder ablation, Table \ref{tab:ablation_encoder}: best EPE of three encoders at +2 ms\\
+Separate left context encoder & RAFT-Stereo lineage \cite{lipson2021raftstereo}; context-gated variants win the family ablation, Table \ref{tab:ablation_gev4line}\\
+Group-wise cost at one coarse scale & GwcNet \cite{guo2019gwcnet} graceful degradation under small aggregation budgets\\
+Iterated coarse-to-fine refinement & refinement ablation, Table \ref{tab:ablation_refinement}: single-pass collapses, finer scales add cost without gain\\
+Local $\pm 2$ correlation lookup & CREStereo \cite{li2022crestereo}: local search beats all-pairs; also confers rectification tolerance, Section \ref{sec:rectification}\\
+Slanted tile planes & HITNet \cite{tankovich2021hitnet}; plane rendering wins the blur study, Table \ref{tab:ablation_blurfix}\\
+Narrow GEV band + fail-soft gate & family ablation best EPE, Table \ref{tab:ablation_gev4line}; narrowing accuracy-neutral, Table \ref{tab:ablation_efficiency}\\
+Rejected: selective recurrent unit & family ablation, Table \ref{tab:ablation_gev4line}: EPE worsens on the compact chassis\\
+Rejected: fresh 1/4 initialization & family ablation, Table \ref{tab:ablation_gev4line}: EPE and bad-1 worsen\\
+Rejected: fix compositions & blur study, Table \ref{tab:ablation_blurfix}: worse than plane rendering alone\\
+Threshold-stack + D1 objective & loss ablation, Table \ref{tab:ablation_loss}: wins EPE, bad-2, D1 together\\
+Native-crop input protocol & input-protocol study, Table \ref{tab:ablation_native}: native axis EPE 6.67 to 2.87 at no resized-axis cost\\
+Augmentation triplet & matched comparison: best val EPE 2.778 to 1.921\\
+OneCycle 60k schedule & training dynamics, Chapter 8: validation floor reached before the budget ends\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\FloatBarrier
+\section{Detailed Design}
+\label{sec:detailed_design}
+This section specifies each block of the pipeline in the order data
+flows through it, with the governing equations.
+
+\subsection{Shared Feature Encoder and Context Encoder}
 The matching network is a truncated YOLO26s backbone whose first seven
 blocks are retained, producing features at one quarter, one eighth, and
 one sixteenth resolution with 128, 256, and 256 channels. A detection
 backbone is a deliberate choice rather than a convenience: its features
 are pretrained to localize objects across scales, which is close to what
 stereo matching needs from an encoder, and the encoder ablation of
-Chapter 4 confirmed that this backbone beats both a hand-built GhostConv
+Chapter 8 confirmed that this backbone beats both a hand-built GhostConv
 stack and its own smaller sibling on every accuracy metric at a
 two-millisecond cost. The detection neck and head above the one-sixteenth
 stage are removed at construction rather than merely unused, because
@@ -137,9 +248,7 @@ same separation is adopted here.
 \label{fig:encoders}
 \end{figure}
 
-\section{Tile Initialization and Cost Volume}
-% Source: FINAL_MODEL_ARCHITECTURE section 6. Introduce the tile state
-% T = (d, sx, sy, h, c) here.
+\subsection{Tile Initialization and Cost Volume}
 To seed the coarse-to-fine process, the tile initialization module builds
 a group-wise correlation volume at one sixteenth resolution. For each of
 eight feature groups and each integer disparity, the matching score is the
@@ -179,12 +288,7 @@ probability that serves as an initial confidence.
 \label{fig:tile_init}
 \end{figure}
 
-\section{Recurrent Tile Refinement}
-% Source: FINAL_MODEL_ARCHITECTURE section 7. Separate unshared
-% TileRefine modules at 1/16, 1/8, 1/4 (channel counts differ); warp +
-% local correlation lookup (half range 2, five offsets); the gated
-% residual head (four sigmoid gates); softplus non-negativity; schedule
-% 2/3/3 = eight updates.
+\subsection{Recurrent Tile Refinement}
 The tile state is refined by separate refinement modules at one
 sixteenth, one eighth, and one quarter resolution; their weights are not
 shared because the matching-feature channel counts differ across scales.
@@ -231,9 +335,7 @@ element-wise product.
 \label{fig:refinement}
 \end{figure}
 
-\section{Plane-Aware Cross-Scale Propagation}
-% Source: FINAL_MODEL_ARCHITECTURE section 8. Slopes are USED, not just
-% stored; contrast with plain bilinear upsampling.
+\subsection{Plane-Aware Cross-Scale Propagation}
 Between adjacent scales, the propagation module resamples the disparity,
 slopes, hidden feature, and confidence to the finer grid. Disparity is
 multiplied by two because its pixel unit changes with resolution. Unlike
@@ -262,17 +364,13 @@ the finer grid.
 \label{fig:plane_prop}
 \end{figure}
 
-\section{Geometry Encoding Volume and Fail-Soft Fusion}
-% Source: FINAL_MODEL_ARCHITECTURE section 9 + the narrow-band variant
-% (the trained configuration): the volume samples 33 hypotheses in a
-% +-16 band around the current tile disparity (efficiency finding F3,
-% validated accuracy-neutral). Three 3x3x3 convolutions, 16 channels.
+\subsection{Geometry Encoding Volume and Fail-Soft Fusion}
 The geometry encoding volume adds an independent global proposal at one
 quarter resolution, in the spirit of IGEV-Stereo \cite{xu2023igev}. In the
 trained configuration it is narrow: rather than the full 64 disparity
 planes of the base design, it samples 33 hypotheses in a band of plus or
 minus 16 around the current tile disparity, a change validated in
-Chapter 4 as accuracy-neutral while removing roughly a quarter of the
+Chapter 8 as accuracy-neutral while removing roughly a quarter of the
 model's multiply-accumulate operations. The band is not as restrictive
 as it sounds: 16 quarter-resolution planes correspond to 64
 full-resolution pixels on either side of the current estimate, and since
@@ -322,11 +420,7 @@ confidence becomes the maximum of the two estimates.
 \label{fig:gev_fusion}
 \end{figure}
 
-\section{Plane Rendering and Learned Convex Upsampling}
-% Source: FINAL_MODEL_ARCHITECTURE section 10 + the plane-render fix
-% (blur-fix ablation 20260703_blurfix_n500: bad-0.5 -22.5 percent,
-% selected over bimodal and bundle1; composition was WORSE than plane
-% alone: report that in Ch4, cite here).
+\subsection{Plane Rendering and Learned Convex Upsampling}
 The final one-quarter disparity is upsampled to full resolution in two
 learned two-times stages. The first stage predicts masks from the
 one-quarter left features and the second from the one-half left features.
@@ -337,7 +431,7 @@ combination of nearby coarse values, following the convex upsampling of
 RAFT-Stereo \cite{lipson2021raftstereo}. Before upsampling, a
 plane-rendering step reconstructs each tile from its disparity and slopes
 and applies an edge gate; this was the decisive fix in the
-boundary-sharpness study of Chapter 4, where it reduced the bad-0.5 rate
+boundary-sharpness study of Chapter 8, where it reduced the bad-0.5 rate
 by roughly 22 percent relative to the control. Convex upsampling can
 select different source neighbors near a boundary, but it cannot invent a
 disparity hypothesis absent from the one-quarter prediction, so thin and
@@ -350,195 +444,36 @@ distant structures remain a known limitation.
 \label{fig:upsample}
 \end{figure}
 
-\section{Training Objective}
-% Source: FINAL_MODEL_ARCHITECTURE section 12 + trainer loss_fn.
-% Valid pixels: finite GT in (0, 320) px. Lower scales resized to full
-% resolution and scaled before comparison.
-The network is trained with the multi-scale supervised objective of
-\eqref{eq:loss}. A pixel counts as valid when its ground-truth disparity
-is finite and lies between 0 and 320 pixels. Each lower-scale prediction
-is resized to full resolution and multiplied by its scale factor before
-the comparison. The objective weights an L1 term at every scale most
-heavily at full resolution, adds a matching L1 term on the
-geometry-volume output, and augments the full-resolution prediction with
-a Sobel gradient-consistency term, a threshold hinge stack, a KITTI-style
-D1-relative hinge, an edge-aware smoothness term, and a gated
-slant-supervision term that trains the plane slopes only where they are
-trustworthy. The slant term pairs with plane rendering: it makes the
-slopes accurate enough for the rendering step to sharpen boundaries. The
-composition of the objective is itself an experimental result rather
-than a guess. The loss ablation of Chapter 4 tested nine formulations
-and found that a plain L1 under-serves the outlier metrics, that hinge
-terms on a single threshold overfit that threshold, and that the
-threshold stack combined with the D1 hinge was the only formulation to
-win the end-point error and the outlier rates together; the production
-objective descends from that winner, with the gradient term retained for
-its sub-pixel benefit and the smoothness term kept at a deliberately
-small weight so it regularizes without blurring.
-
+\subsection{From Disparity to 3D Reconstruction}
+\label{sec:reconstruction_method}
+The disparity map is not the end product of the pipeline; it is the
+carrier of the three-dimensional structure of the scene. Once the
+disparity is known, every valid pixel back-projects to a metric
+three-dimensional point through the pinhole relations
 \begin{equation}
-\begin{aligned}
-\mathcal{L} \;=\;& 1.00\,\mathcal{L}_{1}(d_{\mathrm{full}})
- + 0.50\,\mathcal{L}_{1}(d_{1/2})
- + 0.30\,\mathcal{L}_{1}(d_{1/4})
- + 0.20\,\mathcal{L}_{1}(d_{1/8})
- + 0.10\,\mathcal{L}_{1}(d_{1/16})\\
-&+ 0.15\,\mathcal{L}_{1}(d_{\mathrm{gev}})
- + 0.50\,\mathcal{L}_{\mathrm{grad}}
- + 0.20\,\mathcal{L}_{\mathrm{thr}}
- + 0.20\,\mathcal{L}_{\mathrm{D1}}
- + 0.02\,\mathcal{L}_{\mathrm{smooth}}
- + 0.30\,\mathcal{L}_{\mathrm{slant}}
-\end{aligned}
-\label{eq:loss}
+Z = \frac{f\,B}{d}, \qquad
+X = \frac{(u - c_x)\,Z}{f}, \qquad
+Y = \frac{(v - c_y)\,Z}{f}
+\label{eq:backprojection}
 \end{equation}
-where $\mathcal{L}_1$ is the masked mean absolute disparity error,
-$\mathcal{L}_{\mathrm{grad}}$ a Sobel gradient-consistency term,
-$\mathcal{L}_{\mathrm{thr}}$ a hinge over the error thresholds
-$\{0.5, 1, 2, 3\}$ pixels, $\mathcal{L}_{\mathrm{D1}}$ the D1-relative
-hinge, $\mathcal{L}_{\mathrm{smooth}}$ an edge-aware smoothness term, and
-$\mathcal{L}_{\mathrm{slant}}$ the gated slant supervision.
+where $(u, v)$ are the pixel coordinates, $(c_x, c_y)$ the principal
+point, $f$ the focal length in pixels, $B$ the stereo baseline, and
+$(X, Y, Z)$ the recovered point in the camera frame. Coloring each point
+with the corresponding left-image pixel yields a dense colored point
+cloud of the scene. For the reconstructions reported in Chapter 8, the
+cloud is post-processed with two standard operations: a statistical
+outlier filter removes the isolated flying points that appear along depth
+discontinuities, and a voxel downsampling makes the point density
+uniform. The stereo rig's calibrated values, a focal length of
+approximately 1005 pixels at the native 1280-pixel width and a baseline
+of 52 millimeters, scale to the inference resolution by the width ratio.
+This reconstruction path is what the thesis title refers to: the network
+provides the dense disparity, and the calibrated geometry turns it into a
+metric three-dimensional model of the scene.
 
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=\textwidth]{fig_3_8_supervision_preview}
-\caption{\textbf{Multi-scale supervision.} Six disparity outputs receive weighted L1 terms against the ground truth per \eqref{eq:loss}; the full-resolution prediction additionally receives the gradient, threshold, D1, smoothness, and gated slant terms.}
-\label{fig:supervision}
-\end{figure}
-
-\section{Datasets and Training Protocol}
-% Sources: run meta.json args block; 20260704_native_vs_resize_n500
-% comparison.md; the grand-comparison augmentation evidence.
-% Content: SceneFlow canonical split (35,454 train = FT3D-TRAIN + Monkaa
-% + Driving finalpass; 4,370 test = FT3D-TEST); native 384x640 co-located
-% random crops (cite the native-vs-resize ablation, Ch4); OpenStereo
-% augmentation triplet (asymmetric color jitter, right-only random erase,
-% random scale); OneCycle 60k steps peak 8e-4, batch 32, bf16, A100;
-% input contract [0,1]; validation on a fixed 400-pair FT3D-TEST subset
-% at the native 960x540 pad-16 axis.
-The model is trained on the full SceneFlow finalpass dataset. The
-canonical split contains 35,454 training pairs, drawn from the
-FlyingThings3D training set together with Monkaa and Driving, and the
-FlyingThings3D test set of 4,370 pairs is held out for evaluation; only
-FlyingThings3D provides an official test split, so the test set is drawn
-from it alone. Training samples random 384 by 640 windows that are
-co-located in both views from the native 960 by 540 frames, which
-preserves the native disparity magnitudes. Chapter 4 shows that this
-native-crop protocol substantially outperforms the legacy protocol of
-downscaling the whole frame. Three augmentations from the OpenStereo
-recipe are applied: asymmetric color jitter, right-image-only random
-erasing, and random scaling. Optimization uses AdamW with a OneCycle
-schedule over 60,000 steps at a peak learning rate of $8 \times 10^{-4}$,
-a batch of 32, and bfloat16 mixed precision, on a single A100 GPU. The
-input is normalized to the unit interval at the model boundary.
-Validation uses a fixed 400-pair subset of the test set at the native
-960 by 540 axis, evaluated every thousand steps, with a resized-axis
-measurement logged alongside. Table \ref{tab:train_config} lists the
-configuration.
-
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=\textwidth]{fig_3_10_input_protocol}
-\caption{\textbf{Native-crop input protocol.} Training samples random $384\times 640$ co-located windows of the native $960\times 540$ frame (left), preserving native disparity magnitudes; the legacy protocol (right) downscales the whole frame and shrinks every disparity by the same factor.}
-\label{fig:input_protocol}
-\end{figure}
-
-\begin{table}[!htbp]
-\centering
-\caption{\textbf{Training configuration of the production run.} Values verbatim from the run's configuration record (meta.json of run 20260704).}
-\label{tab:train_config}
-\small
-\begin{tabular}{ll}
-\toprule
-Element & Value\\
-\midrule
-Optimizer & AdamW, weight decay $10^{-5}$\\
-Schedule & OneCycle, 60{,}000 steps, peak LR $8\times 10^{-4}$\\
-Batch size / precision & 32 / bfloat16 mixed\\
-Input protocol & random native $384\times 640$ co-located crops\\
-Augmentation & asymmetric color jitter, right-only erase, random scale\\
-Training data & full SceneFlow finalpass, 35{,}454 pairs\\
-Validation & fixed 400-pair FlyingThings3D subset, every 1k steps\\
-Hardware & one NVIDIA A100 80 GB (cloud)\\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\section{Design-Space Exploration Methodology}
-% Sources: model/benchmarks/OVERFIT_METHODOLOGY.md; the ablation-study-
-% expert protocol. Content: matched-overfit harness (fixed pairs, fixed
-% seed, full 8-metric reporting), controlled single-knob ablations,
-% pre-registered win criteria, cross-dataset gate after every training
-% run. This section is methodology (PO4 setup); its RESULTS are Ch4.
-The architectural choices in this chapter were made under a controlled
-matched-overfit methodology rather than by intuition. Each candidate is
-trained on a fixed set of SceneFlow pairs with a fixed seed, deterministic
-convolution kernels, an identical step budget, and an identical evaluation
-protocol, and all eight stereo metrics together with an inference-latency
-benchmark are reported for every arm. Single knobs are varied one at a
-time, the winning criterion is registered before a run, and every
-candidate is checked against a held-out cross-dataset evaluation, so that
-an in-domain gain that fails to transfer is not mistaken for progress. The
-results of these studies appear in Chapter 4; this section states the
-protocol that produced them.
-
-\section{Optimization of the Network for Edge Inference}
-% Source: THESIS_PLAN section 3 (F1-F8 findings table). This is thesis
-% content evidencing PO3/PO5: cost-volume zero-copy views, grid-sample
-% batching, static-channel hoisting, head fusion, dead-code removal,
-% narrow GEV band; equivalence-proof discipline (bitwise or matched A/B
-% per fix); export blockers identified (F.unfold, GroupNorm, Conv3d) and
-% their mitigations.
-Reaching the latency target required an optimization pass over the
-network's inference graph, treated as an engineering task in its own
-right. Six changes were applied. The cost-volume construction loops were
-rewritten to use padded zero-copy views instead of allocating and zeroing
-a feature map for every disparity bin. The grid-sample calls were reduced
-from 48 to eight by batching the lookups and caching the sampling grids.
-Static channels of the recurrent input, which are re-convolved every
-iteration, were hoisted once per scale, following the precomputed-context
-trick of RAFT-Stereo \cite{lipson2021raftstereo}. The gate convolutions
-and the four output heads, which share inputs, were fused. Dead
-inference-path code was removed. Finally, the geometry volume was narrowed
-to a band around the tile disparity. Each change was proven equivalent
-before adoption, either bitwise or through a matched A/B comparison, and
-together they cut the full-precision latency by a factor of 1.74. The pass
-also surfaced three export blockers for eight-bit deployment, namely the
-unfold operation in convex upsampling, group normalization on some
-accelerator toolchains, and three-dimensional convolution on neural
-processing units, each of which has a documented replacement.
-Table \ref{tab:efficiency_findings} summarizes the changes.
-
-\begin{table}[!htbp]
-\centering
-\caption{\textbf{Inference optimizations and their equivalence status.} Savings measured at $384\times 640$ on RTX 3050; equivalence class states how each change was proven safe before adoption.}
-\label{tab:efficiency_findings}
-\small
-\begin{tabular}{p{5.6cm}p{4.2cm}l}
-\toprule
-Optimization & Saving & Equivalence\\
-\midrule
-Zero-copy padded views in cost-volume loops & 5 to 15\% latency & bitwise\\
-Batched correlation lookups, cached grids & 3 to 8\% latency & identical math\\
-Static GRU input channels hoisted per scale & 8 to 10\% of MACs & exact\\
-Fused gate convolutions and output heads & 1 to 3\% latency & bitwise\\
-Dead inference-path code removed & memory + launches & exact\\
-Narrow GEV band ($\pm 16$ around tile $d$) & 25 to 30\% of MACs & matched A/B (Ch.~4)\\
-\midrule
-Combined & fp32 61.4 ms vs 106.7 ms base ($1.74\times$) & \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=0.8\textwidth]{fig_3_11_param_budget}
-\caption{\textbf{Parameter budget of the trained model.} Module split computed directly from the trained checkpoint's state dictionary; the shared encoder and the three refinement stages hold 95 percent of the 2.96 M parameters.}
-\label{fig:param_budget}
-\end{figure}
-
-\section{Evaluation Metrics}
-% Source: FINAL_MODEL_ARCHITECTURE section 16.
+\FloatBarrier
+\section{Design Assessment and Performance Indices}
+\label{sec:design_assessment}
 Accuracy is reported with the standard stereo metrics defined in
 \eqref{eq:metrics}. The end-point error is the mean absolute disparity
 error over valid pixels; the bad-$t$ rate is the percentage of valid
@@ -569,75 +504,33 @@ where $V$ is the set of valid pixels, $\hat{d}$ the predicted disparity,
 $d^{*}$ the ground truth, and $t \in \{0.5, 1, 2, 3\}$ pixels the bad-rate
 thresholds.
 
-\section{Summary of Design Decisions}
-Every load-bearing decision in this chapter is tied to a controlled
-study in Chapter 4 or to published evidence in Chapter 2. Table
-\ref{tab:design_evidence} collects the mapping so that the design can be
-audited decision by decision.
+Alongside accuracy, latency, and memory, the parameter budget itself is
+a performance index of the design, since the envelope of Section
+\ref{sec:design_requirements} bounds it. Figure \ref{fig:param_budget} reports the module-wise split
+of the trained model, computed directly from the checkpoint's state
+dictionary.
 
-\begin{table}[!htbp]
+\begin{figure}[!htbp]
 \centering
-\caption{\textbf{Design decisions and their evidence.} Each architectural or training choice with the study or literature that justifies it.}
-\label{tab:design_evidence}
-\small
-\begin{tabular}{p{4.6cm}p{7.6cm}}
-\toprule
-Decision & Evidence\\
-\midrule
-YOLO26s shared encoder & encoder ablation, Table \ref{tab:ablation_encoder}: best EPE of three encoders at +2 ms\\
-Separate left context encoder & RAFT-Stereo lineage \cite{lipson2021raftstereo}; context-gated variants win the family ablation, Table \ref{tab:ablation_gev4line}\\
-Group-wise cost at one coarse scale & GwcNet \cite{guo2019gwcnet} graceful degradation under small aggregation budgets\\
-Iterated coarse-to-fine refinement & refinement ablation, Table \ref{tab:ablation_refinement}: single-pass collapses, finer scales add cost without gain\\
-Local $\pm 2$ correlation lookup & CREStereo \cite{li2022crestereo}: local search beats all-pairs; also confers rectification tolerance, Section \ref{sec:rectification}\\
-Slanted tile planes & HITNet \cite{tankovich2021hitnet}; plane rendering wins the blur study, Table \ref{tab:ablation_blurfix}\\
-Narrow GEV band + fail-soft gate & family ablation best EPE, Table \ref{tab:ablation_gev4line}; narrowing accuracy-neutral, Table \ref{tab:ablation_efficiency}\\
-Rejected: selective recurrent unit & family ablation, Table \ref{tab:ablation_gev4line}: EPE worsens on the compact chassis\\
-Rejected: fresh 1/4 initialization & family ablation, Table \ref{tab:ablation_gev4line}: EPE and bad-1 worsen\\
-Rejected: fix compositions & blur study, Table \ref{tab:ablation_blurfix}: worse than plane rendering alone\\
-Threshold-stack + D1 objective & loss ablation, Table \ref{tab:ablation_loss}: wins EPE, bad-2, D1 together\\
-Native-crop input protocol & input-protocol study, Table \ref{tab:ablation_native}: native axis EPE 6.67 to 2.87 at no resized-axis cost\\
-Augmentation triplet & matched comparison: best val EPE 2.778 to 1.921\\
-OneCycle 60k schedule & training dynamics, Chapter 4: validation floor reached before the budget ends\\
-\bottomrule
-\end{tabular}
-\end{table}
+\includegraphics[width=0.8\textwidth]{fig_3_11_param_budget}
+\caption{\textbf{Parameter budget of the trained model.} Module split computed directly from the trained checkpoint's state dictionary; the shared encoder and the three refinement stages hold 95 percent of the 2.96 M parameters.}
+\label{fig:param_budget}
+\end{figure}
 
-\section{From Disparity to 3D Reconstruction}
-\label{sec:reconstruction_method}
-The disparity map is not the end product of the pipeline; it is the
-carrier of the three-dimensional structure of the scene. Once the
-disparity is known, every valid pixel back-projects to a metric
-three-dimensional point through the pinhole relations
-\begin{equation}
-Z = \frac{f\,B}{d}, \qquad
-X = \frac{(u - c_x)\,Z}{f}, \qquad
-Y = \frac{(v - c_y)\,Z}{f}
-\label{eq:backprojection}
-\end{equation}
-where $(u, v)$ are the pixel coordinates, $(c_x, c_y)$ the principal
-point, $f$ the focal length in pixels, $B$ the stereo baseline, and
-$(X, Y, Z)$ the recovered point in the camera frame. Coloring each point
-with the corresponding left-image pixel yields a dense colored point
-cloud of the scene. For the reconstructions reported in Chapter 4, the
-cloud is post-processed with two standard operations: a statistical
-outlier filter removes the isolated flying points that appear along depth
-discontinuities, and a voxel downsampling makes the point density
-uniform. The stereo rig's calibrated values, a focal length of
-approximately 1005 pixels at the native 1280-pixel width and a baseline
-of 52 millimeters, scale to the inference resolution by the width ratio.
-This reconstruction path is what the thesis title refers to: the network
-provides the dense disparity, and the calibrated geometry turns it into a
-metric three-dimensional model of the scene.
-
-\section{Implementation and Deployment Environment}
-% Sources: meta.json; THESIS_PLAN section 2A. PyTorch 2.11 cu128; Modal
-% A100-80GB training, T4 evaluation; RTX 3050 local bench; CCB stereo
-% camera rig; target device Jetson Orin Nano (measured on-device 36.3 ms).
-The model is implemented in PyTorch 2.11 with CUDA 12.8. Training runs on
-a single cloud A100 with 80 gigabytes of memory, ablations and evaluations
-on a cloud T4, and the local latency benchmark on an RTX 3050 laptop GPU
-with roughly 4 gigabytes of memory. Real-camera pairs come from a
-calibrated binocular rig that streams a 2560 by 720 side-by-side image.
-The intended deployment target is the Jetson Orin Nano, on which the
-optimized model was measured directly; the on-device latency is reported
-in Chapter 4.
+\FloatBarrier
+\section{Summary}
+This chapter defined the design problem, the four research questions,
+and the hard envelope of under 3 million parameters, real-time
+operation on a 4 to 6 TOPS accelerator, under 200 megabytes of
+inference memory, and INT8-exportable operators. Candidate designs were
+judged on the full eight-metric stereo set together with latency and
+memory, under a matched-overfit protocol with mandatory cross-dataset
+evaluation. The resulting architecture, StereoLite, combines a
+group-wise cost volume, recurrent tile refinement with plane-aware
+cross-scale propagation, a narrow-band geometry encoding volume with a
+fail-soft gate, and plane rendering with learned convex upsampling,
+each block specified with its governing equations. The design decisions
+are auditable through the evidence table, and the chapter closed with
+the performance indices used throughout the thesis. The training
+procedure and edge-inference optimization appear in Chapter 7, and the
+experimental evaluation in Chapter 8.

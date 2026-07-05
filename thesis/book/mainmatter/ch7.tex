@@ -1,0 +1,386 @@
+% =====================================================================
+% CHAPTER 7: Design Methodology and Implementation (9-chapter template)
+% Template source: thesis-or-project-template_1745300785.pdf, Chapter 7.
+% Assembled per thesis/RESTRUCTURE_PLAN.md from:
+%   - old mainmatter/ch3.tex: "Training Objective" (7.2.1, equations
+%     byte-identical), "Datasets and Training Protocol" (7.2.2),
+%     "Implementation and Deployment Environment" (into 7.3),
+%     "Optimization of the Network for Edge Inference" (7.4).
+%   - old appendices/app_a.tex "Software and Hardware Environment"
+%     (into 7.3; Appendix A keeps the raw config table).
+%   - old mainmatter/ch4.tex "Experimental Setup Summary" + the protocol
+%     sentences of the measurement sections (7.6, 7.8; RESULTS stay in
+%     Chapter 8).
+% New prose: 7.1 Introduction, 7.5 Review and Feedback, 7.7 Principle of
+% Operation, 7.9 Summary. No new numbers are introduced.
+% Moved labels (each used once book-wide): eq:loss, fig:supervision,
+% fig:input_protocol, tab:train_config, tab:efficiency_findings.
+% Hard-coded "Chapter 4" refs in moved prose updated to Chapter 8.
+% =====================================================================
+\chapter{Design Methodology and Implementation}
+
+\section{Introduction}
+Chapter 3 fixed the architecture of StereoLite; this chapter states how
+that architecture was turned into a trained, optimized, and measurable
+system. It details the training objective and the dataset protocol,
+records the selection of hyperparameters, hardware, and software, and
+describes the optimization pass that brought the network within its edge
+latency budget. It then explains how the design process was reviewed and
+fed back on itself, lays out the simulation and experimental setup, walks
+through the principle of operation of the deployed pipeline from
+rectified image pair to metric point cloud, and defines the measurement
+protocols under which every number of Chapter 8 was obtained. The results
+themselves are reported and discussed in Chapter 8; this chapter confines
+itself to the methodology and implementation that produced them.
+
+\FloatBarrier
+\section{Detailed Design Methodology}
+The design methodology has two implementation-level components: the
+objective the network is trained to minimize, and the data and
+optimization protocol under which that objective is applied. Each is
+detailed in turn.
+
+\subsection{Training Objective}
+The network is trained with the multi-scale supervised objective of
+\eqref{eq:loss}. A pixel counts as valid when its ground-truth disparity
+is finite and lies between 0 and 320 pixels. Each lower-scale prediction
+is resized to full resolution and multiplied by its scale factor before
+the comparison. The objective weights an L1 term at every scale most
+heavily at full resolution, adds a matching L1 term on the
+geometry-volume output, and augments the full-resolution prediction with
+a Sobel gradient-consistency term, a threshold hinge stack, a KITTI-style
+D1-relative hinge, an edge-aware smoothness term, and a gated
+slant-supervision term that trains the plane slopes only where they are
+trustworthy. The slant term pairs with plane rendering: it makes the
+slopes accurate enough for the rendering step to sharpen boundaries. The
+composition of the objective is itself an experimental result rather
+than a guess. The loss ablation of Chapter 8 tested nine formulations
+and found that a plain L1 under-serves the outlier metrics, that hinge
+terms on a single threshold overfit that threshold, and that the
+threshold stack combined with the D1 hinge was the only formulation to
+win the end-point error and the outlier rates together; the production
+objective descends from that winner, with the gradient term retained for
+its sub-pixel benefit and the smoothness term kept at a deliberately
+small weight so it regularizes without blurring.
+
+\begin{equation}
+\begin{aligned}
+\mathcal{L} \;=\;& 1.00\,\mathcal{L}_{1}(d_{\mathrm{full}})
+ + 0.50\,\mathcal{L}_{1}(d_{1/2})
+ + 0.30\,\mathcal{L}_{1}(d_{1/4})
+ + 0.20\,\mathcal{L}_{1}(d_{1/8})
+ + 0.10\,\mathcal{L}_{1}(d_{1/16})\\
+&+ 0.15\,\mathcal{L}_{1}(d_{\mathrm{gev}})
+ + 0.50\,\mathcal{L}_{\mathrm{grad}}
+ + 0.20\,\mathcal{L}_{\mathrm{thr}}
+ + 0.20\,\mathcal{L}_{\mathrm{D1}}
+ + 0.02\,\mathcal{L}_{\mathrm{smooth}}
+ + 0.30\,\mathcal{L}_{\mathrm{slant}}
+\end{aligned}
+\label{eq:loss}
+\end{equation}
+where $\mathcal{L}_1$ is the masked mean absolute disparity error,
+$\mathcal{L}_{\mathrm{grad}}$ a Sobel gradient-consistency term,
+$\mathcal{L}_{\mathrm{thr}}$ a hinge over the error thresholds
+$\{0.5, 1, 2, 3\}$ pixels, $\mathcal{L}_{\mathrm{D1}}$ the D1-relative
+hinge, $\mathcal{L}_{\mathrm{smooth}}$ an edge-aware smoothness term, and
+$\mathcal{L}_{\mathrm{slant}}$ the gated slant supervision.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{fig_3_8_supervision_preview}
+\caption{\textbf{Multi-scale supervision.} Six disparity outputs receive weighted L1 terms against the ground truth per \eqref{eq:loss}; the full-resolution prediction additionally receives the gradient, threshold, D1, smoothness, and gated slant terms.}
+\label{fig:supervision}
+\end{figure}
+
+\FloatBarrier
+\subsection{Datasets and Training Protocol}
+The model is trained on the full SceneFlow finalpass dataset. The
+canonical split contains 35,454 training pairs, drawn from the
+FlyingThings3D training set together with Monkaa and Driving, and the
+FlyingThings3D test set of 4,370 pairs is held out for evaluation; only
+FlyingThings3D provides an official test split, so the test set is drawn
+from it alone. Training samples random 384 by 640 windows that are
+co-located in both views from the native 960 by 540 frames, which
+preserves the native disparity magnitudes. Chapter 8 shows that this
+native-crop protocol substantially outperforms the legacy protocol of
+downscaling the whole frame. Three augmentations from the OpenStereo
+recipe are applied: asymmetric color jitter, right-image-only random
+erasing, and random scaling. Optimization uses AdamW with a OneCycle
+schedule over 60,000 steps at a peak learning rate of $8 \times 10^{-4}$,
+a batch of 32, and bfloat16 mixed precision, on a single A100 GPU. The
+input is normalized to the unit interval at the model boundary.
+Validation uses a fixed 400-pair subset of the test set at the native
+960 by 540 axis, evaluated every thousand steps, with a resized-axis
+measurement logged alongside. Table \ref{tab:train_config} lists the
+configuration.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{fig_3_10_input_protocol}
+\caption{\textbf{Native-crop input protocol.} Training samples random $384\times 640$ co-located windows of the native $960\times 540$ frame (left), preserving native disparity magnitudes; the legacy protocol (right) downscales the whole frame and shrinks every disparity by the same factor.}
+\label{fig:input_protocol}
+\end{figure}
+
+\begin{table}[!htbp]
+\centering
+\caption{\textbf{Training configuration of the production run.} Values verbatim from the run's configuration record (meta.json of run 20260704).}
+\label{tab:train_config}
+\small
+\begin{tabular}{ll}
+\toprule
+Element & Value\\
+\midrule
+Optimizer & AdamW, weight decay $10^{-5}$\\
+Schedule & OneCycle, 60{,}000 steps, peak LR $8\times 10^{-4}$\\
+Batch size / precision & 32 / bfloat16 mixed\\
+Input protocol & random native $384\times 640$ co-located crops\\
+Augmentation & asymmetric color jitter, right-only erase, random scale\\
+Training data & full SceneFlow finalpass, 35{,}454 pairs\\
+Validation & fixed 400-pair FlyingThings3D subset, every 1k steps\\
+Hardware & one NVIDIA A100 80 GB (cloud)\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\FloatBarrier
+\section{Selection of Parameters, Apparatus and Components}
+The network's hyperparameters were not chosen in a single pass; each
+load-bearing value is the survivor of a controlled study reported in
+Chapter 8, and the design-evidence audit of Chapter 3 maps every choice
+to its justification. The principal architectural parameters are the
+truncated YOLO26s backbone retained through its first seven blocks, a
+32-channel recurrent hidden state, a 48-channel refinement head, eight
+correlation groups over 24 disparity hypotheses at one sixteenth
+resolution, a local correlation half-range of two pixels, a refinement
+schedule of two, three, and three iterations across the three scales, and
+a geometry encoding volume narrowed to a band of plus or minus 16 around
+the tile disparity. The training-side parameters are those of Table
+\ref{tab:train_config}. The complete configuration record of the trained
+model, verbatim from its checkpoint, is given in Table
+\ref{tab:arch_config} of Appendix A and is not duplicated here.
+
+The apparatus divides into compute and sensing. The model is implemented
+in PyTorch 2.11 with CUDA 12.8 on Python 3.10. Training runs on a single
+cloud A100 GPU with 80 gigabytes of memory; ablations and evaluations run
+on a cloud T4, whose modest cost permits a controlled study after every
+design change; and the local latency benchmark runs on an RTX 3050 laptop
+GPU with roughly 4 gigabytes of memory, which stands in for the
+memory-constrained end of the deployment spectrum during development. The
+intended deployment target is the Jetson Orin Nano class of edge
+accelerator, on which the optimized model was measured directly; the
+on-device result is reported in Chapter 8. On the sensing side,
+real-camera pairs come from a calibrated low-cost binocular rig that
+streams a 2560 by 720 side-by-side image, split into a rectified 1280 by
+720 pair per frame. This rig supplies the real-data qualification of the
+trained model: the zero-shot qualitative pairs, the real-camera agreement
+protocol of Section \ref{sec:testing_protocols}, and the scenes
+reconstructed in three dimensions in Chapter 8.
+
+\FloatBarrier
+\section{Optimization and Configuration Selection}
+Reaching the latency target required an optimization pass over the
+network's inference graph, treated as an engineering task in its own
+right. Six changes were applied. The cost-volume construction loops were
+rewritten to use padded zero-copy views instead of allocating and zeroing
+a feature map for every disparity bin. The grid-sample calls were reduced
+from 48 to eight by batching the lookups and caching the sampling grids.
+Static channels of the recurrent input, which are re-convolved every
+iteration, were hoisted once per scale, following the precomputed-context
+trick of RAFT-Stereo \cite{lipson2021raftstereo}. The gate convolutions
+and the four output heads, which share inputs, were fused. Dead
+inference-path code was removed. Finally, the geometry volume was narrowed
+to a band around the tile disparity. Each change was proven equivalent
+before adoption, either bitwise or through a matched A/B comparison, and
+together they cut the full-precision latency by a factor of 1.74. The pass
+also surfaced three export blockers for eight-bit deployment, namely the
+unfold operation in convex upsampling, group normalization on some
+accelerator toolchains, and three-dimensional convolution on neural
+processing units, each of which has a documented replacement.
+Table \ref{tab:efficiency_findings} summarizes the changes.
+
+\begin{table}[!htbp]
+\centering
+\caption{\textbf{Inference optimizations and their equivalence status.} Savings measured at $384\times 640$ on RTX 3050; equivalence class states how each change was proven safe before adoption.}
+\label{tab:efficiency_findings}
+\small
+\begin{tabular}{p{5.6cm}p{4.2cm}l}
+\toprule
+Optimization & Saving & Equivalence\\
+\midrule
+Zero-copy padded views in cost-volume loops & 5 to 15\% latency & bitwise\\
+Batched correlation lookups, cached grids & 3 to 8\% latency & identical math\\
+Static GRU input channels hoisted per scale & 8 to 10\% of MACs & exact\\
+Fused gate convolutions and output heads & 1 to 3\% latency & bitwise\\
+Dead inference-path code removed & memory + launches & exact\\
+Narrow GEV band ($\pm 16$ around tile $d$) & 25 to 30\% of MACs & matched A/B (Ch.~8)\\
+\midrule
+Combined & fp32 61.4 ms vs 106.7 ms base ($1.74\times$) & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\FloatBarrier
+\section{Review and Feedback}
+The implementation advanced under an explicit review-and-feedback
+discipline rather than by unchecked iteration. Every proposed design
+change, whether an architectural block, a loss term, or an input-protocol
+variant, was gated by a controlled ablation on the matched harness of
+Chapter 3 before it could enter the production configuration; a change
+that failed to win its comparison was not adopted, however plausible its
+motivation. Every run, winning or losing, was logged with its full
+configuration and metrics to a master experiments log, so that the
+evidence trail behind each decision can be audited and no comparison
+depends on memory. Intermediate results, including training curves,
+qualitative panels, and ablation tables, were reviewed with the
+supervisor at regular intervals, and the feedback from those reviews
+redirected the work more than once, most visibly toward the
+cross-dataset evaluation gate that now follows every training run.
+Failed variants were documented rather than discarded: the rejected
+mechanisms and anti-synergistic compositions reported in Chapter 8 are
+retained precisely because they constrain future work as firmly as the
+adopted ones justify the present design.
+
+\FloatBarrier
+\section{Simulation and Experimental Setup}
+All experiments run against the setup described here; the results
+themselves are reported in Chapter 8. Three datasets are used. The
+SceneFlow finalpass dataset provides the synthetic training corpus and
+the in-domain test bed, under the split and protocol of Table
+\ref{tab:train_config}: 35,454 training pairs and the held-out
+FlyingThings3D test set of 4,370 pairs, with a fixed 400-pair subset
+serving as the validation and perturbation-sweep set. The Middlebury 2014
+benchmark, 23 perfect-set scenes of real indoor imagery that the model
+never sees during training, serves as the zero-shot cross-domain test.
+The third source is the project's physical stereo rig, the calibrated
+2560 by 720 side-by-side camera of Section 7.3, which supplies real
+rectified pairs with no ground truth for qualitative evaluation, teacher
+agreement, and three-dimensional reconstruction.
+
+The evaluations run as scripted drivers on cloud GPUs, one driver per
+experiment: full-test-set evaluation, zero-shot Middlebury 2014
+evaluation under a protocol identical for our model and the published
+reference checkpoints, and the rectification-robustness sweep. Each
+driver records its configuration and metrics to a metadata file alongside
+its outputs, and Appendix A names the specific scripts so that every
+reported number can be reproduced. Cross-domain evaluation on a cloud T4
+costs minutes and cents per run, which is what makes the
+after-every-training-run evaluation gate of Section 7.5 practical.
+Accuracy in every experiment is measured with the standard stereo metrics
+defined in \eqref{eq:metrics}, averaged per image and then over images;
+the measurement protocols for latency, rectification robustness, and
+real-camera agreement are specified in Section
+\ref{sec:testing_protocols}.
+
+\FloatBarrier
+\section{Principle of Operation}
+In deployment the system operates as a fixed feed-forward pipeline from a
+rectified image pair to a metric depth map, exercising the blocks of
+Chapter 3 in sequence. A rectified left and right pair enters at the
+inference resolution of 384 by 640 pixels, normalized to the unit
+interval. The shared encoder processes both views in a single batched
+invocation and emits matching features at one quarter, one eighth, and
+one sixteenth resolution, while the separate context encoder reads the
+left image alone and produces the context maps that feed the recurrent
+state.
+
+Matching begins at the coarsest scale. The tile initialization module
+builds the group-wise correlation volume of \eqref{eq:gwc} at one
+sixteenth resolution, regularizes it with a small three-dimensional
+network, and reads off the initial disparity and confidence through the
+soft-argmax of \eqref{eq:softargmax_init}; the plane slopes start at zero
+and the hidden state starts from the coarsest context map. The recurrent
+refinement then runs its fixed schedule of two iterations at one
+sixteenth, three at one eighth, and three at one quarter resolution. At
+each iteration the right features are warped by the current disparity, a
+local correlation is evaluated over five offsets, and the convolutional
+gated recurrent unit of \eqref{eq:convgru} updates the hidden state, from
+which gated residuals adjust the disparity, the plane slopes, and the
+confidence. Between scales, the plane-aware propagation of
+\eqref{eq:plane_prop} carries the tile state to the finer grid along its
+local slanted-surface hypothesis rather than by plain interpolation.
+
+At one quarter resolution the narrow-band geometry encoding volume
+produces its independent proposal per \eqref{eq:gev_expect}, and the
+fail-soft gate of \eqref{eq:failsoft} blends that proposal into the
+recurrent estimate only where the learned weight favors it, correcting
+regions the tile state resolved poorly without disturbing those it
+resolved well. The refined quarter-resolution state is then rendered
+from its tile planes with an edge gate and upsampled to full resolution
+by the two learned convex-combination stages, each output subpixel a
+softmax-weighted mixture of its three-by-three coarse neighborhood. The
+result is a dense full-resolution disparity map.
+
+Disparity becomes depth through the calibrated relations of
+\eqref{eq:backprojection}: depth follows $Z = fB/d$, and each valid pixel
+optionally back-projects to a metric three-dimensional point in the
+camera frame, colored by its left-image pixel. On the project's rig the
+calibrated focal length and baseline scale to the inference resolution by
+the width ratio, so the point cloud is metric without further tuning.
+This single forward pass, image pair in, disparity and optionally a
+colored point cloud out, is the operation measured throughout Chapter 8.
+
+\FloatBarrier
+\section{Testing and Measurement}
+\label{sec:testing_protocols}
+Four measurement protocols govern the experiments of Chapter 8; they are
+specified here so that every reported number has a stated procedure, and
+the numbers themselves appear only in that chapter.
+
+The first protocol measures latency and memory. Latency is measured at
+batch one and 384 by 640 resolution, with warm-up passes preceding the
+timed passes, and memory is recorded as the peak inference working set;
+the device is stated for every measurement. On the RTX 3050 laptop GPU
+the model is timed in eager PyTorch in both full and half precision,
+without compiler assistance, so the figures reflect the unoptimized
+serving path. On the deployment target, the Jetson Orin Nano, the
+optimized model is exported to an eight-bit TensorRT engine and measured
+directly on the device, which is the figure of merit for the real-time
+claim.
+
+The second protocol tests tolerance to imperfect rectification under
+controlled conditions. The trained model is evaluated on the fixed
+400-pair FlyingThings3D subset at the native axis while the right image
+is shifted vertically by a controlled offset and the disparity ground
+truth is left unchanged, so the offset emulates a residual vertical
+misalignment between the views. The sweep covers offsets from zero
+through sub-pixel values to several pixels, and the standard metrics are
+reported at each offset.
+
+The third protocol corroborates the synthetic sweep on physical data.
+The model is run on 997 rectified pairs from the project's stereo rig,
+whose factory rectification leaves a residual vertical misalignment, and
+its disparity is compared against the pseudo-ground-truth produced by the
+FoundationStereo teacher on the same pairs. Because both the model and
+the teacher observe the same misaligned input, this protocol measures
+agreement with a strong reference rather than absolute error, and it is
+interpreted as corroborating, not replacing, the controlled sweep.
+
+The fourth is the dual-axis evaluation convention. Every in-domain
+evaluation is reported on the native 960 by 540 axis, which preserves the
+true disparity magnitudes, with a resized-axis measurement at 640 by 384
+logged alongside for comparability with the legacy protocol; input-protocol
+comparisons evaluate every arm on both axes so that a gain on one axis
+cannot hide a loss on the other. Zero-shot Middlebury 2014 evaluation
+follows a single fixed protocol applied identically to our model and to
+the public reference checkpoints: inference at 384 by 640, ground truth
+scaled to the inference width, and disparities above 192 pixels masked,
+with per-scene metrics macro-averaged over scenes.
+
+\FloatBarrier
+\section{Summary}
+This chapter recorded the path from the architecture of Chapter 3 to a
+trained and deployable system. The network is trained with a multi-scale
+composite objective whose formulation was itself selected by ablation,
+under a native-crop SceneFlow protocol with the OpenStereo augmentation
+triplet, a OneCycle schedule, and cloud A100 hardware. Hyperparameters,
+apparatus, and software were selected on documented evidence, with the
+full configuration recorded in Appendix A, and an equivalence-proven
+optimization pass brought the inference graph within the edge latency
+budget. The design process was gated by controlled ablations, logged to a
+master experiments record, and reviewed regularly with the supervisor.
+The experimental setup spans a synthetic training and test corpus, an
+unseen real benchmark, and a physical stereo rig, and four measurement
+protocols, covering latency, rectification perturbation, real-camera
+agreement, and dual-axis evaluation, define how every number of Chapter 8
+was obtained.

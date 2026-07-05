@@ -1,0 +1,135 @@
+% =====================================================================
+% CHAPTER 6: Thesis Management and Finance (9-chapter RUET MTE template)
+% Assembled per thesis/RESTRUCTURE_PLAN.md from:
+%   - old appendices/app_b.tex "Project Timeline" (phases as a table;
+%     the Gantt figure fig:gantt itself moved to Chapter 1, Section 1.5.1
+%     and is only referenced here, never duplicated)
+%   - old appendices/app_b.tex "Expenses" (tab:expenses, moved intact)
+%   - old appendices/app_b.tex "Economic Analysis" (split into hardware
+%     vs cloud/software budget)
+% New prose: 6.1 Introduction, 6.5 Summary, connective text. All numbers
+% are exactly as the source states; none are invented.
+% PO demonstrated: PO11 (project management and finance).
+% =====================================================================
+\chapter{Thesis Management and Finance}
+
+\section{Introduction}
+A thesis is also a project, and this chapter records how it was managed
+and what it cost. The work ran from February to July 2026 and was carried
+out almost entirely on rented cloud compute, which kept the hardware cost
+low and made the spending both small and fully itemizable. Section 6.2
+describes the management of the work and its time frame across seven
+phases; Section 6.3 states the overall budget; Section 6.4 breaks the
+budget into its hardware and its cloud and software components; Section
+6.5 summarizes.
+
+\FloatBarrier
+\section{Management of the Thesis}
+The project was organized as a sequence of phases with explicit outputs,
+so that each phase produced an artifact the next phase consumed: the
+literature study produced the design candidates, the ablation campaign
+produced the validated architecture, the production run produced the
+trained model, and the evaluation produced the results of Chapter 8.
+Progress was gated on evidence rather than on the calendar: the
+production training run was launched only after the ablation campaign
+had settled the architecture, and the writing consolidated only results
+that had passed their evaluation gates.
+
+\subsection{Time Frame}
+The project ran from February to July 2026 in seven work phases: an
+initial phase of paper collection and study overlapping a review-paper
+draft, followed by architecture design and an ablation campaign, then
+the production training run and its evaluation gates, with thesis
+writing in the final weeks. Table \ref{tab:timeframe} lists the phases
+with their periods and outputs; the corresponding Gantt chart appears in
+the work plan of Chapter 1.
+
+\begin{table}[!htbp]
+\centering
+\caption{\textbf{Time frame of the thesis.} The seven work phases from February to July 2026; the Gantt chart of the work plan of Chapter 1 shows their calendar extents and overlaps.}
+\label{tab:timeframe}
+\small
+\begin{tabular}{clp{6.6cm}}
+\toprule
+Phase & Period & Output\\
+\midrule
+1. Paper collection and study & initial phase & Surveyed literature base and the review of Chapter 2\\
+2. Review-paper draft & overlapping phase 1 & Draft survey of compression techniques for stereo matching\\
+3. Architecture design & after phase 1 & Candidate network designs of Chapter 3\\
+4. Ablation campaign & following design & Validated architecture and training recipe (Chapter 8 studies)\\
+5. Production training run & after the campaign & Trained production model (Chapter 7)\\
+6. Evaluation gates & after training & In-domain, zero-shot, robustness, and deployment results of Chapter 8\\
+7. Thesis writing & final weeks & This report\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\FloatBarrier
+\section{Overall Budget}
+The project was carried out almost entirely on rented cloud compute, which
+kept the hardware cost low. Table \ref{tab:expenses} itemizes the spend.
+The dominant item is the single production training run on a cloud A100;
+the many ablation and evaluation runs were individually inexpensive
+because they used the smaller T4 and L40S instances for short durations.
+
+\begin{table}[!htbp]
+\centering
+\caption{\textbf{Project expenses.} Cloud figures are approximate and reflect the on-demand rates of the compute provider.}
+\label{tab:expenses}
+\small
+\begin{tabular}{lc}
+\toprule
+Item & Approximate cost (USD)\\
+\midrule
+Production training run (A100, about one day) & 10 to 15\\
+Ablation sweeps (T4 and L40S, many short runs) & 15 to 25\\
+Evaluation runs (T4, a fraction of a dollar each) & 5\\
+Stereo camera rig & 60\\
+Storage and miscellaneous cloud & 10\\
+\midrule
+Total & 100 to 115\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\FloatBarrier
+\section{Component/Software Budget}
+The budget of Table \ref{tab:expenses} divides into a hardware component
+and a cloud and software component.
+
+The hardware component consists of a single purchased item, the stereo
+camera rig at approximately 60 USD, which served both as the source of
+the real-data experiments of Chapter 8 and as the model of the deployed
+sensor. This small hardware bill is itself part of the economic case for
+the approach, which rests on the cost of the deployed sensor rather than
+on the cost of development. A passive stereo rig requires two commodity
+image sensors and an embedded accelerator, a bill of materials on the
+order of a few tens of dollars, whereas a comparable active-depth or
+LiDAR unit costs several times as much and adds an emitter.
+
+The cloud and software component covers everything else: the production
+training run on a cloud A100 at approximately 10 to 15 USD for about one
+day, the ablation sweeps on T4 and L40S instances at approximately 15 to
+25 USD across many short runs, the evaluation runs on T4 at
+approximately 5 USD in total with each run costing a fraction of a
+dollar, and storage and miscellaneous cloud services at approximately 10
+USD. The software stack itself, the deep-learning framework and the
+supporting tooling of Chapter 7, is open source and incurred no license
+cost. Because the model runs on the device, no recurring cloud-inference
+cost is incurred in deployment. The combination of a low sensor cost and
+on-device inference makes the approach attractive for price-sensitive
+robotics and embedded products.
+
+\FloatBarrier
+\section{Summary}
+This chapter recorded the management and finance of the thesis. The work
+ran from February to July 2026 in seven phases, from paper collection
+through design, ablation, production training, and evaluation to
+writing, with each phase gated on the output of the one before it and
+the calendar extents shown in the work plan of Chapter 1. The total
+spend was approximately 100 to 115 USD, dominated by cloud compute, with
+the stereo camera rig at 60 USD as the only hardware purchase and an
+open-source software stack at no license cost. The deployed sensor
+itself carries a bill of materials on the order of a few tens of dollars
+and incurs no recurring cloud-inference cost, which is the economic case
+for the approach.
