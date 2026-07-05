@@ -18,7 +18,7 @@ from drawio_lib import (  # noqa: E402
     BLUE_F, BLUE_S, D, EDGE, GREEN_F, GREEN_S, GREY_F, GREY_S, LAV_F,
     LAV_S, ORAN_F, ORAN_S, RED_F, RED_S, SUP, YEL_F, YEL_S)
 
-ROOT = Path("/home/abrar/Research/stero_research_claude")
+ROOT = SRC.parents[3]
 OUT = ROOT / "thesis/book/figures"
 sys.path.insert(0, str(ROOT / "review_paper/figures/_data"))
 from method_data import METHODS  # noqa: E402
@@ -316,8 +316,10 @@ def fig_3_5_plane_prop():
     d.box(70, 110, 200, 200, "", fill=GREY_F, stroke=EDGE)
     d.text(70, 190, 200, 44, "<b>parent tile</b><br>d, s<sub>x</sub>, "
            "s<sub>y</sub>", fs=17)
-    d.line(120, 275, 215, 240, color="#0072B2", arrow="classic", width=1.8)
-    d.text(200, 262, 48, 24, "s<sub>x</sub>", fs=15, color="#0072B2")
+    # Show the x-slope along the x direction.  The former diagonal arrow
+    # could be mistaken for a malformed connector in the rendered figure.
+    d.line(115, 265, 225, 265, color="#0072B2", arrow="classic", width=1.8)
+    d.text(185, 272, 48, 24, "s<sub>x</sub>", fs=15, color="#0072B2")
     d.text(300, 150, 190, 32, "<b>&#8593;2 upsample</b>", fs=17)
     offs = [("&#8722;¼, &#8722;¼", 0, 0),
             ("+¼, &#8722;¼", 1, 0),
