@@ -15,6 +15,21 @@ records decisions and open items only.
 | 2026-07-05 | Model public name "StereoLite" thesis-wide; variant slug only in Appendix A |
 | 2026-07-05 | Two title pages skipped: single merged title page (Book Template style) implemented in frontmatter/titlepage.tex |
 
+## Figure ledger (2026-07-05)
+
+PLACED (embedded, final captions): fig 1.1 geometry, fig 1.3 edge gap,
+fig 2.2 timeline, fig 2.5 taxonomy, fig 2.6a/b Pareto pair, fig 3.1
+architecture (INTERIM preview PNG; swap for the drawio PDF export),
+fig 4.1 training curves, fig 4.2 convergence filmstrip, fig 4.3
+qualitative grid, fig 4.4 MB14 per-scene bars.
+
+STILL TODO (stubs with instructions in the tex): fig 2.1 classical
+pipeline, fig 2.4 four-paradigm panel, figs 3.2 to 3.8 per-block drawio,
+fig 3.10 input protocol, fig 4.5 MB14 qualitative (needs --save_viz
+Modal rerun), fig 4.6 camera panels (regenerate with best.pth), fig 4.7
+ablation bars, fig 4.8 final Pareto. Architecture figures follow the
+drawio grammar contract (WRITING_PLAN section 9).
+
 ## Open items
 
 - [ ] Head of MTE name (certificate countersign block)

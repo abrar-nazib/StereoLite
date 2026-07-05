@@ -1,21 +1,34 @@
 % ================= Abstract ============================================
-% WRITTEN LAST (after all chapters). WRITING SESSION INSTRUCTIONS
-% (delete this block when written):
-%   - Invoke research-linguistics-expert; follow the 7-move structure
-%     (patterns.md section 1): context/constraint -> gap (However,) ->
-%     named proposal -> mechanism 1 -> mechanism 2 -> headline result
-%     (accuracy AND latency in one sentence) -> availability line.
-%   - Max 300 words, 8 to 10 sentences of 15 to 25 words, no citations,
-%     self-contained, one honest limitation sentence.
-%   - Headline numbers to include (sources in WRITING_PLAN section 0.3):
-%       * 2.96 M parameters (meta.json params_train_M 2.9631)
-%       * SceneFlow FlyingThings3D test, 4,370 pairs: EPE 0.78 px,
-%         D1-all 3.40 percent (meta.json final_metrics_all)
-%       * zero-shot Middlebury 2014, 23 scenes: EPE 1.71 px,
-%         D1-all 10.9 percent (mb14_zero_shot.json)
-%       * RTX 3050 latency 49.8 ms fp16 at 384x640 (THESIS_PLAN A2)
-%       * Jetson Orin Nano projected ~30 ms* INT8 (asterisk convention)
-%   - No en/em dashes in prose.
+% Written 2026-07-05 per research-linguistics-expert (7-move structure).
+% Number sources: run meta.json final_metrics_all (EPE 0.7807, D1 3.40,
+% 4,370 pairs), mb14_zero_shot.json (D1 10.86), THESIS_PLAN A2 (49.8 ms
+% fp16 RTX 3050; Orin ~30 ms* projection), params_train_M 2.9631.
+% REVISIT at final QA: (a) if the rectification-robustness sweep
+% (WRITING_PLAN 11a) supports objective 2, add one sentence on measured
+% tolerance; (b) swap the projection sentence for the measured Jetson
+% number when the board arrives; (c) keep under 300 words.
 \chapter*{Abstract}
 
-\todo{Write the abstract last, per the instructions in this file's header.}
+Real-time depth perception from stereo cameras is a core requirement for
+mobile robots, drones, and augmented reality devices that must operate
+within a power budget of a few watts. However, the most accurate deep
+stereo networks rely on foundation-scale backbones with hundreds of
+millions of parameters, placing them far beyond the reach of embedded
+hardware. This thesis presents StereoLite, a 2.96 million parameter
+stereo matching network that combines slanted tile-plane hypotheses with
+recurrent, AI-based disparity refinement. A group-wise correlation volume
+at one sixteenth resolution initializes a tile state that convolutional
+GRU updates refine across three scales, guided by a dedicated left-image
+context encoder. A narrow-band geometry encoding volume proposes
+long-range corrections through a learned fail-soft gate, and
+plane-equation rendering with learned convex upsampling recovers sharp
+full-resolution disparity. Trained only on synthetic SceneFlow data, the
+network attains 0.78 px end-point error and 3.40 percent D1-all on the
+full FlyingThings3D test set of 4,370 pairs. Zero-shot evaluation on the
+unseen Middlebury 2014 benchmark yields 10.9 percent D1-all, and
+inference at $384 \times 640$ resolution takes 49.8 ms on a laptop
+RTX 3050 GPU in half precision. Projections indicate roughly 30 ms on
+Jetson Orin Nano class hardware after INT8 optimization; these projected
+values await confirmation on the physical device. All training code,
+evaluation drivers, and the trained checkpoint are archived in the
+project repository to support full reproduction of every reported number.
