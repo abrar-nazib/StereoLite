@@ -80,3 +80,7 @@ thesis/**/*.synctex.gz
 .envthesis/**/*.nls
 thesis/**/*.ilg
 thesis/book/Thesis.pdf
+thesis/**/*.fdb_latexmk
+thesis/**/*.fls
+.playwright-mcp/
+drawio_qa_v*.png

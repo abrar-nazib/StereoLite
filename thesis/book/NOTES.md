@@ -47,7 +47,9 @@ section renders in IEEE style.
 - [ ] Appendix E: review-paper entry vs "none" (supervisor)
 - [ ] MB14 per-scene table: Ch4 body vs appendix (layout-time call)
 - [x] Rectification-robustness sweep DONE (2026-07-05): objective-2 evidence in Ch4 section 4.5 + Fig 4.9; graceful to ~1px (EPE 1.03 to 1.53)
-- [ ] Export fig_3_1_architecture.drawio to cropped PDF once user finishes hand-adjustments
+- [ ] Export the .drawio architecture figures to cropped PDFs once user finishes hand-adjustments
+- [x] 3D reconstruction delivered (2026-07-05): Ch3 back-projection section + Ch4 section with fig_4_10 (Open3D, best.pth on rig pairs, PLYs in model/benchmarks/thesis_reconstruction/)
+- [x] Body expanded to 76 pages: full ablation history (encoder/refinement/loss/recurrent-family tables), design-evidence table, nomenclature, deeper Ch1/Ch2/Ch4/Ch5; onehalfspacing on mainmatter per user decision (matches accepted precedent)
 - [ ] Jetson Orin Nano board: swap asterisked projections for measurements on arrival
 
 ## Build

@@ -97,6 +97,10 @@
 
 % ----------------------- main matter ----------------------------------
 \pagenumbering{arabic}
+% One-and-a-half spacing for the body, matching the accepted June-2025
+% MTE precedent and the department template's own chapter default
+% (user decision 2026-07-05; frontmatter stays single-spaced).
+\onehalfspacing
 
 \include{mainmatter/ch1}
 \include{mainmatter/ch2}
@@ -112,6 +116,11 @@
 \cleardoublepage
 \phantomsection
 \begin{appendices}
+% our titlesec chapter format hardcodes the word "Chapter"; switch the
+% label to "Appendix" for the letter-numbered appendix chapters
+\titleformat{\chapter}[display]
+  {\centering\bfseries\fontsize{16}{19}\selectfont}
+  {Appendix \thechapter}{6pt}{}
 \include{appendices/app_a}
 \include{appendices/app_b}
 \include{appendices/app_c}
