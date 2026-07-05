@@ -7,11 +7,44 @@
 \chapter{PO and KPA Attainment Tracker}
 
 \section{Program Outcome Mapping}
-\todo{Table: PO (1..12), where demonstrated (section numbers), one-line
-evidence each; assemble from po\_tracker\_notes.md.}
+Table \ref{tab:po_tracker} maps each program outcome to the section of this
+thesis that demonstrates it, with a one-line statement of the evidence.
+
+\begin{table}[!htbp]
+\centering
+\caption{\textbf{Program-outcome attainment tracker.} Mapping of each demonstrated program outcome to its location and evidence.}
+\label{tab:po_tracker}
+\small
+\begin{tabular}{clp{7.6cm}}
+\toprule
+PO & Location & Evidence\\
+\midrule
+PO1 & Ch.~1 & Engineering knowledge of stereo geometry, sensing trade-offs, and the depth-from-disparity relation.\\
+PO2 & Ch.~1, 2, 3 & Problem analysis: the accuracy-latency-memory constraint, the literature gap, and the formal design requirements.\\
+PO3 & Ch.~3 & Design and development of the StereoLite architecture block by block.\\
+PO4 & Ch.~4 & Investigation through controlled ablation studies and in-domain, cross-domain, and robustness evaluation.\\
+PO5 & Ch.~3, App.~A & Modern tool usage: PyTorch, cloud GPU training, mixed precision, and profiling.\\
+PO6 & Ch.~4 & Engineer and society: on-device privacy and accessibility of a low-cost depth sensor.\\
+PO7 & Ch.~4 & Environment and sustainability: passive sensing, low power, and a transparent training footprint.\\
+PO8 & App.~C & Ethics: AI-usage disclosure, conflict-of-interest statement, and similarity report.\\
+PO9 & App.~C & Individual and teamwork: the CRediT contribution statement of the two authors.\\
+PO10 & App.~C, whole thesis & Communication: the written report, figures, and the supervisor-consultation record.\\
+PO11 & App.~B & Project management and finance: the timeline and the itemized expense record.\\
+PO12 & Ch.~5 & Life-long learning: the future-work directions grounded in the field's trajectory.\\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \section{Complex Engineering Problem Attributes}
-\todo{State the K-profile explicitly: P1 depth of knowledge via K3
-(engineering fundamentals), K4 (specialist stereo knowledge), K5
-(design of the network), K8 (research-literature grounding); one
-sentence of evidence per attribute pointing into the chapters.}
+The thesis addresses a complex engineering problem, which requires depth
+of knowledge beyond natural science and mathematics alone. The
+load-bearing knowledge profile is K3, K4, K5, and K8. Attribute K3,
+engineering fundamentals, is exercised in the stereo pipeline and the
+cost-volume mechanisms of Chapters 2 and 3. Attribute K4, specialist
+knowledge, is exercised in the selection and adaptation of the
+tile-hypothesis, recurrent, and geometry-volume building blocks in
+Chapter 3. Attribute K5, engineering design, is exercised in the design
+of the StereoLite architecture and its inference-optimization pass under
+hard resource constraints. Attribute K8, research-literature grounding, is
+exercised in the literature review of Chapter 2, which grounds every
+design choice in published evidence.

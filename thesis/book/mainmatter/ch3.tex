@@ -26,14 +26,48 @@
 % (accuracy at budget), RQ2 (zero-shot generalization), RQ3 (edge
 % latency), RQ4 (tolerance to imperfect rectification, objective 2);
 % assumptions (rectified input, max disparity 192 px).
-\todo{Write per WRITING\_PLAN section 5.1 row 3.1.}
+Stereo matching takes a pair of rectified images and produces a dense
+disparity map, from which metric depth follows directly through the
+calibrated relation of \eqref{eq:depth_from_disparity}. This thesis
+addresses that task under a hardware budget rather than an accuracy
+budget alone. The design requirements follow from the class of edge
+accelerators found on mobile robots and drones: the network must be
+compact enough for on-device memory, must run in real time on a device
+of roughly four to six tera-operations per second, must keep a small
+inference working set, and must use operators that quantize cleanly to
+eight-bit integer arithmetic. These requirements frame four research
+questions. The first asks whether a network within a few million
+parameters can reach competitive in-domain accuracy on synthetic data.
+The second asks whether it generalizes zero-shot to an unseen real
+domain. The third asks whether it meets the real-time latency target on
+the intended device class. The fourth asks whether it tolerates the
+small vertical misalignments that arise when rectification is imperfect,
+which is the second objective of this thesis. We assume rectified
+binocular input and a maximum disparity of 192 pixels at the inference
+resolution, and we train on synthetic data with dense ground truth.
 
 \section{System Overview}
 % Narrate the full pipeline once against Fig 3.1; one paragraph per
 % stage; name the inherited-and-modified mechanisms with their Ch2
 % ancestry: group-wise cost (\eqref{eq:gwc_lit}), ConvGRU + convex
 % upsampling (RAFT-Stereo), GEV (IGEV), tile-plane hypotheses (HITNet).
-\todo{Write per WRITING\_PLAN section 5.1 row 3.2.}
+Figure \ref{fig:architecture} gives the complete pipeline. The proposed
+model, StereoLite, is a coarse-to-fine tile-hypothesis network with light
+recurrent refinement. It inherits three mechanisms from the iterative and
+3D-cost-volume literature and adapts each to the edge budget. The matching
+cost is a group-wise correlation volume in the manner of GwcNet
+\cite{guo2019gwcnet}, restricted to a single coarse scale. The refinement
+operator is a convolutional gated recurrent unit and the final upsampling
+is a learned convex combination, both adapted from RAFT-Stereo
+\cite{lipson2021raftstereo} but run for only a handful of iterations at
+coarse resolution. A quarter-resolution geometry encoding volume, in the
+spirit of IGEV-Stereo \cite{xu2023igev}, supplies a global disparity
+proposal that a learned gate blends into the recurrent estimate. Slanted
+tile planes, following the HITNet paradigm \cite{tankovich2021hitnet},
+carry a local surface hypothesis across scales so that disparity remains
+sub-pixel without rebuilding a cost volume at every level. A shared
+feature encoder feeds the matching path, and a separate left-image
+context encoder feeds the recurrent state.
 
 \begin{figure}[!htbp]
 \centering
@@ -50,7 +84,22 @@
 % shared weights via batch concatenation; f4 128 / f8 256 / f16 256 ch;
 % the separate left-only context encoder (GhostConv + SE, 32 ch out) and
 % WHY matching features must not double as recurrent context.
-\todo{Write per WRITING\_PLAN section 5.1 row 3.3.}
+The matching network is a truncated YOLO26s backbone whose first seven
+blocks are retained, producing features at one quarter, one eighth, and
+one sixteenth resolution with 128, 256, and 256 channels. The two views
+are concatenated along the batch dimension and pass through a single
+shared invocation, which guarantees identical weights for both images.
+The detection neck and head above the one-sixteenth stage are removed,
+since only the pyramid features are needed. A separate context encoder
+processes the left image alone. It applies a strided convolution followed
+by two GhostConv blocks with squeeze-and-excitation, and projects to a
+32-channel quarter-resolution context map that is pooled to the coarser
+scales. Matching evidence and recurrent context are kept in separate
+streams for a specific reason. When the matching features also serve as
+context, the recurrent unit cannot separate appearance from
+correspondence; the RAFT-Stereo lineage \cite{lipson2021raftstereo}
+established that a dedicated context path improves refinement, and the
+same separation is adopted here.
 
 \begin{figure}[!htbp]
 \centering
@@ -62,27 +111,37 @@
 \section{Tile Initialization and Cost Volume}
 % Source: FINAL_MODEL_ARCHITECTURE section 6. Introduce the tile state
 % T = (d, sx, sy, h, c) here.
-\todo{Purpose clause, then \eqref{eq:gwc}; then the 3-D regularization
-(8-16-16-1) and soft-argmax init \eqref{eq:softargmax_init}; initial
-slopes zero; hidden state replaced by ctx16; 24 hypotheses cover roughly
-0 to 368 full-resolution pixels.}
+To seed the coarse-to-fine process, the tile initialization module builds
+a group-wise correlation volume at one sixteenth resolution. For each of
+eight feature groups and each integer disparity, the matching score is the
+mean channel-wise product between the left features and the horizontally
+shifted right features, given by \eqref{eq:gwc}. A small three-dimensional
+convolutional network with an eight, sixteen, sixteen, one channel
+schedule regularizes the volume, and a softmax along the disparity axis
+yields a probability distribution. The initial disparity and confidence
+follow from the soft-argmax and the distribution peak in
+\eqref{eq:softargmax_init}. The plane slopes are initialized to zero and
+the hidden feature is replaced by the coarsest context map. The 24
+hypotheses at this scale span roughly 0 to 368 full-resolution pixels.
 
 \begin{equation}
 C(g,d,y,x) \;=\; \frac{1}{C/G}\sum_{c=1}^{C/G}
   f_{L}^{\,g,c}(y,x)\; f_{R}^{\,g,c}(y,\,x-d)
 \label{eq:gwc}
 \end{equation}
-\todo{where-clause: $G=8$ feature groups, $d \in \{0,\dots,23\}$ disparity
-hypotheses at $1/16$ scale, $f_{L}^{\,g,c}$ the $c$-th channel of group
-$g$ of the left feature map.}
+where $G = 8$ is the number of feature groups, $C$ the channel count,
+$d \in \{0, \dots, 23\}$ the integer disparity hypotheses at one sixteenth
+resolution, and $f_{L}^{\,g,c}$, $f_{R}^{\,g,c}$ the $c$-th channel of
+group $g$ of the left and right feature maps.
 
 \begin{equation}
 d_{0} \;=\; \sum_{d} p(d)\, d, \qquad
 c_{0} \;=\; \max_{d}\, p(d)
 \label{eq:softargmax_init}
 \end{equation}
-\todo{where-clause: $p(d)$ the softmax over the regularized volume along
-the disparity dimension.}
+where $p(d)$ is the softmax of the regularized cost volume along the
+disparity dimension, $d_0$ the expected disparity, and $c_0$ the peak
+probability that serves as an initial confidence.
 
 \begin{figure}[!htbp]
 \centering
@@ -97,17 +156,31 @@ the disparity dimension.}
 % local correlation lookup (half range 2, five offsets); the gated
 % residual head (four sigmoid gates); softplus non-negativity; schedule
 % 2/3/3 = eight updates.
-\todo{Write per WRITING\_PLAN section 5.1 row 3.5, using
-\eqref{eq:gru_input} and \eqref{eq:convgru}.}
+The tile state is refined by separate refinement modules at one
+sixteenth, one eighth, and one quarter resolution; their weights are not
+shared because the matching-feature channel counts differ across scales.
+At each iteration the right feature map is warped toward the left view by
+the current disparity, and a differentiable local correlation is
+evaluated over five offsets within a half-range of two pixels. The
+recurrent input assembles the left features, the warped right features,
+the current state, the local correlation, and the context, as in
+\eqref{eq:gru_input}. A convolutional gated recurrent unit updates the
+persistent hidden state through the gate equations of \eqref{eq:convgru}.
+A two-layer head with 48 hidden channels predicts residuals for
+disparity, both plane slopes, and confidence, and a second learned gate
+emits four independent sigmoid weights that scale each residual.
+Disparity is constrained to remain non-negative through a softplus. The
+schedule runs two iterations at one sixteenth, three at one eighth, and
+three at one quarter, for eight learned updates in total.
 
 \begin{equation}
 x \;=\; \bigl[\, f_{L},\; \mathcal{W}(f_{R};\,d),\; d,\; s_{x},\; s_{y},\;
   c,\; \mathrm{corr},\; \mathrm{ctx} \,\bigr]
 \label{eq:gru_input}
 \end{equation}
-\todo{where-clause: $\mathcal{W}$ the disparity warp of the right
-features, $\mathrm{corr}$ the five-offset local correlation, and
-$\mathrm{ctx}$ the scale-matched context map.}
+where $\mathcal{W}(f_{R}; d)$ denotes the right features warped by the
+current disparity, $\mathrm{corr}$ the five-offset local correlation, and
+$\mathrm{ctx}$ the scale-matched context map.
 
 \begin{equation}
 \begin{aligned}
@@ -118,8 +191,9 @@ h' &= (1-z) \odot h + z \odot q,
 \end{aligned}
 \label{eq:convgru}
 \end{equation}
-\todo{where-clause: $h$ the 32-channel persistent hidden state, $\odot$
-the element-wise product.}
+where $h$ is the 32-channel persistent hidden state, $z$ and $r$ the
+update and reset gates, $q$ the candidate state, and $\odot$ the
+element-wise product.
 
 \begin{figure}[!htbp]
 \centering
@@ -131,8 +205,15 @@ the element-wise product.}
 \section{Plane-Aware Cross-Scale Propagation}
 % Source: FINAL_MODEL_ARCHITECTURE section 8. Slopes are USED, not just
 % stored; contrast with plain bilinear upsampling.
-\todo{Write per WRITING\_PLAN section 5.1 row 3.6, around
-\eqref{eq:plane_prop}.}
+Between adjacent scales, the propagation module resamples the disparity,
+slopes, hidden feature, and confidence to the finer grid. Disparity is
+multiplied by two because its pixel unit changes with resolution. Unlike
+plain bilinear interpolation, the propagated disparity also uses the local
+plane slopes to place the four child pixels around each parent tile,
+following \eqref{eq:plane_prop}. This is the tile-plane component of the
+design, in the manner of HITNet \cite{tankovich2021hitnet}; it preserves
+a local slanted-surface hypothesis while moving to a finer grid, which
+keeps sub-pixel structure without rebuilding a cost volume at every level.
 
 \begin{equation}
 d_{\mathrm{child}} \;=\; 2\,\mathcal{B}(d_{\mathrm{parent}})
@@ -140,8 +221,10 @@ d_{\mathrm{child}} \;=\; 2\,\mathcal{B}(d_{\mathrm{parent}})
 \qquad \Delta x, \Delta y \in \{-0.25,\, +0.25\}
 \label{eq:plane_prop}
 \end{equation}
-\todo{where-clause: $\mathcal{B}$ bilinear resampling; the factor two
-accounts for the disparity unit change across scales.}
+where $\mathcal{B}$ is bilinear resampling of the parent disparity, $s_x$
+and $s_y$ the local plane slopes, and $\Delta x, \Delta y \in \{-0.25,
++0.25\}$ the child offsets; the factor of two rescales the disparity to
+the finer grid.
 
 \begin{figure}[!htbp]
 \centering
@@ -155,10 +238,24 @@ accounts for the disparity unit change across scales.}
 % (the trained configuration): the volume samples 33 hypotheses in a
 % +-16 band around the current tile disparity (efficiency finding F3,
 % validated accuracy-neutral). Three 3x3x3 convolutions, 16 channels.
-\todo{Write per WRITING\_PLAN section 5.1 row 3.7, around
-\eqref{eq:gev_expect} and \eqref{eq:failsoft}; explain the bias-init
-argument (initial gate weight ~0.018, training starts at the stable
-baseline and must learn where GEV information helps).}
+The geometry encoding volume adds an independent global proposal at one
+quarter resolution, in the spirit of IGEV-Stereo \cite{xu2023igev}. In the
+trained configuration it is narrow: rather than the full 64 disparity
+planes of the base design, it samples 33 hypotheses in a band of plus or
+minus 16 around the current tile disparity, a change validated in
+Chapter 4 as accuracy-neutral while removing roughly a quarter of the
+model's multiply-accumulate operations. The volume is regularized by
+three three-dimensional convolutions with 16 hidden channels, and the
+softmax distribution yields the expected disparity, a confidence, and a
+projected geometry feature, as in \eqref{eq:gev_expect}. The proposal is
+not substituted unconditionally. A learned gate takes the context, the
+geometry feature, both confidences, the absolute disagreement, and the
+current disparity, and produces a scalar weight through
+\eqref{eq:failsoft}. The gate's final bias is initialized to minus four,
+so the initial weight is approximately 0.018 and training begins close to
+the stable recurrent baseline; the network then learns where the geometry
+proposal helps. This fail-soft design keeps the global branch from
+corrupting regions the recurrent path already resolves well.
 
 \begin{equation}
 d_{\mathrm{gev}} = \sum_{d} p(d)\, d, \qquad
@@ -166,8 +263,9 @@ c_{\mathrm{gev}} = \max_{d}\, p(d), \qquad
 g_{\mathrm{gev}} = \phi\Bigl(\sum_{d} G(d)\, p(d)\Bigr)
 \label{eq:gev_expect}
 \end{equation}
-\todo{where-clause: $G$ the regularized 3-D geometry feature, $\phi$ a
-projection to a 16-channel 2-D expected-geometry map.}
+where $p(d)$ is the softmax over the regularized quarter-resolution
+volume, $G(d)$ the regularized three-dimensional geometry feature, and
+$\phi$ a projection to a 16-channel two-dimensional expected-geometry map.
 
 \begin{equation}
 \begin{aligned}
@@ -177,9 +275,10 @@ d_{\mathrm{fused}} &= \mathrm{softplus}\bigl(d + w\,(d_{\mathrm{gev}} - d)\bigr)
 \end{aligned}
 \label{eq:failsoft}
 \end{equation}
-\todo{where-clause: $F$ the fusion network with final-layer bias
-initialized to $-4$; slopes attenuate by $(1-w)$; confidence becomes the
-maximum of the two estimates.}
+where $F$ is the fusion network whose final-layer bias is initialized to
+$-4$, $c$ and $c_{\mathrm{gev}}$ the tile and geometry confidences, and
+$w$ the blend weight; the slopes are attenuated by $(1 - w)$ and the
+confidence becomes the maximum of the two estimates.
 
 \begin{figure}[!htbp]
 \centering
@@ -193,10 +292,21 @@ maximum of the two estimates.}
 % (blur-fix ablation 20260703_blurfix_n500: bad-0.5 -22.5 percent,
 % selected over bimodal and bundle1; composition was WORSE than plane
 % alone: report that in Ch4, cite here).
-\todo{Write per WRITING\_PLAN section 5.1 row 3.8: two 2x stages with
-nine-weight softmax masks from fL4 then fL2; plane-equation rendering
-with the edge gate; the known limitation (cannot invent high-frequency
-structure absent at 1/4).}
+The final one-quarter disparity is upsampled to full resolution in two
+learned two-times stages. The first stage predicts masks from the
+one-quarter left features and the second from the one-half left features.
+For every output subpixel, a mask predicts nine weights over the
+three-by-three coarse neighborhood, and a softmax makes the weights
+non-negative and sum to one, so the upsampled disparity is a convex
+combination of nearby coarse values, following the convex upsampling of
+RAFT-Stereo \cite{lipson2021raftstereo}. Before upsampling, a
+plane-rendering step reconstructs each tile from its disparity and slopes
+and applies an edge gate; this was the decisive fix in the
+boundary-sharpness study of Chapter 4, where it reduced the bad-0.5 rate
+by roughly 22 percent relative to the control. Convex upsampling can
+select different source neighbors near a boundary, but it cannot invent a
+disparity hypothesis absent from the one-quarter prediction, so thin and
+distant structures remain a known limitation.
 
 \begin{figure}[!htbp]
 \centering
@@ -209,8 +319,18 @@ structure absent at 1/4).}
 % Source: FINAL_MODEL_ARCHITECTURE section 12 + trainer loss_fn.
 % Valid pixels: finite GT in (0, 320) px. Lower scales resized to full
 % resolution and scaled before comparison.
-\todo{Name each term's job in one sentence each around \eqref{eq:loss};
-the gated slant supervision (weight 0.3) pairs with plane rendering.}
+The network is trained with the multi-scale supervised objective of
+\eqref{eq:loss}. A pixel counts as valid when its ground-truth disparity
+is finite and lies between 0 and 320 pixels. Each lower-scale prediction
+is resized to full resolution and multiplied by its scale factor before
+the comparison. The objective weights an L1 term at every scale most
+heavily at full resolution, adds a matching L1 term on the
+geometry-volume output, and augments the full-resolution prediction with
+a Sobel gradient-consistency term, a threshold hinge stack, a KITTI-style
+D1-relative hinge, an edge-aware smoothness term, and a gated
+slant-supervision term that trains the plane slopes only where they are
+trustworthy. The slant term pairs with plane rendering: it makes the
+slopes accurate enough for the rendering step to sharpen boundaries.
 
 \begin{equation}
 \begin{aligned}
@@ -228,12 +348,12 @@ the gated slant supervision (weight 0.3) pairs with plane rendering.}
 \end{aligned}
 \label{eq:loss}
 \end{equation}
-\todo{where-clause defining each term: $\mathcal{L}_{1}$ masked mean
-absolute error, $\mathcal{L}_{\mathrm{grad}}$ Sobel gradient
-consistency, $\mathcal{L}_{\mathrm{thr}}$ threshold hinge stack,
-$\mathcal{L}_{\mathrm{D1}}$ the D1-relative hinge,
-$\mathcal{L}_{\mathrm{smooth}}$ edge-aware smoothness,
-$\mathcal{L}_{\mathrm{slant}}$ the gated slant supervision.}
+where $\mathcal{L}_1$ is the masked mean absolute disparity error,
+$\mathcal{L}_{\mathrm{grad}}$ a Sobel gradient-consistency term,
+$\mathcal{L}_{\mathrm{thr}}$ a hinge over the error thresholds
+$\{0.5, 1, 2, 3\}$ pixels, $\mathcal{L}_{\mathrm{D1}}$ the D1-relative
+hinge, $\mathcal{L}_{\mathrm{smooth}}$ an edge-aware smoothness term, and
+$\mathcal{L}_{\mathrm{slant}}$ the gated slant supervision.
 
 \begin{figure}[!htbp]
 \centering
@@ -252,7 +372,25 @@ $\mathcal{L}_{\mathrm{slant}}$ the gated slant supervision.}
 % random scale); OneCycle 60k steps peak 8e-4, batch 32, bf16, A100;
 % input contract [0,1]; validation on a fixed 400-pair FT3D-TEST subset
 % at the native 960x540 pad-16 axis.
-\todo{Write per WRITING\_PLAN section 5.1 row 3.10.}
+The model is trained on the full SceneFlow finalpass dataset. The
+canonical split contains 35,454 training pairs, drawn from the
+FlyingThings3D training set together with Monkaa and Driving, and the
+FlyingThings3D test set of 4,370 pairs is held out for evaluation; only
+FlyingThings3D provides an official test split, so the test set is drawn
+from it alone. Training samples random 384 by 640 windows that are
+co-located in both views from the native 960 by 540 frames, which
+preserves the native disparity magnitudes. Chapter 4 shows that this
+native-crop protocol substantially outperforms the legacy protocol of
+downscaling the whole frame. Three augmentations from the OpenStereo
+recipe are applied: asymmetric color jitter, right-image-only random
+erasing, and random scaling. Optimization uses AdamW with a OneCycle
+schedule over 60,000 steps at a peak learning rate of $8 \times 10^{-4}$,
+a batch of 32, and bfloat16 mixed precision, on a single A100 GPU. The
+input is normalized to the unit interval at the model boundary.
+Validation uses a fixed 400-pair subset of the test set at the native
+960 by 540 axis, evaluated every thousand steps, with a resized-axis
+measurement logged alongside. Table \ref{tab:train_config} lists the
+configuration.
 
 \begin{figure}[!htbp]
 \centering
@@ -288,7 +426,17 @@ Hardware & one NVIDIA A100 80 GB (cloud)\\
 % seed, full 8-metric reporting), controlled single-knob ablations,
 % pre-registered win criteria, cross-dataset gate after every training
 % run. This section is methodology (PO4 setup); its RESULTS are Ch4.
-\todo{Write per WRITING\_PLAN section 5.1 row 3.11.}
+The architectural choices in this chapter were made under a controlled
+matched-overfit methodology rather than by intuition. Each candidate is
+trained on a fixed set of SceneFlow pairs with a fixed seed, deterministic
+convolution kernels, an identical step budget, and an identical evaluation
+protocol, and all eight stereo metrics together with an inference-latency
+benchmark are reported for every arm. Single knobs are varied one at a
+time, the winning criterion is registered before a run, and every
+candidate is checked against a held-out cross-dataset evaluation, so that
+an in-domain gain that fails to transfer is not mistaken for progress. The
+results of these studies appear in Chapter 4; this section states the
+protocol that produced them.
 
 \section{Optimization of the Network for Edge Inference}
 % Source: THESIS_PLAN section 3 (F1-F8 findings table). This is thesis
@@ -297,7 +445,25 @@ Hardware & one NVIDIA A100 80 GB (cloud)\\
 % narrow GEV band; equivalence-proof discipline (bitwise or matched A/B
 % per fix); export blockers identified (F.unfold, GroupNorm, Conv3d) and
 % their mitigations.
-\todo{Write per WRITING\_PLAN section 5.1 row 3.12.}
+Reaching the latency target required an optimization pass over the
+network's inference graph, treated as an engineering task in its own
+right. Six changes were applied. The cost-volume construction loops were
+rewritten to use padded zero-copy views instead of allocating and zeroing
+a feature map for every disparity bin. The grid-sample calls were reduced
+from 48 to eight by batching the lookups and caching the sampling grids.
+Static channels of the recurrent input, which are re-convolved every
+iteration, were hoisted once per scale, following the precomputed-context
+trick of RAFT-Stereo \cite{lipson2021raftstereo}. The gate convolutions
+and the four output heads, which share inputs, were fused. Dead
+inference-path code was removed. Finally, the geometry volume was narrowed
+to a band around the tile disparity. Each change was proven equivalent
+before adoption, either bitwise or through a matched A/B comparison, and
+together they cut the full-precision latency by a factor of 1.74. The pass
+also surfaced three export blockers for eight-bit deployment, namely the
+unfold operation in convex upsampling, group normalization on some
+accelerator toolchains, and three-dimensional convolution on neural
+processing units, each of which has a documented replacement.
+Table \ref{tab:efficiency_findings} summarizes the changes.
 
 \begin{table}[!htbp]
 \centering
@@ -329,9 +495,18 @@ Combined & fp32 61.4 ms vs 106.7 ms base ($1.74\times$) & \\
 
 \section{Evaluation Metrics}
 % Source: FINAL_MODEL_ARCHITECTURE section 16.
-\todo{Introduce \eqref{eq:metrics}; add RMSE and median absolute error in
-prose; state the latency and memory measurement protocol (batch 1,
-384x640, warm-up, fp16/fp32, device named per measurement).}
+Accuracy is reported with the standard stereo metrics defined in
+\eqref{eq:metrics}. The end-point error is the mean absolute disparity
+error over valid pixels; the bad-$t$ rate is the percentage of valid
+pixels whose absolute error exceeds $t$ pixels; and the D1-all rate is the
+KITTI outlier definition. The root-mean-square error and the median
+absolute error are reported alongside, the former to expose large outliers
+and the latter as an outlier-robust summary. Each image contributes its
+own averaged metric, and the scores are averaged over images rather than
+by pooling every pixel globally. Latency is measured at batch one and
+384 by 640 resolution with ten warm-up passes and a hundred timed passes,
+and memory as the peak inference working set; the device is stated for
+every reported measurement.
 
 \begin{equation}
 \begin{aligned}
@@ -346,12 +521,20 @@ prose; state the latency and memory measurement protocol (batch 1,
 \end{aligned}
 \label{eq:metrics}
 \end{equation}
-\todo{where-clause: $V$ the valid-pixel set, $\hat{d}$ the prediction,
-$d^{*}$ the ground truth, $t \in \{0.5, 1, 2, 3\}$ px.}
+where $V$ is the set of valid pixels, $\hat{d}$ the predicted disparity,
+$d^{*}$ the ground truth, and $t \in \{0.5, 1, 2, 3\}$ pixels the bad-rate
+thresholds.
 
 \section{Implementation and Deployment Environment}
 % Sources: meta.json; THESIS_PLAN section 2A. PyTorch 2.11 cu128; Modal
 % A100-80GB training, T4 evaluation; RTX 3050 local bench; CCB stereo
 % camera rig; target device class Jetson Orin Nano (borrowed board
 % pending; projections carry asterisks).
-\todo{Write per WRITING\_PLAN section 5.1 row 3.14.}
+The model is implemented in PyTorch 2.11 with CUDA 12.8. Training runs on
+a single cloud A100 with 80 gigabytes of memory, ablations and evaluations
+on a cloud T4, and the local latency benchmark on an RTX 3050 laptop GPU
+with roughly 4 gigabytes of memory. Real-camera pairs come from a
+calibrated binocular rig that streams a 2560 by 720 side-by-side image.
+The intended deployment target is the Jetson Orin Nano class of device;
+on-device measurement awaits that hardware, and the projections reported
+in Chapter 4 are marked accordingly.

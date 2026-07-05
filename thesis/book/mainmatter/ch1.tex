@@ -19,7 +19,21 @@
 % Content: why machine depth perception matters; passive stereo vs LiDAR
 % vs structured light (cost, power, form factor); state Eq 1.1 EARLY with
 % a where-clause; applications (mobile robots, drones, AR, embedded rigs).
-\todo{Write per WRITING\_PLAN section 3.1 row 1.1.}
+Depth perception is a prerequisite for a machine that must act in
+three-dimensional space. A mobile robot avoids obstacles, a drone holds
+its position, and an augmented-reality headset anchors virtual content
+only if it knows how far away each surface lies. Among the passive ways to
+recover depth, binocular stereo is attractive for embedded systems because
+it emits no light, draws little power, and uses two inexpensive cameras
+rather than a laser scanner. Given a pair of images from two horizontally
+separated cameras, the horizontal shift of a scene point between the two
+views, its disparity, determines depth through the calibrated relation of
+\eqref{eq:depth_from_disparity}. A dense disparity map therefore yields a
+dense depth map, which downstream perception and reconstruction consume
+directly. The applications that motivate this thesis, namely mobile
+robots, drones, augmented and virtual reality, and compact embedded
+sensing rigs, share a common trait: they carry a small power and compute
+budget and demand results in real time.
 
 % Eq 1.1: the depth-from-disparity relation (introduce with a purpose
 % clause, then a where-clause naming every symbol).
@@ -27,8 +41,10 @@
 Z = \frac{f\,B}{d}
 \label{eq:depth_from_disparity}
 \end{equation}
-\todo{where-clause for \eqref{eq:depth_from_disparity}: $Z$ depth, $f$
-focal length in pixels, $B$ baseline, $d$ disparity.}
+where $Z$ is the depth of a scene point, $f$ the camera focal length in
+pixels, $B$ the baseline separating the two cameras, and $d$ the
+disparity, the horizontal shift of the point between the two rectified
+views.
 
 \begin{figure}[!htbp]
 \centering
@@ -44,7 +60,23 @@ focal length in pixels, $B$ baseline, $d$ disparity.}
 % params) but is undeployable on edge; edge envelope 1 to 6 TOPS, 4 GB,
 % 5 to 25 W; accuracy-latency-memory triangle; the concessive gap pivot
 % ("However, ...").
-\todo{Write per WRITING\_PLAN section 3.1 row 1.2.}
+Deep networks have transformed the accuracy of stereo matching. The most
+accurate systems now pair a foundation-scale monocular prior with an
+iterative refinement core; FoundationStereo, for example, reports 0.34
+pixel end-point error on the SceneFlow benchmark with a backbone of
+roughly 340 million parameters \cite{wen2025foundationstereo}. However,
+this accuracy is bought with a computational cost that embedded hardware
+cannot pay. The edge accelerators found on mobile robots and drones
+deliver a few tera-operations per second, carry a few gigabytes of memory,
+and operate within a power envelope of a few watts to a few tens of watts.
+A network with hundreds of millions of parameters and hundreds of
+milliseconds of latency does not fit that budget. The problem this thesis
+addresses is therefore not accuracy alone but the joint objective of
+accuracy, latency, and memory: a stereo network that is accurate enough to
+be useful, small enough to fit in on-device memory, and fast enough to run
+in real time on an edge accelerator. Figure \ref{fig:edge_gap} places the
+published literature on this trade-off and marks the region this thesis
+targets.
 
 \begin{figure}[!htbp]
 \centering
@@ -65,21 +97,50 @@ resource-limited platforms.
 in terms of rectification.
 \end{enumerate}
 
-\todo{Scope paragraph: passive rectified binocular stereo, supervised
-synthetic training, sub-3 M parameter budget, zero-shot cross-domain
-validation, edge latency qualification; excluded: active sensing,
-self-supervision, deployment SDK productization. Note: objective 2 is
-evidenced by the rectification-robustness sweep (WRITING\_PLAN section
-11a) reported in Chapter 4.}
+The scope of this thesis is passive rectified binocular stereo, trained by
+supervision on synthetic data with dense ground truth. The design targets
+a compact network of a few million parameters, evaluated both in domain
+and zero-shot on an unseen real domain, with its inference optimized for
+the edge latency envelope and qualified on real camera pairs. Active
+sensing, self-supervised training, monocular depth estimation, and the
+production of a deployment software development kit are outside the scope.
+The evidence for the second objective, tolerance to imperfect
+rectification, is a controlled perturbation study reported in Chapter 4.
 
 \section{Rationale and Significance}
 % Content: why a NEW small architecture rather than shrinking a big one;
 % Complex Engineering Problem justification woven in: K3 (engineering
 % fundamentals), K4 (specialist stereo knowledge), K5 (network design),
 % K8 (research-literature grounding), one sentence each.
-\todo{Write per WRITING\_PLAN section 3.1 row 1.4, including the explicit
-CEP K-profile statement (K3, K4, K5, K8).}
+A natural question is why this thesis designs a new compact network rather
+than compressing an existing large one. Two reasons motivate the choice.
+First, the accuracy of the foundation-scale systems rests substantially on
+their monocular priors and their scale, neither of which survives
+aggressive compression, so compressing them tends to discard the very
+component that makes them accurate. Second, the tile-hypothesis and
+recurrent-refinement families were designed for efficiency from the
+outset and offer a cleaner starting point for an edge budget. Designing
+such a network is a complex engineering problem: it cannot be solved by
+natural science or mathematics alone. It requires in-depth engineering
+knowledge of the stereo pipeline (attribute K3), specialist knowledge of
+the deep-stereo literature and its building blocks (K4), the design of a
+novel architecture under hard resource constraints (K5), and grounding in
+a large body of research literature to select and combine the right
+mechanisms (K8). These attributes are demonstrated across the methodology
+and results chapters.
 
 \section{Thesis Organization}
 % Write LAST for this chapter: one tight sentence per chapter.
-\todo{One-sentence-per-chapter outline of Chapters 2 to 5 plus appendices.}
+The remainder of this thesis is organized as follows. Chapter 2 reviews
+the stereo-matching literature, from the classical pipeline through the
+deep-learning eras to the modern efficient and foundation-model families,
+with an emphasis on how edge deployability is achieved. Chapter 3 presents
+the proposed architecture block by block, together with its training
+protocol and the optimization pass that meets the edge latency target.
+Chapter 4 reports the in-domain and zero-shot accuracy, the ablation
+studies, and the efficiency and deployment measurements, and discusses
+their implications. Chapter 5 summarizes the findings, states the
+limitations, and outlines future work. The appendices provide the
+technical specifications, the project management and financial record, the
+ethics and teamwork statements, the program-outcome attainment tracker,
+and the list of publications.
