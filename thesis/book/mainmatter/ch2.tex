@@ -11,9 +11,10 @@
 %     table/page breadcrumbs) or method_data.py.
 %   - Figures and tables below are DONE (embedded, cited); do not move
 %     them; write the prose around them.
-%   - Architecture panels in Fig \ref{fig:paradigms} are REPRODUCED from
-%     the original papers with citation (user-approved practice for the
-%     thesis); all other diagrams are our own redrawn .drawio figures.
+%   - The per-paradigm architecture panels (fig:psmnet, fig:raftstereo,
+%     fig:hitnet, fig:liteany) are REPRODUCED from the original papers with
+%     citation and distributed into the sections that discuss each method
+%     (user-approved practice); all other diagrams are our own .drawio.
 %   - PO demonstrated: PO2 throughout.
 % =====================================================================
 \chapter{Literature Review}
@@ -29,20 +30,38 @@ must lie, in the other view, on a known line determined by the relative
 pose of the two cameras. Rectification warps both images so that these
 epipolar lines become horizontal scanlines at the same row, after which
 every pair of corresponding points lies on the same scanline and the
-search for a match reduces to a one-dimensional search along it. The
-horizontal shift between a point and its match is the disparity, and it
-determines depth through the calibrated relation introduced in Chapter 1.
-Because the relation is inverse, disparity resolution matters most for
-distant surfaces: a fixed sub-pixel disparity error spans a growing depth
-interval as the scene recedes, which is why the field measures accuracy
-in fractions of a pixel. The central intermediate structure is the
+search for a match reduces to a one-dimensional search along it, as
+Figure \ref{fig:stereo_geometry} illustrates. The horizontal shift
+between a point and its match is the disparity, and it determines depth
+through the calibrated pinhole relation
+\begin{equation}
+Z = \frac{f\,B}{d}
+\label{eq:depth_from_disparity}
+\end{equation}
+where $Z$ is the depth of a scene point, $f$ the camera focal length in
+pixels, $B$ the baseline separating the two cameras, and $d$ the
+disparity, the horizontal shift of the point between the two rectified
+views. Because the relation is inverse, disparity resolution matters most
+for distant surfaces: a fixed sub-pixel disparity error spans a growing
+depth interval as the scene recedes, which is why the field measures
+accuracy in fractions of a pixel.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.92\textwidth]{fig_1_1_stereo_geometry_preview}
+\caption{\textbf{Two-view stereo geometry.} A scene point $P$ projects to $x_L$ and $x_R$ on two rectified image planes separated by the baseline $B$; the disparity $d = x_L - x_R$ recovers depth through $Z = fB/d$.}
+\label{fig:stereo_geometry}
+\end{figure}
+
+The central intermediate structure is the
 disparity space image, or cost volume, which stores for every pixel and
 every candidate disparity a score measuring how well the two views
 agree; this structure is the direct precursor of the learned cost
 volumes used throughout this thesis. Scharstein and Szeliski
 \cite{scharstein2002taxonomy} organized every stereo algorithm into four
-steps: matching cost computation, cost aggregation, disparity
-optimization, and disparity refinement. Local methods place their effort
+steps, shown in Figure \ref{fig:classical_pipeline}: matching cost
+computation, cost aggregation, disparity optimization, and disparity
+refinement. Local methods place their effort
 in aggregation, imposing smoothness implicitly through the support
 window, and are fast but blur edges; global methods place it in an
 explicit energy minimization and are sharp but slow. The classical
@@ -86,6 +105,7 @@ penalty for one-pixel disparity changes that preserves slanted surfaces,
 $P_2$ a larger penalty for jumps beyond one pixel that permits true
 discontinuities, and $\mathbb{1}[\cdot]$ the indicator function.
 
+\FloatBarrier
 \section{The Deep Learning Transition}
 % Sources: tier2/end_to_end/{MC-CNN,DispNetC,GCNet}.md,
 % tier1/surveys/Poggi_Synergies_TPAMI2021.md.
@@ -136,13 +156,23 @@ into high probability. The operator assumes a single-peaked cost
 distribution and returns an intermediate value where that assumption
 fails, such as at a depth discontinuity.
 
+\FloatBarrier
 \section{The 3D Cost-Volume Era}
 % Sources: tier2/end_to_end/{PSMNet,GWCNet,GANet,AANet,ACVNet,CFNet}.md.
 The years that followed refined the three-dimensional cost-volume
-paradigm. PSMNet \cite{chang2018psmnet} added spatial pyramid pooling, to
-inject global context at the feature level, and three stacked hourglass
-modules with intermediate supervision; it became the de-facto baseline for
-the era. GwcNet \cite{guo2019gwcnet} introduced the group-wise correlation
+paradigm. PSMNet \cite{chang2018psmnet}, shown in Figure
+\ref{fig:psmnet}, added spatial pyramid pooling, to inject global context
+at the feature level, and three stacked hourglass modules with
+intermediate supervision; it became the de-facto baseline for the era.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{fig_2_4a_psmnet}
+\caption{\textbf{PSMNet: the 3D cost-volume paradigm.} Architecture overview reproduced from \cite{chang2018psmnet}: spatial pyramid pooling on shared features, a concatenation cost volume, and 3D CNN regularization followed by disparity regression.}
+\label{fig:psmnet}
+\end{figure}
+
+GwcNet \cite{guo2019gwcnet} introduced the group-wise correlation
 volume, which splits the features into channel groups and computes an
 inner-product correlation per group, as in \eqref{eq:gwc_lit}. This form
 sits between the information-poor full correlation and the expensive
@@ -177,16 +207,27 @@ the resulting volume carries one channel per group. The tile
 initialization of this thesis uses this operator at a single coarse scale,
 as \eqref{eq:gwc} makes explicit.
 
+\FloatBarrier
 \section{Iterative Refinement}
 % Sources: tier1/iterative/* + reference_impls/raft_stereo, igev_stereo.
 A different paradigm emerged with RAFT-Stereo \cite{lipson2021raftstereo},
-which adapted the iterative refinement of RAFT optical flow to stereo. It
-builds an all-pairs one-dimensional correlation volume, uses a separate
-context encoder to seed a multi-level convolutional gated recurrent unit,
-and refines the disparity through many lightweight update iterations, each
-of which looks up correlation values around the current estimate. It
-restores full resolution with a learned convex upsampling that predicts a
-weighted combination of a coarse neighborhood. Three of these mechanisms,
+shown in Figure \ref{fig:raftstereo}, which adapted the iterative
+refinement of RAFT optical flow to stereo. It builds an all-pairs
+one-dimensional correlation volume, uses a separate context encoder to
+seed a multi-level convolutional gated recurrent unit, and refines the
+disparity through many lightweight update iterations, each of which looks
+up correlation values around the current estimate. It restores full
+resolution with a learned convex upsampling that predicts a weighted
+combination of a coarse neighborhood.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{fig_2_4b_raftstereo}
+\caption{\textbf{RAFT-Stereo: the iterative paradigm.} Architecture overview reproduced from \cite{lipson2021raftstereo}: a dedicated context encoder seeds a convolutional gated recurrent unit that iteratively looks up an all-pairs correlation volume.}
+\label{fig:raftstereo}
+\end{figure}
+
+Three of these mechanisms,
 the group-wise cost lookup, the recurrent update, and convex upsampling,
 reappear in modified form in the model of this thesis. IGEV-Stereo
 \cite{xu2023igev} improved the paradigm by building a geometry encoding
@@ -247,32 +288,6 @@ $C_G$ the regularized geometry volume, and $d_0$ the warm-start disparity;
 each iteration then looks up values from both $C_G$ and the all-pairs
 correlation.
 
-\begin{figure}[!htbp]
-\centering
-\begin{subfigure}{0.49\textwidth}
-\centering
-\includegraphics[width=\textwidth,height=3.4cm,keepaspectratio]{fig_2_4a_psmnet}
-\caption{PSMNet: 3D cost-volume paradigm \cite{chang2018psmnet}}
-\end{subfigure}\hfill
-\begin{subfigure}{0.49\textwidth}
-\centering
-\includegraphics[width=\textwidth,height=3.4cm,keepaspectratio]{fig_2_4b_raftstereo}
-\caption{RAFT-Stereo: iterative paradigm \cite{lipson2021raftstereo}}
-\end{subfigure}\\[6pt]
-\begin{subfigure}{0.49\textwidth}
-\centering
-\includegraphics[width=\textwidth,height=3.4cm,keepaspectratio]{fig_2_4c_hitnet}
-\caption{HITNet: tile-hypothesis paradigm \cite{tankovich2021hitnet}}
-\end{subfigure}\hfill
-\begin{subfigure}{0.49\textwidth}
-\centering
-\includegraphics[width=\textwidth,height=3.4cm,keepaspectratio]{fig_2_4d_liteanystereo}
-\caption{LiteAnyStereo: efficient KD-trained paradigm \cite{jing2025liteanystereo}}
-\end{subfigure}
-\caption{\textbf{Four stereo-matching paradigms.} Architecture overviews reproduced from the original publications for comparison; each caption cites the source. The proposed StereoLite combines the tile-hypothesis state of (c) with the recurrent refinement of (b) and a geometry encoding volume in the spirit of IGEV.}
-\label{fig:paradigms}
-\end{figure}
-
 A parallel line replaced the cost volume itself with attention. STTR
 \cite{li2021sttr} treats matching as dense sequence-to-sequence
 correspondence along the epipolar lines, alternating self-attention
@@ -284,6 +299,7 @@ range, but its dense attention has remained costly at the resolutions
 and budgets that edge deployment demands, which is why the proposed
 model draws on the recurrent family instead.
 
+\FloatBarrier
 \section{Foundation-Model Era}
 % Sources: tier1/foundation_model/* + review_paper section 03.
 The most recent and most accurate systems share a common recipe: they
@@ -313,7 +329,9 @@ buys its accuracy twice over, from the prior's knowledge of monocular
 structure and from the iterations it saves. These systems set the
 accuracy ceiling, but they do so with hundreds of millions of parameters
 and hundreds of milliseconds of latency, which motivates rather than
-solves the edge problem this thesis addresses.
+solves the edge problem this thesis addresses. Figure \ref{fig:timeline}
+traces this progression across the six paradigm eras and marks where the
+present work sits.
 
 \begin{figure}[!htbp]
 \centering
@@ -322,6 +340,7 @@ solves the edge problem this thesis addresses.
 \label{fig:timeline}
 \end{figure}
 
+\FloatBarrier
 \section{Efficient and Edge-Deployable Stereo}
 % THE load-bearing section (~7 pages). Skeleton: review_paper section 04
 % (rewrite for thesis register, do not copy).
@@ -367,17 +386,24 @@ milliseconds per frame. DeepPruner \cite{duggal2019deeppruner} predicts a
 per-pixel disparity range with a differentiable PatchMatch and a
 confidence-range predictor, so that the expensive aggregation runs only
 on a pruned set of hypotheses; its fast variant reaches 0.97 pixel
-end-point error at 61 milliseconds. HITNet \cite{tankovich2021hitnet}
-removes the three-dimensional cost volume altogether: it represents the
-scene as a grid of small tiles, each carrying a slanted-plane hypothesis
-with a disparity, two slopes, and a descriptor, and refines these
-hypotheses by two-dimensional propagation and warping across scales,
-reaching 0.43 pixel end-point error at 0.97 million parameters and 54
-milliseconds. The slanted plane lets a tile represent sub-pixel structure
-that a fronto-parallel hypothesis cannot, which is what allows the
-network to stay accurate without a dense volume. This tile-hypothesis
-representation, including its plane slopes, is the paradigm from which
-the model of this thesis is built.
+end-point error at 61 milliseconds. HITNet \cite{tankovich2021hitnet},
+shown in Figure \ref{fig:hitnet}, removes the three-dimensional cost
+volume altogether: it represents the scene as a grid of small tiles, each
+carrying a slanted-plane hypothesis with a disparity, two slopes, and a
+descriptor, and refines these hypotheses by two-dimensional propagation
+and warping across scales, reaching 0.43 pixel end-point error at 0.97
+million parameters and 54 milliseconds. The slanted plane lets a tile
+represent sub-pixel structure that a fronto-parallel hypothesis cannot,
+which is what allows the network to stay accurate without a dense volume.
+This tile-hypothesis representation, including its plane slopes, is the
+paradigm from which the model of this thesis is built.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{fig_2_4c_hitnet}
+\caption{\textbf{HITNet: the tile-hypothesis paradigm.} Architecture overview reproduced from \cite{tankovich2021hitnet}: the scene is a grid of slanted-plane tiles refined by propagation across scales, without a dense 3D cost volume. This is the paradigm the proposed model builds on.}
+\label{fig:hitnet}
+\end{figure}
 
 \subsection{Iterative-Loop Compression}
 Where the iterative methods spend their cost is the update loop, and the
@@ -394,12 +420,21 @@ of latency on an embedded board.
 
 \subsection{Knowledge Distillation}
 A distinct family reduces the accuracy cost of a small network by training
-it against a large teacher. LiteAnyStereo \cite{jing2025liteanystereo}
-pairs a 7.6 million parameter non-iterative network with a three-stage
-training pipeline: supervised training on synthetic data, self-distillation
-under input perturbation, and distillation from a frozen FoundationStereo
-teacher on unlabeled real pairs. The result is strong zero-shot accuracy
-that the same network cannot reach by supervised training alone.
+it against a large teacher. LiteAnyStereo \cite{jing2025liteanystereo},
+whose network is shown in Figure \ref{fig:liteany}, pairs a 7.6 million
+parameter non-iterative network with a three-stage training pipeline:
+supervised training on synthetic data, self-distillation under input
+perturbation, and distillation from a frozen FoundationStereo teacher on
+unlabeled real pairs. The result is strong zero-shot accuracy that the
+same network cannot reach by supervised training alone.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{fig_2_4d_liteanystereo}
+\caption{\textbf{LiteAnyStereo: the efficient, distillation-trained paradigm.} Architecture overview reproduced from \cite{jing2025liteanystereo}: a compact non-iterative network that reaches strong zero-shot accuracy through the three-stage training pipeline of Figure \ref{fig:kd_stages}, not through architectural iteration.}
+\label{fig:liteany}
+\end{figure}
+
 Distill-then-Prune \cite{pan2024dtp} shows that distilling before pruning,
 and using the teacher output alone rather than the teacher combined with
 ground truth, gives the best student. The common form of the distillation
@@ -412,8 +447,9 @@ term is a masked regression between the student and teacher disparity,
 \end{equation}
 where $\hat{d}_S$ and $\hat{d}_T$ are the student and teacher disparities,
 $\Omega$ the image domain, and $m_i$ an optional teacher-confidence mask.
-This three-stage pipeline is the largest untapped lever for the model of
-this thesis, and it is revisited as future work in Chapter 5.
+This three-stage pipeline, illustrated in Figure \ref{fig:kd_stages}, is
+the largest untapped lever for the model of this thesis, and it is
+revisited as future work in Chapter 5.
 
 \begin{figure}[!htbp]
 \centering
@@ -481,6 +517,7 @@ and several can be combined, a point the model of this thesis exploits by
 pairing a substituted backbone with a compressed cost volume and a
 compressed recurrent loop.
 
+\FloatBarrier
 \section{Cross-Domain Generalization}
 % Sources: tier3/domain_shift/*, review_paper section 05.
 A network trained on synthetic data often fails on real domains, because
@@ -514,6 +551,7 @@ training pipeline rather than to any recurrent module. This thesis returns
 to the question in Chapter 4, where the training pipeline is shown to close
 most of the cross-domain gap for a non-iterative tile network.
 
+\FloatBarrier
 \section{Benchmarks and Datasets}
 % Sources: tier2/datasets/*, review_paper section 02.3.
 The benchmarks that this thesis uses are summarized in Table
@@ -564,6 +602,7 @@ ETH3D & mixed & 27 / 20 & ${\sim}940{\times}490$ & laser scan & \cite{schops2017
 \end{tabular}
 \end{table}
 
+\FloatBarrier
 \section{Summary and Research Gap}
 Table \ref{tab:method_comparison} and Figure \ref{fig:pareto} summarize
 the trade-offs across the eras. The accuracy frontier is held by the
@@ -573,9 +612,9 @@ occupies the low-parameter region at some cost in accuracy. Within that
 efficient region, the surveyed literature does not directly address the
 specific combination this thesis targets: a tile-hypothesis network of a
 few million parameters that fuses a geometry encoding volume through a
-fail-soft gate, is measured for real-time inference on the Jetson Orin
-Nano class of hardware, and is characterized for robustness to imperfect
-rectification. The cross-domain evidence surveyed above further suggests
+fail-soft gate, is measured for near real-time inference on the Jetson
+Orin Nano class of hardware, and is characterized for robustness to
+imperfect rectification. The cross-domain evidence surveyed above further suggests
 that the training pipeline, more than architectural iteration, governs
 zero-shot accuracy for compact networks, a point the following chapters
 take up directly.

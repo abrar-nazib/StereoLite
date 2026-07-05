@@ -82,6 +82,7 @@ side-by-side image. The intended deployment target is the Jetson Orin Nano
 class of device.
 
 \section{Reproduction Pointers}
+\begin{sloppypar}
 Every reported number can be reproduced from the repository. The production
 model is trained by the driver \texttt{train\_full\_sceneflow\_a100.py},
 the SceneFlow test number by \texttt{eval\_full\_testset.py}, the zero-shot
@@ -89,3 +90,4 @@ Middlebury 2014 result by \texttt{eval\_gev4\_middlebury2014.py}, and the
 rectification-robustness sweep of the second objective by
 \texttt{eval\_rectification\_robustness.py}. Each driver records its
 configuration and metrics to a metadata file alongside the checkpoint.
+\end{sloppypar}

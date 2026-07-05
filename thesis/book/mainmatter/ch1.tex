@@ -22,7 +22,11 @@
 Depth perception is a prerequisite for a machine that must act in
 three-dimensional space. A mobile robot avoids obstacles, a drone holds
 its position, and an augmented-reality headset anchors virtual content
-only if it knows how far away each surface lies. The sensing options differ sharply in cost and character. Scanning LiDAR
+only if it knows how far away each surface lies. Depth is therefore not
+an optional cue but the quantity on which the safety and usefulness of
+these systems depend.
+
+The sensing options differ sharply in cost and character. Scanning LiDAR
 measures time of flight along emitted laser beams and delivers accurate
 but sparse points at a price and power draw that exclude small platforms.
 Structured-light and time-of-flight cameras emit infrared patterns or
@@ -31,36 +35,31 @@ fail in sunlight, and interfere with one another when several devices
 share a space. Among the passive ways to recover depth, binocular stereo
 is attractive for embedded systems because it emits nothing, draws little
 power, works indoors and outdoors alike, and uses two inexpensive image
-sensors rather than a laser scanner; its cost is computational, since the
+sensors rather than a laser scanner. Its cost is computational: the
 correspondence between the two views must be solved for every pixel, and
-that computation is precisely what this thesis makes affordable. Given a pair of images from two horizontally
-separated cameras, the horizontal shift of a scene point between the two
-views, its disparity, determines depth through the calibrated relation of
-\eqref{eq:depth_from_disparity}. A dense disparity map therefore yields a
-dense depth map, which downstream perception and reconstruction consume
-directly. The applications that motivate this thesis share a common
-trait: they carry a small power and compute budget and demand results in
-real time, but they stress depth differently. A mobile robot needs
-reliable obstacle depth at a few meters and tolerates modest resolution;
-a drone needs the same at higher frame rates because its closing speeds
-are larger; an augmented-reality headset needs sharp depth boundaries so
-that virtual content occludes correctly against real edges; and an
-embedded sensing rig needs metric accuracy so that the recovered
-geometry can be measured and reconstructed. A single network that serves
-all four must therefore balance accuracy, boundary sharpness, latency,
-and memory rather than excel at any one of them, and that balance is the
-design objective of this thesis.
+that computation is precisely what this thesis makes affordable.
 
-% Eq 1.1: the depth-from-disparity relation (introduce with a purpose
-% clause, then a where-clause naming every symbol).
-\begin{equation}
-Z = \frac{f\,B}{d}
-\label{eq:depth_from_disparity}
-\end{equation}
-where $Z$ is the depth of a scene point, $f$ the camera focal length in
-pixels, $B$ the baseline separating the two cameras, and $d$ the
-disparity, the horizontal shift of the point between the two rectified
-views.
+Binocular stereo recovers depth from the horizontal shift of a scene
+point between two horizontally separated views. That shift, the
+disparity, is inversely proportional to depth through a calibrated
+pinhole relation developed in Chapter 2. A dense disparity map therefore
+yields a dense depth map, which downstream perception and reconstruction
+consume directly, and computing that disparity map accurately and quickly
+is the task this thesis addresses.
+
+The applications that motivate this thesis share a common trait: they
+carry a small power and compute budget and demand results in real time,
+but they stress depth differently. A mobile robot needs reliable obstacle
+depth at a few meters and tolerates modest resolution; a drone needs the
+same at higher frame rates because its closing speeds are larger; an
+augmented-reality headset needs sharp depth boundaries so that virtual
+content occludes correctly against real edges; and an embedded sensing
+rig needs metric accuracy so that the recovered geometry can be measured
+and reconstructed. A single network that serves all four must therefore
+balance accuracy, boundary sharpness, latency, and memory rather than
+excel at any one of them, and that balance is the design objective of
+this thesis.
+
 \nm{$d$}{disparity, the horizontal pixel shift between rectified views}
 \nm{$Z$}{depth of a scene point along the camera axis}
 \nm{$f$}{camera focal length in pixels}
@@ -77,13 +76,6 @@ views.
 \nm{TOPS}{tera-operations per second}
 \nm{INT8}{eight-bit integer arithmetic}
 \nm{GT}{ground truth}
-
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=0.92\textwidth]{fig_1_1_stereo_geometry_preview}
-\caption{\textbf{Two-view stereo geometry.} A scene point $P$ projects to $x_L$ and $x_R$ on two rectified image planes separated by the baseline $B$; the disparity $d = x_L - x_R$ recovers depth through $Z = fB/d$.}
-\label{fig:stereo_geometry}
-\end{figure}
 
 \section{Problem Statement}
 % Sources: THESIS_PLAN state-of-play; papers/verified_performance.md
@@ -113,7 +105,7 @@ targets.
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=\textwidth]{fig_1_3_edge_gap}
-\caption{\textbf{The edge-deployment gap.} SceneFlow end-point error against trainable parameters for representative methods of each family; the shaded band marks the sub-3 M parameter edge budget targeted in this thesis. Published values follow each paper's standard SceneFlow protocol; the StereoLite point is our full FlyingThings3D test result at the native evaluation axis (Chapter 4).}
+\caption{\textbf{The edge-deployment gap.} Trainable parameter count (horizontal, log scale) against SceneFlow end-point error for representative methods of each family; the shaded band marks the sub-3 M parameter edge budget targeted in this thesis. The plot positions methods by size: the horizontal axis is the controlled comparison, while the vertical axis is indicative rather than a head-to-head ranking, because each published value follows that paper's own SceneFlow protocol and the StereoLite point is our FlyingThings3D test result at the native evaluation axis (Chapter 4). The point of the figure is that accuracy has been concentrated in models far outside the edge budget.}
 \label{fig:edge_gap}
 \end{figure}
 
@@ -141,7 +133,10 @@ geometry, which is the reconstruction the thesis title refers to. Active
 sensing, self-supervised training, monocular depth estimation, and the
 production of a deployment software development kit are outside the scope.
 The evidence for the second objective, tolerance to imperfect
-rectification, is a controlled perturbation study reported in Chapter 4.
+rectification, is twofold and reported in Chapter 4: a controlled
+perturbation study on synthetic data with known ground truth, and a
+real-data demonstration on a low-cost stereo rig whose factory
+rectification is imperfect, on which the model retains low error.
 
 \section{Rationale and Significance}
 % Content: why a NEW small architecture rather than shrinking a big one;
@@ -155,28 +150,36 @@ their monocular priors and their scale, neither of which survives
 aggressive compression, so compressing them tends to discard the very
 component that makes them accurate. Second, the tile-hypothesis and
 recurrent-refinement families were designed for efficiency from the
-outset and offer a cleaner starting point for an edge budget. Designing
-such a network is a complex engineering problem: it cannot be solved by
-natural science or mathematics alone. It requires in-depth engineering
-knowledge of the stereo pipeline (attribute K3), specialist knowledge of
-the deep-stereo literature and its building blocks (K4), the design of a
-novel architecture under hard resource constraints (K5), and grounding in
-a large body of research literature to select and combine the right
-mechanisms (K8). These attributes are demonstrated across the methodology
-and results chapters.
+outset and offer a cleaner starting point for an edge budget.
+
+Designing such a network is a complex engineering problem in the formal
+sense: it cannot be solved by natural science or mathematics alone. It
+requires in-depth engineering knowledge of the stereo pipeline,
+specialist knowledge of the deep-stereo literature and its building
+blocks, the design of a novel architecture under hard resource
+constraints, and grounding in a large body of research literature to
+select and combine the right mechanisms. In the terms of the Washington
+Accord knowledge profile that the program-outcome framework adopts, these
+four demands correspond to profiles K3, K4, K5, and K8, and Appendix D
+maps each to the chapters that demonstrate it.
 
 \section{Thesis Organization}
 % Write LAST for this chapter: one tight sentence per chapter.
-The remainder of this thesis is organized as follows. Chapter 2 reviews
-the stereo-matching literature, from the classical pipeline through the
-deep-learning eras to the modern efficient and foundation-model families,
-with an emphasis on how edge deployability is achieved. Chapter 3 presents
-the proposed architecture block by block, together with its training
-protocol and the optimization pass that meets the edge latency target.
-Chapter 4 reports the in-domain and zero-shot accuracy, the ablation
-studies, and the efficiency and deployment measurements, and discusses
-their implications. Chapter 5 summarizes the findings, states the
-limitations, and outlines future work. The appendices provide the
-technical specifications, the project management and financial record, the
-ethics and teamwork statements, the program-outcome attainment tracker,
-and the list of publications.
+The remainder of this thesis is organized as follows.
+\begin{itemize}
+\item \textbf{Chapter 2} reviews the stereo-matching literature, from the
+classical pipeline through the deep-learning eras to the modern efficient
+and foundation-model families, with an emphasis on how edge deployability
+is achieved.
+\item \textbf{Chapter 3} presents the proposed architecture block by
+block, together with its training protocol and the optimization pass that
+meets the edge latency target.
+\item \textbf{Chapter 4} reports the in-domain and zero-shot accuracy, the
+ablation studies, and the efficiency and deployment measurements, and
+discusses their implications.
+\item \textbf{Chapter 5} summarizes the findings, states the limitations,
+and outlines future work.
+\end{itemize}
+The appendices provide the technical specifications, the project
+management and financial record, the ethics and teamwork statements, the
+program-outcome attainment tracker, and the list of publications.

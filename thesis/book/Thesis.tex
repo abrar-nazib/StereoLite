@@ -58,8 +58,9 @@
 \titleformat{\section}
   {\bfseries\fontsize{13}{16}\selectfont}{\thesection}{0.6em}{}
 \titleformat{\subsection}
-  {\normalfont\fontsize{12}{15}\selectfont}{\thesubsection}{0.6em}{}
+  {\bfseries\fontsize{12}{15}\selectfont}{\thesubsection}{0.6em}{}
 % NO \subsubsection anywhere (department rule).
+\usepackage{placeins} % \FloatBarrier keeps figures inside their section
 
 \renewcommand{\contentsname}{List of Contents}
 \renewcommand{\bibname}{References}

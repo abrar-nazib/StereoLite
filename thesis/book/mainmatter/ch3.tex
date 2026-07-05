@@ -257,7 +257,7 @@ the finer grid.
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.9\textwidth]{fig_3_5_plane_prop_preview}
+\includegraphics[width=\textwidth]{fig_3_5_plane_prop_preview}
 \caption{\textbf{Plane-aware propagation between scales.} Each parent tile spawns four children whose disparities follow the local plane defined by the slopes, per \eqref{eq:plane_prop}, instead of plain bilinear interpolation.}
 \label{fig:plane_prop}
 \end{figure}
@@ -632,13 +632,12 @@ metric three-dimensional model of the scene.
 \section{Implementation and Deployment Environment}
 % Sources: meta.json; THESIS_PLAN section 2A. PyTorch 2.11 cu128; Modal
 % A100-80GB training, T4 evaluation; RTX 3050 local bench; CCB stereo
-% camera rig; target device class Jetson Orin Nano (borrowed board
-% pending; projections carry asterisks).
+% camera rig; target device Jetson Orin Nano (measured on-device 36.3 ms).
 The model is implemented in PyTorch 2.11 with CUDA 12.8. Training runs on
 a single cloud A100 with 80 gigabytes of memory, ablations and evaluations
 on a cloud T4, and the local latency benchmark on an RTX 3050 laptop GPU
 with roughly 4 gigabytes of memory. Real-camera pairs come from a
 calibrated binocular rig that streams a 2560 by 720 side-by-side image.
-The intended deployment target is the Jetson Orin Nano class of device;
-on-device measurement awaits that hardware, and the projections reported
-in Chapter 4 are marked accordingly.
+The intended deployment target is the Jetson Orin Nano, on which the
+optimized model was measured directly; the on-device latency is reported
+in Chapter 4.
