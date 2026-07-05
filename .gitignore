@@ -85,3 +85,4 @@ thesis/**/*.fdb_latexmk
 thesis/**/*.fls
 .playwright-mcp/
 drawio_qa_v*.png
+thesis/book/mainmatter/_old5/

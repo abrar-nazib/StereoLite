@@ -1,34 +1,38 @@
 % =====================================================================
-% CHAPTER 1: Introduction  (~7 pages)
-% WRITING SESSION INSTRUCTIONS (keep until the chapter is done):
-%   - Read thesis/WRITING_PLAN.md section 3 FIRST (content spec, sources,
-%     figures, PO evidence per section).
-%   - Invoke ruet-thesis-expert (format) + research-linguistics-expert
-%     (prose). Register: 4-paragraph funnel stretched to chapter length
-%     (patterns.md section 2); assert, do not hedge.
-%   - Every number cites a repo source; no en/em dashes in prose; log PO
-%     evidence lines to thesis/book/po_tracker_notes.md as you draft.
-%   - POs demonstrated here: PO1 (engineering knowledge), PO2 (problem
-%     analysis). CEP K-profile (K3, K4, K5, K8) stated in section 1.4.
+% CHAPTER 1: Introduction (9-chapter RUET MTE template)
+% Template source: thesis-or-project-template_1745300785.pdf, Chapter 1.
+% Assembled per thesis/RESTRUCTURE_PLAN.md from:
+%   - old mainmatter/ch1.tex (all sections except the CEP paragraph of
+%     Rationale, which moves to Chapter 5)
+%   - old appendices/app_b.tex "Project Timeline" (fig:gantt -> 1.5.1)
+% New prose: 1.1 Overview, 1.4 Research Methodology, 1.6 Organization,
+% 1.7 Summary. No new numbers are introduced.
 % =====================================================================
 \chapter{Introduction}
 
-\section{Background and Motivation}
-% Sources: review_paper/sections/01_introduction.tex + 02_background.tex,
-% papers/summaries/tier1/surveys/Tosi_Survey_IJCV2025.md.
-% Content: why machine depth perception matters; passive stereo vs LiDAR
-% vs structured light (cost, power, form factor); state Eq 1.1 EARLY with
-% a where-clause; applications (mobile robots, drones, AR, embedded rigs).
+\section{Overview}
 Depth perception is a prerequisite for a machine that must act in
-three-dimensional space. A mobile robot avoids obstacles, a drone holds
+three-dimensional space: a mobile robot avoids obstacles, a drone holds
 its position, and an augmented-reality headset anchors virtual content
-only if it knows how far away each surface lies. Depth is therefore not
-an optional cue but the quantity on which the safety and usefulness of
-these systems depend.
+only if it knows how far away each surface lies. Binocular stereo
+recovers that depth passively from two inexpensive image sensors, but
+the dense correspondence it requires is computationally demanding, and
+the deep networks that now solve it most accurately are far too large
+and too slow for the embedded accelerators these platforms carry. This
+thesis designs, trains, and deploys a compact stereo matching network
+that closes that gap: it delivers dense disparity, and through it metric
+three-dimensional reconstruction, within the parameter, latency, and
+memory budget of edge hardware. This chapter states the background and
+motivation, the objectives, the research methodology, and the plan and
+organization of the work.
 
-The sensing options differ sharply in cost and character. Scanning LiDAR
-measures time of flight along emitted laser beams and delivers accurate
-but sparse points at a price and power draw that exclude small platforms.
+\FloatBarrier
+\section{Background and Motivation}
+Depth is not an optional cue but the quantity on which the safety and
+usefulness of spatially acting systems depend. The sensing options
+differ sharply in cost and character. Scanning LiDAR measures time of
+flight along emitted laser beams and delivers accurate but sparse points
+at a price and power draw that exclude small platforms.
 Structured-light and time-of-flight cameras emit infrared patterns or
 pulses and recover dense depth indoors, but their emitters limit range,
 fail in sunlight, and interfere with one another when several devices
@@ -77,13 +81,6 @@ this thesis.
 \nm{INT8}{eight-bit integer arithmetic}
 \nm{GT}{ground truth}
 
-\section{Problem Statement}
-% Sources: THESIS_PLAN state-of-play; papers/verified_performance.md
-% (FoundationStereo size); review_paper/sections/03_foundation_baseline.tex.
-% Content: accurate deep stereo exists (foundation models, hundreds of M
-% params) but is undeployable on edge; edge envelope 1 to 6 TOPS, 4 GB,
-% 5 to 25 W; accuracy-latency-memory triangle; the concessive gap pivot
-% ("However, ...").
 Deep networks have transformed the accuracy of stereo matching. The most
 accurate systems now pair a foundation-scale monocular prior with an
 iterative refinement core; FoundationStereo, for example, reports 0.34
@@ -105,13 +102,12 @@ targets.
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=\textwidth]{fig_1_3_edge_gap}
-\caption{\textbf{The edge-deployment gap.} Trainable parameter count (horizontal, log scale) against SceneFlow end-point error for representative methods of each family; the shaded band marks the sub-3 M parameter edge budget targeted in this thesis. The plot positions methods by size: the horizontal axis is the controlled comparison, while the vertical axis is indicative rather than a head-to-head ranking, because each published value follows that paper's own SceneFlow protocol and the StereoLite point is our FlyingThings3D test result at the native evaluation axis (Chapter 4). The point of the figure is that accuracy has been concentrated in models far outside the edge budget.}
+\caption{\textbf{The edge-deployment gap.} Trainable parameter count (horizontal, log scale) against SceneFlow end-point error for representative methods of each family; the shaded band marks the sub-3 M parameter edge budget targeted in this thesis. The plot positions methods by size: the horizontal axis is the controlled comparison, while the vertical axis is indicative rather than a head-to-head ranking, because each published value follows that paper's own SceneFlow protocol and the StereoLite point is our FlyingThings3D test result at the native evaluation axis (Chapter 8). The point of the figure is that accuracy has been concentrated in models far outside the edge budget.}
 \label{fig:edge_gap}
 \end{figure}
 
-\section{Research Objectives and Scope}
-% The two objectives are FIXED by the user (2026-07-05), verbatim below.
-% Do NOT reword them. Sub-goals may be listed as scope items.
+\FloatBarrier
+\section{Objectives}
 The objectives of this thesis are:
 \begin{enumerate}
 \item To design a computationally efficient stereo matching pipeline that
@@ -133,16 +129,11 @@ geometry, which is the reconstruction the thesis title refers to. Active
 sensing, self-supervised training, monocular depth estimation, and the
 production of a deployment software development kit are outside the scope.
 The evidence for the second objective, tolerance to imperfect
-rectification, is twofold and reported in Chapter 4: a controlled
+rectification, is twofold and reported in Chapter 8: a controlled
 perturbation study on synthetic data with known ground truth, and a
 real-data demonstration on a low-cost stereo rig whose factory
 rectification is imperfect, on which the model retains low error.
 
-\section{Rationale and Significance}
-% Content: why a NEW small architecture rather than shrinking a big one;
-% Complex Engineering Problem justification woven in: K3 (engineering
-% fundamentals), K4 (specialist stereo knowledge), K5 (network design),
-% K8 (research-literature grounding), one sentence each.
 A natural question is why this thesis designs a new compact network rather
 than compressing an existing large one. Two reasons motivate the choice.
 First, the accuracy of the foundation-scale systems rests substantially on
@@ -152,34 +143,99 @@ component that makes them accurate. Second, the tile-hypothesis and
 recurrent-refinement families were designed for efficiency from the
 outset and offer a cleaner starting point for an edge budget.
 
-Designing such a network is a complex engineering problem in the formal
-sense: it cannot be solved by natural science or mathematics alone. It
-requires in-depth engineering knowledge of the stereo pipeline,
-specialist knowledge of the deep-stereo literature and its building
-blocks, the design of a novel architecture under hard resource
-constraints, and grounding in a large body of research literature to
-select and combine the right mechanisms. In the terms of the Washington
-Accord knowledge profile that the program-outcome framework adopts, these
-four demands correspond to profiles K3, K4, K5, and K8, and Appendix D
-maps each to the chapters that demonstrate it.
+\FloatBarrier
+\section{Research Methodology}
+The work follows an evidence-gated design methodology: every
+architectural choice is admitted only after it wins a controlled
+comparison, and every trained model is judged on accuracy, latency, and
+memory jointly rather than on any single metric. Design proceeds by
+single-knob ablation on a fixed harness of one hundred training pairs, so
+that competing variants are compared under identical data, seed, and
+compute; the surviving configuration is then trained on the full dataset
+on cloud GPUs, evaluated in domain, zero-shot on an unseen real
+benchmark, and under controlled rectification perturbation, and finally
+optimized and measured on the target edge device. The steps, elaborated
+in Chapters 3, 7, and 8, are:
+\begin{enumerate}
+\item study of the stereo matching literature and its efficient and
+edge-deployable families;
+\item definition of the design requirements and the edge deployment
+envelope;
+\item architecture design by controlled single-knob ablation on a fixed
+100-pair harness;
+\item full-dataset training of the selected configuration on cloud GPUs;
+\item evaluation in domain, zero-shot on an unseen real domain, and under
+rectification perturbation;
+\item optimization of the network for edge inference and on-device
+latency measurement.
+\end{enumerate}
 
-\section{Thesis Organization}
-% Write LAST for this chapter: one tight sentence per chapter.
-The remainder of this thesis is organized as follows.
+\FloatBarrier
+\section{Project Planning}
+The thesis was executed as a sequence of overlapping phases, from
+literature study through design, training, evaluation, and writing. The
+work plan below records the schedule that was followed.
+
+\subsection{Work Plan}
+The project ran from February to July 2026. Figure \ref{fig:gantt} shows
+the schedule: an initial phase of paper collection and study overlapping a
+review-paper draft, followed by architecture design and an ablation
+campaign, then the production training run and its evaluation gates, with
+thesis writing in the final weeks.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{fig_b_1_gantt}
+\caption{\textbf{Project timeline.} The seven work phases from February to July 2026.}
+\label{fig:gantt}
+\end{figure}
+
+\FloatBarrier
+\section{Organization of the Report}
+The remainder of this report is organized as follows.
 \begin{itemize}
-\item \textbf{Chapter 2} reviews the stereo-matching literature, from the
-classical pipeline through the deep-learning eras to the modern efficient
-and foundation-model families, with an emphasis on how edge deployability
-is achieved.
-\item \textbf{Chapter 3} presents the proposed architecture block by
-block, together with its training protocol and the optimization pass that
-meets the edge latency target.
-\item \textbf{Chapter 4} reports the in-domain and zero-shot accuracy, the
-ablation studies, and the efficiency and deployment measurements, and
-discusses their implications.
-\item \textbf{Chapter 5} summarizes the findings, states the limitations,
+\item \textbf{Chapter 2} reviews the stereo-matching literature from the
+classical pipeline through the deep-learning eras to the efficient and
+foundation-model families, states the requirements of edge-deployable
+stereo, and reviews in detail the mechanisms the adopted methodology
+inherits.
+\item \textbf{Chapter 3} presents the design of StereoLite: the problem
+statements, the design requirements and criteria, the design steps, and
+the detailed block-by-block architecture with its assessment metrics.
+\item \textbf{Chapter 4} examines the socio-economic impact of the work
+and its environmental and sustainability aspects.
+\item \textbf{Chapter 5} maps the thesis onto the complex engineering
+problem and complex engineering activity frameworks.
+\item \textbf{Chapter 6} records the management of the thesis, its time
+frame, and its overall and component-level budget.
+\item \textbf{Chapter 7} details the design methodology and
+implementation: the training objective and protocol, the selection of
+parameters and components, the edge-inference optimization, the
+experimental setup, and the measurement protocols.
+\item \textbf{Chapter 8} reports and discusses the results: training
+dynamics, ablation studies, in-domain and zero-shot accuracy,
+rectification robustness, efficiency and deployment measurements, and
+three-dimensional reconstruction.
+\item \textbf{Chapter 9} concludes the report, states the limitations,
 and outlines future work.
 \end{itemize}
-The appendices provide the technical specifications, the project
-management and financial record, the ethics and teamwork statements, the
-program-outcome attainment tracker, and the list of publications.
+The appendices provide the technical specifications, the ethics and
+teamwork statements, the program-outcome attainment tracker, and the
+list of publications.
+
+\FloatBarrier
+\section{Summary}
+This chapter introduced the problem the thesis addresses: dense, accurate
+stereo depth on hardware that offers only a few tera-operations per
+second, a few gigabytes of memory, and a few watts. It motivated passive
+binocular stereo over active sensing for embedded platforms and located
+the gap between the accuracy of foundation-scale stereo networks and the
+budget of edge accelerators. Two objectives were stated: a
+computationally efficient stereo matching pipeline with AI-based
+disparity refinement for resource-limited platforms, and an architecture
+that withstands camera imperfections in rectification. The research
+methodology was outlined as a pipeline of literature study, controlled
+single-knob ablation, full-dataset cloud training, in-domain and
+zero-shot and robustness evaluation, and on-device measurement. The
+chapter closed with the project work plan and the organization of the
+remaining eight chapters.

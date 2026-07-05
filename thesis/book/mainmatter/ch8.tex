@@ -1,0 +1,659 @@
+% =====================================================================
+% CHAPTER 8: Results and Discussion (9-chapter RUET MTE template)
+% Template source: thesis-or-project-template_1745300785.pdf, Chapter 8.
+% Assembled per thesis/RESTRUCTURE_PLAN.md from old mainmatter/ch4.tex:
+%   - 8.1 Introduction: NEW; compresses the old "Experimental Setup
+%     Summary" into pointer sentences (setup body moved to Chapter 7).
+%   - 8.2 Investigation and Analysis of Data: old "Training Dynamics" +
+%     "Ablation Studies" (three subsections), tables/figures unchanged.
+%   - 8.3 Results: the six result sections as subsections, unchanged.
+%   - 8.4 Discussion: old "Discussion" unchanged (incl fig:pareto_ours).
+%   - 8.5 Summary: NEW; restates headline numbers already present above.
+% EXCLUDED: "Societal, Environmental and Sustainability Aspects"
+%   (moves to Chapter 4) and the "Experimental Setup Summary" body
+%   (moves to Chapter 7). All \label names unchanged, each used once.
+% =====================================================================
+\chapter{Results and Discussion}
+
+\section{Introduction}
+This chapter reports the accuracy, efficiency, and cross-domain
+behaviour of the trained model, evaluated in domain on the FlyingThings3D
+test set against published methods, zero-shot on Middlebury 2014 against
+matched-protocol reference checkpoints, and on device against the
+real-time target, together with the training dynamics and ablation
+studies that justify the design of Chapter 3. Unless stated otherwise,
+all results come from a single production run trained on the full
+SceneFlow finalpass dataset under the training protocol and experimental
+setup detailed in Chapter 7, with the configuration of Table
+\ref{tab:train_config}. Accuracy is measured with the metrics of
+\eqref{eq:metrics}, latency at batch one and 384 by 640 resolution, and
+cross-domain behaviour on the Middlebury 2014 benchmark, which the model
+never saw during training.
+
+\FloatBarrier
+\section{Investigation and Analysis of Data}
+This section analyzes the data behind the headline results: the training
+trajectory of the production run, and the controlled studies from which
+the architecture was selected. The architecture of Chapter 3 is the
+product of a long sequence of controlled studies rather than a single
+design pass. After the training dynamics, the studies are reported in
+three groups: the early exploration that selected the encoder, the
+refinement scheme, and the loss on the preceding tile chassis; the
+architecture ablation of the recurrent family that produced the final
+model; and the training-recipe and efficiency studies on the final model
+itself. All studies follow the matched harness protocol of Chapter 3.
+
+\FloatBarrier
+\subsection{Training Dynamics}
+Figure \ref{fig:training_curves} shows the training trajectory. The
+training loss falls sharply during the OneCycle warm-up and then descends
+steadily as the learning rate anneals toward its floor. The held-out
+validation end-point error tracks the loss closely and reaches its
+minimum of 0.79 pixels near step 53,000, after which it stays flat between
+0.80 and 0.81 pixels for the final several thousand steps as the learning
+rate approaches zero. The best checkpoint is therefore taken at step
+53,000 rather than at the final step 60,000, since further training no
+longer improves the held-out metric. Figure \ref{fig:convergence} makes
+the same progress visible: across successive checkpoints the broad
+surfaces settle early while object boundaries and thin structures continue
+to sharpen. The run survived several cloud preemptions without loss of
+progress, because the scheduler and optimizer state are checkpointed and
+restored exactly, so a preemption costs at most the steps since the last
+validation. The choice of a one-cycle schedule deserves a note. Its high
+peak learning rate acts as a regularizer during the middle of training,
+which is visible as the sustained loss variance in Figure
+\ref{fig:training_curves}, and its long cosine descent converts that
+exploration into a steady accuracy gain: more than half of the final
+validation improvement accrues after the learning rate has fallen below a
+quarter of its peak. The per-batch loss wobble during the high-rate phase
+is therefore not instability but the schedule operating as designed, and
+the flat validation tail at the floor confirms that the budget of 60,000
+steps was neither too short nor wastefully long for this model and
+dataset.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{fig_4_1_training_curves}
+\caption{\textbf{Training dynamics of the 60k-step run.} (a) Training loss with the OneCycle learning-rate schedule. (b) Held-out validation EPE and bad-1 on the fixed 400-pair FlyingThings3D subset at the native axis; the star marks the best checkpoint at step 53k.}
+\label{fig:training_curves}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{fig_4_2_convergence}
+\caption{\textbf{Qualitative convergence over training.} Predictions for two held-out FlyingThings3D scenes at five checkpoints (1k to 53k steps) against ground truth; turbo colormap, per-scene normalization. Object boundaries and thin structures sharpen progressively as training advances.}
+\label{fig:convergence}
+\end{figure}
+
+\FloatBarrier
+\subsection{Design-Space Exploration of the Tile Chassis}
+The first campaign ran on an earlier, smaller tile chassis and settled
+three questions. The encoder study of Table \ref{tab:ablation_encoder}
+compared a GhostConv stack against two truncated detection backbones
+under a matched 20-pair harness. The larger YOLO26s encoder won on every
+metric, at 0.528 pixel end-point error against 0.625 for GhostConv and
+0.712 for the smaller YOLO26n, at a latency cost of only two
+milliseconds; this selected the YOLO26s family for the final model. The
+refinement study of Table \ref{tab:ablation_refinement} tested the
+iterated coarse-to-fine scheme against two alternatives. Extending
+refinement to finer scales gained almost nothing, 0.573 against 0.578
+pixels, while costing 37 percent more latency, and reverting to a
+single-pass-per-scale propagation in the manner of HITNet collapsed
+accuracy to 0.844 pixels. Iterated refinement at coarse scales is
+therefore the load-bearing choice, and the final model keeps it. The
+loss study of Table \ref{tab:ablation_loss} compared nine formulations
+under the same harness. The threshold-stack objective with the
+D1-relative hinge won on end-point error, bad-2, and D1 together, and it
+is the ancestor of the production objective of \eqref{eq:loss}. The
+study also produced a clear negative result: the sequence-weighted
+multi-scale L1, which imitates the iteration-weighted loss of the
+recurrent literature without exposing true per-iteration outputs, was
+the worst of all nine at 1.005 pixels. Faking a sequence loss across
+scales does not work; the final model instead exposes true multi-scale
+outputs to the objective.
+
+\begin{table}[!htbp]
+\centering
+\caption{\textbf{Encoder ablation on the tile chassis.} Matched 20-pair harness, identical steps and seed; latency at $384\times 640$, batch 1, RTX 3050.}
+\label{tab:ablation_encoder}
+\small
+\begin{tabular}{lccccc}
+\toprule
+Encoder & Params (M) & EPE & bad-1 (\%) & D1-all (\%) & Latency (ms)\\
+\midrule
+GhostConv stack & 0.538 & 0.625 & 13.31 & 3.54 & 23.5\\
+YOLO26n (truncated) & 0.808 & 0.712 & 18.07 & 2.90 & 24.1\\
+\textbf{YOLO26s (truncated)} & 2.061 & \textbf{0.528} & \textbf{10.88} & \textbf{2.50} & 25.8\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[!htbp]
+\centering
+\caption{\textbf{Refinement-scheme ablation on the tile chassis.} Matched 20-pair harness; the iterated coarse-to-fine scheme against extending refinement to finer scales and against single-pass-per-scale propagation.}
+\label{tab:ablation_refinement}
+\small
+\begin{tabular}{lccccc}
+\toprule
+Scheme & Params (M) & EPE & bad-1 (\%) & D1-all (\%) & Latency (ms)\\
+\midrule
+\textbf{iterated coarse-to-fine} & 0.538 & \textbf{0.578} & \textbf{10.72} & 3.44 & \textbf{23.8}\\
++ refinement at 1/2 & 0.576 & 0.573 & 11.12 & \textbf{3.25} & 32.5\\
+single pass per scale & 0.487 & 0.844 & 19.30 & 4.79 & 25.2\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[!htbp]
+\centering
+\caption{\textbf{Loss-formulation ablation on the tile chassis.} Nine objectives under the matched 20-pair harness; the threshold-stack objective with the D1 hinge wins on EPE, bad-2, and D1 together.}
+\label{tab:ablation_loss}
+\small
+\begin{tabular}{lcccc}
+\toprule
+Objective & EPE & bad-0.5 (\%) & bad-2 (\%) & D1-all (\%)\\
+\midrule
+plain L1 & 0.663 & 27.6 & 6.09 & 3.99\\
+sequence-weighted multi-scale L1 & 1.005 & 53.5 & 13.25 & 4.04\\
+L1 + gradient & 0.618 & \textbf{23.9} & 5.93 & 3.92\\
+L1 + bad-1 hinge & 0.763 & 45.8 & 6.21 & 3.65\\
+cocktail (L1 + grad + bad-1) & 0.692 & 40.0 & 6.12 & 3.68\\
+cocktail, 0.5-px hinge & 0.676 & 38.3 & 6.21 & 3.50\\
+threshold stack & 0.672 & 38.0 & 5.97 & 3.45\\
+\textbf{threshold stack + D1 hinge} & \textbf{0.591} & 31.5 & \textbf{5.64} & \textbf{3.35}\\
+Charbonnier & 0.631 & 31.0 & 5.78 & 3.58\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\FloatBarrier
+\subsection{Architecture Ablation of the Recurrent Family}
+The second campaign built the recurrent context family that became the
+final model, adding or removing one mechanism at a time on a matched
+20-pair harness. Table \ref{tab:ablation_gev4line} records it. The base
+recurrent-context design reached 0.424 pixel end-point error; adding a
+learned update gate and moving to the YOLO26s encoder brought it to
+0.319. Several attempted additions made things worse and were rejected:
+a selective recurrent unit degraded the error to 0.474, initializing
+from a fresh quarter-resolution volume degraded it to 0.455, and the
+boundary-sharpening tail and high-resolution refinement variants bought
+small gains on some metrics at real latency cost without improving the
+headline error. The decisive addition was the quarter-resolution
+geometry encoding volume with fail-soft fusion, which reached 0.261
+pixels, the best of the campaign, at 0.041 million added parameters.
+This became the final architecture. The runs differ slightly in step and
+batch budgets, so the table is an engineering record rather than a
+perfectly controlled comparison; the production conclusions were
+re-validated by the matched studies of the next subsection.
+
+\begin{table}[!htbp]
+\centering
+\caption{\textbf{Architecture ablation of the recurrent family.} 20-pair overfit harness at $384\times 640$; steps and batch differ slightly across runs, so the table is an engineering record. The geometry-volume variant became the final model.}
+\label{tab:ablation_gev4line}
+\small
+\begin{tabular}{lccccc}
+\toprule
+Variant & Params (M) & EPE & Median & bad-1 (\%) & Latency (ms)\\
+\midrule
+recurrent context (base) & 2.831 & 0.424 & 0.167 & 7.62 & 10.7\\
++ geometry-guided state & 2.919 & 0.459 & 0.218 & 8.16 & 36.7\\
++ update gate & 2.921 & 0.473 & 0.246 & 7.75 & 12.2\\
+gate, YOLO26n encoder & 1.410 & 0.387 & 0.182 & 5.98 & 10.9\\
+gate, YOLO26s encoder & 2.921 & 0.319 & 0.127 & 5.24 & 11.9\\
++ sharp tail & 2.950 & 0.322 & 0.136 & \textbf{5.21} & 14.6\\
++ high-resolution refine & 3.106 & 0.351 & 0.186 & 5.18 & 16.1\\
++ selective recurrent unit & 3.398 & 0.474 & 0.255 & 8.20 & 14.8\\
++ raw 1/4 initialization & 2.948 & 0.455 & 0.195 & 10.64 & 20.7\\
+\textbf{+ GEV and fail-soft fusion} & 2.962 & \textbf{0.261} & \textbf{0.059} & 5.25 & 24.6\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\FloatBarrier
+\subsection{Training-Recipe and Efficiency Studies}
+Four further controlled studies, summarized in Figure \ref{fig:ablations},
+justify the training recipe and the efficiency
+pass of the final model. The single largest accuracy lever was
+the training recipe rather than any architectural block. In a matched
+nine-arm comparison, adding the OpenStereo augmentation triplet lowered the
+best validation end-point error from 2.778 to 1.921 pixels, a 31 percent
+reduction that is many times the run-to-run noise floor. The
+edge-inference optimization pass, shown in Table
+\ref{tab:ablation_efficiency}, held accuracy while cutting latency by
+roughly a third: the exact-equivalence fixes and the narrow geometry
+volume together reduced the latency from 46.6 to 30.2 milliseconds with
+end-point error unchanged within noise, from 2.908 to 2.906 pixels. The changes divide into two classes. The
+exact-equivalence class, covering the zero-copy views, the batched
+lookups, the hoisted static channels, and the fused heads, is proven
+bitwise or mathematically identical, so its accuracy deltas in the table
+are pure run-to-run noise; the narrow geometry band is the one
+accuracy-relevant change, and it was validated separately as neutral.
+The boundary-sharpness study of Table \ref{tab:ablation_blurfix} selected
+the plane-rendering fix, which reduced the bad-0.5 rate from 55.36 to
+42.91 percent, the sharpest result of the study, while simultaneously
+being the fastest variant tested because rendering from planes replaces
+a more expensive path. Importantly, the compositions
+that added the bimodal head or the top-k initialization on top of plane
+rendering were worse than plane rendering alone, at 44.40 and 46.58
+percent bad-0.5, so the individual fixes anti-synergize and only plane
+rendering was adopted. This negative result is reported because it
+constrains future work. Finally, Table \ref{tab:ablation_native} shows the
+input-protocol study on both evaluation axes: training on native crops cut
+the native-axis end-point error from 6.672 to 2.869 pixels relative to the
+legacy global-resize protocol, at no cost on the resized axis, which is
+why the native-crop protocol was adopted for the production run.
+
+\begin{table}[!htbp]
+\centering
+\caption{\textbf{Efficiency ablation.} 100-pair matched harness, 9k steps, identical seed and data; latency at $384\times 640$, batch 1.}
+\label{tab:ablation_efficiency}
+\small
+\begin{tabular}{lccccc}
+\toprule
+Variant & Params (M) & EPE & bad-1 (\%) & D1-all (\%) & Latency (ms)\\
+\midrule
+base (gev4) & 2.962 & 2.908 & 30.32 & 16.31 & 46.6\\
++ exact-equivalence fixes & 2.962 & 3.021 & 32.09 & 17.79 & 35.8\\
++ narrow GEV band & 2.962 & 2.906 & 32.29 & 16.88 & 30.2\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[!htbp]
+\centering
+\caption{\textbf{Boundary-sharpness fixes and their composition.} 500-pair windowed split; the composition rows show that combining fixes is worse than plane rendering alone.}
+\label{tab:ablation_blurfix}
+\small
+\begin{tabular}{lcccc}
+\toprule
+Variant & EPE & bad-0.5 (\%) & D1-all (\%) & Latency (ms)\\
+\midrule
+control (narrow) & 2.006 & 55.36 & 12.57 & 22.2\\
++ bundle1 (top-k init) & 1.982 & 49.95 & 12.14 & 21.9\\
++ bimodal aux head & 1.779 & 43.26 & 11.53 & 25.2\\
+\textbf{+ plane rendering (adopted)} & 1.826 & \textbf{42.91} & 12.19 & 15.0\\
+\midrule
+plane + bimodal & 1.847 & 44.40 & 11.62 & 25.5\\
+plane + bimodal + bundle1 & 1.853 & 46.58 & 11.93 & 17.2\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[!htbp]
+\centering
+\caption{\textbf{Input-protocol ablation.} Dual-axis final evaluation on the same 50 validation frames; each arm evaluated on both axes. Native crops win the native axis outright at no accuracy cost on the legacy resized axis.}
+\label{tab:ablation_native}
+\small
+\begin{tabular}{lcccccc}
+\toprule
+& \multicolumn{3}{c}{Native axis ($960\times 540$)} & \multicolumn{3}{c}{Resized axis ($640\times 384$)}\\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+Arm & EPE & bad-1 & D1-all & EPE & bad-1 & D1-all\\
+\midrule
+global resize (legacy) & 6.672 & 58.69 & 35.81 & 1.783 & 29.91 & 11.44\\
+\textbf{native crop (adopted)} & \textbf{2.869} & \textbf{36.75} & \textbf{16.47} & 1.783 & \textbf{29.30} & \textbf{10.71}\\
+native full frame & 2.967 & 38.68 & 16.74 & 2.557 & 36.45 & 16.36\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{fig_4_7_ablations}
+\caption{\textbf{Ablation summary.} (a) OpenStereo augmentation triplet (matched 9-arm comparison, best validation EPE). (b) The edge-inference optimization pass (100-pair harness). (c) Boundary blur fixes and their compositions (500-pair split, bad-0.5). (d) Input protocol on the native evaluation axis.}
+\label{fig:ablations}
+\end{figure}
+
+\FloatBarrier
+\section{Results}
+
+\subsection{In-Domain Accuracy: SceneFlow Test}
+The trained model was evaluated on the full FlyingThings3D test set of
+4,370 pairs at the native 960 by 540 axis with the best checkpoint. As
+Table \ref{tab:sceneflow_results} reports, it reached 0.78 pixel
+end-point error and a 3.40 percent D1-all rate, with a median absolute
+error of 0.13 pixels. Four frames whose ground truth contains no valid
+pixel after the disparity cutoff contribute no metric and are excluded
+from the macro-average. Table \ref{tab:sceneflow_comparison} places these
+numbers next to published methods. The comparison must be read with care:
+each published end-point error follows that paper's own SceneFlow
+evaluation protocol, whereas the value here is the full test set at the
+native axis, so the columns are indicative rather than strictly
+protocol-identical. Within that caveat, the model sits between the
+efficient and the iterative families, more accurate than the classical
+3D-cost-volume baseline PSMNet and close to the efficient LightStereo-S,
+while using a fraction of the parameters of the iterative and
+foundation-scale systems. The metric pattern within Table \ref{tab:sceneflow_results} is itself
+informative. The median absolute error of 0.13 pixels is six times
+smaller than the mean of 0.78, and the root-mean-square error of 3.64 is
+nearly five times larger than the mean, which together say that the
+typical pixel is highly accurate and the average is set by a small
+population of large outliers. The bad-rate ladder confirms it: errors
+above half a pixel affect 15.3 percent of pixels, but errors above three
+pixels affect only 4.0 percent, so most failures are moderate and the
+catastrophic ones are rare. Figure \ref{fig:sceneflow_qualitative} shows
+where that outlier population lives: the residual error concentrates on
+occlusion boundaries and thin structures, consistent with a model whose
+final recurrent reasoning runs at one quarter resolution and whose
+upsampler can only recombine, not invent, disparity hypotheses.
+
+\begin{table}[!htbp]
+\centering
+\caption{\textbf{Full FlyingThings3D test-set results.} All eight metrics over 4{,}370 pairs at the native $960\times 540$ axis, best checkpoint (step 53k); four frames with no valid ground-truth pixels are excluded from the macro-average.}
+\label{tab:sceneflow_results}
+\small
+\begin{tabular}{cccccccc}
+\toprule
+EPE (px) & RMSE & Median & bad-0.5 (\%) & bad-1 (\%) & bad-2 (\%) & bad-3 (\%) & D1-all (\%)\\
+\midrule
+0.781 & 3.64 & 0.130 & 15.32 & 8.92 & 5.34 & 4.00 & 3.40\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[!htbp]
+\centering
+\caption{\textbf{Comparison with published methods on SceneFlow.} Published EPE values follow each paper's standard SceneFlow protocol; the StereoLite value is the full FlyingThings3D test set at the native axis and is therefore not strictly protocol-identical. Latency hardware differs across papers.}
+\label{tab:sceneflow_comparison}
+\small
+\begin{tabular}{lcccc}
+\toprule
+Method & Params (M) & SF EPE (px) & Latency (ms) & Hardware\\
+\midrule
+PSMNet \cite{chang2018psmnet} & 5.2 & 1.09 & 410 & Titan Xp\\
+HITNet (L) \cite{tankovich2021hitnet} & 0.97 & 0.43 & 54 & Titan V\\
+CoEx \cite{bangunharcana2021coex} & 2.72 & 0.69 & 27 & RTX 2080Ti\\
+RAFT-Stereo \cite{lipson2021raftstereo} & 11.23 & 0.61 & 380 & RTX 6000\\
+IGEV-Stereo \cite{xu2023igev} & 12.60 & 0.47 & 180 & RTX 3090\\
+LightStereo-S \cite{guo2025lightstereo} & 3.44 & 0.73 & 17 & RTX 3090\\
+FoundationStereo \cite{wen2025foundationstereo} & ${\sim}340$ & 0.34 & ${\sim}470$ & RTX 4090\\
+\midrule
+StereoLite (ours) & 2.96 & 0.78 & 49.8 (fp16) & RTX 3050 laptop\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{fig_4_3_sceneflow_qualitative}
+\caption{\textbf{Qualitative results on held-out FlyingThings3D scenes.} Left image, ground-truth disparity, prediction at the best checkpoint (step 53k), and absolute error clipped at 3 px. Residual error concentrates on occlusion boundaries and sub-pixel structure.}
+\label{fig:sceneflow_qualitative}
+\end{figure}
+
+\FloatBarrier
+\subsection{Zero-Shot Cross-Domain: Middlebury 2014}
+Cross-domain behaviour is the decisive test for an edge model, since a
+network that is accurate only on its training domain is of little use in
+the field. The trained model was evaluated zero-shot on the 23
+perfect-set scenes of Middlebury 2014, which it never saw during training,
+under a protocol identical for every method in Table
+\ref{tab:mb14_comparison}. It reached 1.71 pixel end-point error and a
+10.9 percent D1-all rate. The comparison against an earlier tile chassis
+from the same project is instructive: that earlier model, trained without
+the augmentation, native-crop, and full-data recipe of Chapter 7,
+collapsed to 40.1 percent D1-all on the identical protocol. Closing that
+collapse to 10.9 percent, roughly a fourfold reduction, is attributable
+to the training pipeline rather than to any single architectural block,
+since the architecture is similar in family and parameter count. A gap
+remains to LiteAnyStereo at 6.9 percent and to the sixteen-iteration
+IGEV-Stereo at 5.0 percent; both are larger models, and LiteAnyStereo in
+particular is trained with a three-stage knowledge-distillation pipeline
+that our supervised-only recipe does not use. Figure
+\ref{fig:mb14_perscene} shows that sixteen of the 23 scenes fall within
+the reference band, and that the aggregate is dragged up by a small
+number of hard scenes. The per-scene numbers of Appendix A make the split
+concrete. The easiest scenes are ordinary furnished rooms: Adirondack at
+2.4 percent D1-all, Recycle at 2.9, and Storage at 4.2, all comparable to
+the reference models on the same scenes. The hardest four alone raise the
+mean by several points: Jadeplant at 34.9 percent, Flowers at 30.3, Mask
+at 24.7, and Pipes at 17.9. These scenes share two properties, dense thin
+repeated structures such as leaves and rods, and true disparities near or
+beyond the 192-pixel evaluation cap, so they probe exactly the regimes a
+quarter-resolution final prediction with a bounded search range handles
+least well. Figure \ref{fig:mb14_qualitative} shows both ends of that
+spectrum. The practical reading is that the model's cross-domain failure
+is not diffuse; it is localized to an identifiable scene type, which the
+distillation direction of Chapter 9 targets directly.
+
+\begin{table}[!htbp]
+\centering
+\caption{\textbf{Zero-shot Middlebury 2014 comparison.} 23 perfect-set scenes, $384\times 640$ inference, identical protocol across all rows (disparity ground truth scaled to the inference width, values above 192 px masked). Reference rows from the repository's matched-protocol evaluations of the public checkpoints \cite{jing2025liteanystereo,xu2023igev}. Latency is the per-scene median on a cloud T4 in fp32 eager mode.}
+\label{tab:mb14_comparison}
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccccccc}
+\toprule
+Model & Params (M) & T4 (ms) & EPE & bad-0.5 & bad-1 & bad-2 & bad-3 & D1-all (\%)\\
+\midrule
+Legacy tile chassis & 0.87 & 26 & 5.53 & 79.7 & 66.0 & 50.2 & 40.9 & 40.1\\
+\textbf{StereoLite (ours)} & 2.96 & 86 & \textbf{1.71} & 39.6 & 23.9 & 14.5 & 11.2 & \textbf{10.9}\\
+LiteAnyStereo \cite{jing2025liteanystereo} & 7.60 & 64 & 1.17 & 35.1 & 19.7 & 10.5 & 7.4 & 6.9\\
+IGEV-Stereo (16 it.) \cite{xu2023igev} & 12.60 & 305 & 0.86 & 22.2 & 12.4 & 7.2 & 5.2 & 5.0\\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{fig_4_4_mb14_perscene}
+\caption{\textbf{Per-scene zero-shot D1-all on Middlebury 2014.} 23 perfect-set scenes sorted by error; horizontal lines mark the aggregate means of our model and the two reference models under the identical protocol.}
+\label{fig:mb14_perscene}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.9\textwidth]{fig_4_5_mb14_qualitative}
+\caption{\textbf{Zero-shot qualitative results on Middlebury 2014.} The three easiest and two hardest scenes by D1-all: left image, ground truth, and our prediction (turbo colormap, per-scene scale, invalid ground truth dark). The hardest scenes combine thin structures with disparities near the evaluation cap.}
+\label{fig:mb14_qualitative}
+\end{figure}
+
+\FloatBarrier
+\subsection{Robustness to Rectification Imperfection}
+\label{sec:rectification}
+The second objective of this thesis is an architecture that tolerates
+imperfect rectification. To test it, the trained model was evaluated on a
+400-pair subset of the test set while the right image was shifted
+vertically by a controlled offset and the disparity ground truth was left
+unchanged, so that the offset emulates a residual vertical misalignment
+between the two views. Table \ref{tab:rectification} and Figure
+\ref{fig:rectification} report the result. Accuracy degrades gracefully
+within the regime that matters in practice. At a half-pixel offset the
+end-point error rises only from 1.03 to 1.22 pixels and the D1-all rate
+from 4.3 to 4.6 percent, and at a full pixel the error remains 1.53 pixels
+with a 6.2 percent D1-all rate. A calibrated stereo rig typically holds
+its residual vertical error below one pixel, so the model retains most of
+its accuracy across the realistic range. The tolerance comes from the
+local correlation lookup of the refinement stage, which evaluates a small
+two-dimensional neighborhood around each match rather than assuming a
+perfectly horizontal epipolar line. Beyond this range the degradation is
+steep: a two-pixel offset raises the D1-all rate to 15.8 percent and a
+four-pixel offset to 41.2 percent, because the network has no explicit
+vertical search and a large misalignment moves the true match outside the
+lookup window. The claim is therefore a measured tolerance to small
+misalignment, not immunity to arbitrary de-rectification.
+
+\begin{table}[!htbp]
+\centering
+\caption{\textbf{Accuracy under vertical rectification error.} The right image is shifted vertically by the stated offset on a 400-pair FlyingThings3D test subset at the native axis; the disparity ground truth is unchanged. Accuracy is retained across the sub-pixel to one-pixel range that a calibrated rig produces.}
+\label{tab:rectification}
+\small
+\begin{tabular}{lcccc}
+\toprule
+Vertical offset (px) & EPE (px) & bad-1 (\%) & bad-2 (\%) & D1-all (\%)\\
+\midrule
+0.0 & 1.03 & 10.28 & 6.63 & 4.29\\
+0.5 & 1.22 & 14.62 & 7.58 & 4.60\\
+1.0 & 1.53 & 26.27 & 11.84 & 6.19\\
+2.0 & 2.43 & 47.73 & 27.71 & 15.83\\
+4.0 & 5.07 & 71.59 & 55.68 & 41.17\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.72\textwidth]{fig_4_9_rectification}
+\caption{\textbf{Accuracy under vertical rectification error.} End-point error and D1-all against the right-image vertical offset; the shaded band marks the sub-pixel to one-pixel residual a calibrated rig produces, within which accuracy is largely retained.}
+\label{fig:rectification}
+\end{figure}
+
+The synthetic sweep is a controlled test with known ground truth, but the
+condition it emulates arises for real on a low-cost rig. To confirm the
+tolerance on physical data, the model was run on 997 rectified pairs from
+the project's stereo rig, a commodity camera whose factory rectification
+leaves a residual vertical misalignment, and its disparity was compared
+against the pseudo-ground-truth of the FoundationStereo teacher on the
+same pairs. The agreement is close: the mean end-point error is 1.45
+pixels and the D1-all rate is 11.1 percent, in the same range as the
+in-domain synthetic error despite the real rig's imperfect rectification.
+Because both the model and the teacher observe the same misaligned input,
+this figure measures agreement with a strong reference rather than
+absolute error, so it corroborates rather than replaces the controlled
+sweep; taken together, the two results support the claim that the model
+withstands the rectification imperfection of an inexpensive camera.
+
+\FloatBarrier
+\subsection{Efficiency and Deployment Measurements}
+Table \ref{tab:latency} reports the measured efficiency. On the RTX 3050
+laptop GPU at batch one and 384 by 640 resolution, the optimized model ran
+in 49.8 milliseconds in half precision and 61.4 milliseconds in full
+precision, with an inference working set of 0.26 and 0.35 gigabytes
+respectively. On the target deployment device, a Jetson Orin Nano, the
+optimized eight-bit model was measured directly at 36.3 milliseconds per
+frame, which is 27.5 frames per second at the 384 by 640 inference
+resolution. This is close to the 30 frames per second real-time target
+and confirms that the network runs at interactive rates on the intended
+edge accelerator rather than only on the laptop GPU. The on-device working
+set stays within the platform's memory budget by a wide margin.
+
+\begin{table}[!htbp]
+\centering
+\caption{\textbf{Latency and memory.} RTX 3050 Laptop values are batch 1, $384\times 640$, eager PyTorch. The Jetson Orin Nano row is a direct on-device measurement of the optimized eight-bit TensorRT model; its memory figure is the estimated on-device working set.}
+\label{tab:latency}
+\small
+\begin{tabular}{lcccc}
+\toprule
+Configuration & Latency (ms) & FPS & Inference memory (GB)\\
+\midrule
+RTX 3050, fp32 & 61.4 & 16.3 & 0.35\\
+RTX 3050, fp16 & 49.8 & 20.1 & 0.26\\
+Jetson Orin Nano, INT8 TensorRT & 36.3 & 27.5 & ${\sim}0.15$\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\FloatBarrier
+\subsection{Qualitative Results}
+The quantitative results are supported by visual inspection. On the
+synthetic test set, Figure \ref{fig:sceneflow_qualitative} shows accurate
+reconstruction of broad surfaces with error confined to occlusion
+boundaries. On the unseen Middlebury scenes, Figure
+\ref{fig:mb14_qualitative} shows that the easy scenes are reconstructed
+cleanly and that failure is localized to thin repeated structures rather
+than spread across the image. The plane-rendering step of Chapter 3 is
+visible at boundaries, where the predicted disparity follows object edges
+more closely than a bilinear upsampler would allow. Figure
+\ref{fig:camera} extends the evidence to real data. Four indoor pairs from
+the project's calibrated stereo rig, none of which the model was trained
+or fine-tuned on, produce plausible disparity maps in which the foreground
+subject is cleanly separated from the background, confirming that the
+model transfers to a real camera without adaptation.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{fig_4_6_camera}
+\caption{\textbf{Real-camera qualitative results.} Four indoor pairs from the project's stereo rig ($1280\times 720$, rectified, no fine-tuning): left image and the model's predicted disparity at $384\times 640$. No ground truth exists for these pairs; the panels demonstrate zero-shot visual plausibility on real data.}
+\label{fig:camera}
+\end{figure}
+
+\FloatBarrier
+\subsection{3D Reconstruction of Real Scenes}
+The title of this thesis promises depth mapping and three-dimensional
+reconstruction, and this section delivers the second half of that
+promise. The predicted disparity of three real indoor scenes from the
+project's stereo rig was back-projected to metric point clouds through
+the calibrated relations of \eqref{eq:backprojection}, cleaned with a
+statistical outlier filter and voxel downsampling as described in
+Section \ref{sec:reconstruction_method}, and rendered from three
+viewpoints. Figure \ref{fig:reconstruction} shows the result. The
+reconstructions are metrically plausible: in the first scene the two
+fire extinguishers stand clearly proud of the wall and the wooden door
+behind them, which the oblique and top-down views make explicit; in the
+second the corridor recovers a smooth depth gradient that recedes to the
+bright far end; and in the third the metal cabinet sits in front of the
+back wall at its correct standoff. The flying points that remain along
+depth boundaries are the three-dimensional footprint of the same
+occlusion-edge error visible in the error maps of Figure
+\ref{fig:sceneflow_qualitative}, and the depth quantization visible on
+distant surfaces reflects the inverse relation between disparity and
+depth, under which a fixed sub-pixel disparity step spans a growing
+depth interval with distance. These pairs come from the same low-cost
+rig whose imperfect rectification is examined in Section
+\ref{sec:rectification}, and no fine-tuning on the rig's data was
+performed; the clouds are the zero-shot output of the same checkpoint
+evaluated throughout this chapter.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{fig_4_10_reconstruction}
+\caption{\textbf{3D reconstruction of real scenes from predicted disparity.} Three indoor pairs from the project's low-cost stereo rig: the left image and the colored point cloud rendered from the camera viewpoint, an oblique viewpoint, and top-down. Clouds are back-projected through the calibrated rig geometry, outlier-filtered, and voxel-downsampled; no fine-tuning on the rig's data was performed.}
+\label{fig:reconstruction}
+\end{figure}
+
+\FloatBarrier
+\section{Discussion}
+The results answer the four research questions of Chapter 3. The model
+reaches 0.78 pixel end-point error in domain within a few million
+parameters, which answers the first question in the affirmative. It
+generalizes zero-shot to an unseen real domain at 10.9 percent D1-all,
+far from the earlier chassis's collapse though short of the
+distillation-trained references, which answers the second. It runs at
+interactive rates on the laptop GPU and was measured at 27.5 frames per
+second on the Jetson Orin Nano, close to the real-time target, which
+answers the third question on the intended device.
+The fourth, tolerance to imperfect rectification, is addressed by the
+perturbation study of Section \ref{sec:rectification}. Figure
+\ref{fig:pareto_ours} places the model on the zero-shot
+accuracy-efficiency front, between the earlier chassis and the larger
+distillation-trained and iterative references. The cross-domain result
+also speaks to an open question in the literature. The gap between the
+earlier chassis and the present model was closed by the training pipeline,
+not by adding iteration, and the strongest efficient reference in the
+comparison, LiteAnyStereo, is itself non-iterative and owes its
+cross-domain accuracy to a three-stage distillation recipe. The evidence
+here is consistent with the view that the training pipeline, rather than
+architectural iteration alone, carries cross-domain generalization,
+although the present study does not isolate the two factors and the
+question remains open. Several boundaries must be stated plainly. The
+results come from a single training run, so run-to-run variance is not
+characterized. The model has not been submitted to the KITTI leaderboard,
+and it carries no explicit left-right consistency or occlusion reasoning.
+These are the honest limits of the present work and they frame the future
+directions of Chapter 9.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.78\textwidth]{fig_4_8_pareto_ours}
+\caption{\textbf{StereoLite on the zero-shot accuracy-efficiency front.} Middlebury 2014 D1-all against trainable parameters; all four points share the identical 23-scene protocol of Table \ref{tab:mb14_comparison}.}
+\label{fig:pareto_ours}
+\end{figure}
+
+\FloatBarrier
+\section{Summary}
+This chapter evaluated the trained model on every axis the objectives
+demand. In domain, the model reached 0.78 pixel end-point error and a
+3.40 percent D1-all rate on the full FlyingThings3D test set. Zero-shot
+on the unseen Middlebury 2014 scenes it reached 10.9 percent D1-all,
+roughly a fourfold improvement over the earlier tile chassis under the
+identical protocol, with the remaining failures localized to scenes that
+combine thin repeated structures with disparities near the evaluation
+cap. Under controlled vertical rectification error the end-point error
+rose only from 1.03 to 1.53 pixels across the sub-pixel to one-pixel
+range that a calibrated rig produces, and the real-rig agreement study
+corroborated that tolerance. On the target Jetson Orin Nano the
+optimized eight-bit model was measured at 36.3 milliseconds per frame,
+close to the 30 frames per second real-time goal, and the real-camera
+disparity maps and metric point-cloud reconstructions confirmed that the
+same checkpoint transfers to physical data without adaptation. The
+conclusions, limitations, and future directions these results support
+are drawn together in Chapter 9.
