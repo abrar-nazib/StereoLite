@@ -73,12 +73,19 @@ Mean & 1.71 & 23.9 & 14.5 & 10.86\\
 \end{table}
 
 \section{Software and Hardware Environment}
-\todo{PyTorch 2.11 cu128, Python 3.10+, Modal A100-80GB (training), T4
-(evaluation), RTX 3050 Laptop 4 GB (local bench), CCB stereo camera
-(2560x720 side-by-side), target Jetson Orin Nano class.}
+The model is implemented in PyTorch 2.11 with CUDA 12.8 on Python 3.10.
+Training runs on a single cloud A100 with 80 gigabytes of memory,
+ablations and evaluations on a cloud T4, and the local latency benchmark
+on an RTX 3050 laptop GPU with roughly 4 gigabytes of memory. Real-camera
+pairs come from a calibrated binocular rig that streams a 2560 by 720
+side-by-side image. The intended deployment target is the Jetson Orin Nano
+class of device.
 
 \section{Reproduction Pointers}
-\todo{Name the drivers: modal/train\_full\_sceneflow\_a100.py (training),
-modal/eval\_full\_testset.py (SceneFlow test number),
-modal/eval\_gev4\_middlebury2014.py (zero-shot MB14),
-modal/eval\_rectification\_robustness.py (objective-2 sweep).}
+Every reported number can be reproduced from the repository. The production
+model is trained by the driver \texttt{train\_full\_sceneflow\_a100.py},
+the SceneFlow test number by \texttt{eval\_full\_testset.py}, the zero-shot
+Middlebury 2014 result by \texttt{eval\_gev4\_middlebury2014.py}, and the
+rectification-robustness sweep of the second objective by
+\texttt{eval\_rectification\_robustness.py}. Each driver records its
+configuration and metrics to a metadata file alongside the checkpoint.
