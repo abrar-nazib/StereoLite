@@ -1,0 +1,22 @@
+% ============ Appendix A: Technical Specifications (PO5) ==============
+% Sources: FINAL_MODEL_ARCHITECTURE section 11 config table; run
+% meta.json args + cfg; WRITING_PLAN section 8 row A. The internal
+% variant slug (gev4_opt_narrow_plane) IS allowed here (only here).
+\chapter{Technical Specifications}
+
+\section{Model Configuration}
+\todo{Full architecture configuration table from
+FINAL\_MODEL\_ARCHITECTURE section 11 (channels, groups, hypotheses,
+iteration schedule, 2.9623 M parameters) + the trained variant flags
+(narrow GEV half-range 16, plane rendering, slant weight 0.3).}
+
+\section{Software and Hardware Environment}
+\todo{PyTorch 2.11 cu128, Python 3.10+, Modal A100-80GB (training), T4
+(evaluation), RTX 3050 Laptop 4 GB (local bench), CCB stereo camera
+(2560x720 side-by-side), target Jetson Orin Nano class.}
+
+\section{Reproduction Pointers}
+\todo{Name the drivers: modal/train\_full\_sceneflow\_a100.py (training),
+modal/eval\_full\_testset.py (SceneFlow test number),
+modal/eval\_gev4\_middlebury2014.py (zero-shot MB14),
+modal/eval\_rectification\_robustness.py (objective-2 sweep).}

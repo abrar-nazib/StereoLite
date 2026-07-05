@@ -1,0 +1,184 @@
+% =====================================================================
+% CHAPTER 2: Literature Review  (~24 pages, the masterclass chapter)
+% WRITING SESSION INSTRUCTIONS (keep until the chapter is done):
+%   - Read thesis/WRITING_PLAN.md section 4 FIRST. Every subsection there
+%     names the exact summary files to read BEFORE writing it.
+%   - Invoke ruet-thesis-expert + research-linguistics-expert. Register:
+%     flagship for background, "[SYSTEM] [ref] [verb]s [mechanism]" for
+%     minor works, fuller treatment for the ~10 anchor architectures.
+%     Present tense for a paper's claim, past for its specific finding.
+%   - The stereo-vision-expert agent arbitrates any claim the summaries
+%     leave ambiguous. Numbers ONLY from papers/verified_performance.md
+%     or review_paper/figures/_data/method_data.py (both carry per-cell
+%     source breadcrumbs).
+%   - Architecture figures are REDRAWN (drawio pipeline, WRITING_PLAN
+%     section 9), never pasted from papers. References for fidelity:
+%     model/designs/StereoLite/arch_refs/*.png and
+%     .claude/skills/stereo-vision-expert/reference_impls/.
+%   - Cap reproduced equations at the seven below. Cite the origin paper
+%     at each. PO demonstrated: PO2 throughout.
+%   - BibTeX keys: Reference.bib already holds the 72 PDF-verified
+%     entries copied from review_paper/references.bib; cite with those
+%     keys, add new entries only after PDF verification.
+% =====================================================================
+\chapter{Literature Review}
+
+\section{Stereo Matching Fundamentals}
+% Sources: tier1/surveys/Scharstein_Taxonomy_IJCV2002.md,
+% tier1/surveys/Hirschmuller_SGM_TPAMI2007.md, papers/CONCEPTS.md,
+% review_paper/sections/02_background.tex.
+% Content: rectification, epipolar constraint, disparity; the
+% Scharstein-Szeliski 4-step taxonomy; classical costs (SAD, NCC,
+% census); SGM as the classical apex.
+\todo{Write per WRITING\_PLAN section 4.1 row 2.1.}
+
+\begin{figure}[!htbp]
+\centering
+\todo{insert fig\_2\_1\_classical\_pipeline (4-step taxonomy flow; small drawio)}
+\caption{\textbf{The classical stereo pipeline.} \todo{caption}}
+\label{fig:classical_pipeline}
+\end{figure}
+
+% Eq 2.1: SGM energy (Hirschmuller). Introduce, display, where-clause.
+\todo{Eq 2.1 SGM energy $E(D)$ with $P_1$/$P_2$ smoothness terms; source:
+tier1 SGM summary; label eq:sgm\_energy.}
+
+\section{The Deep Learning Transition}
+% Sources: tier2/end_to_end/{MC-CNN,DispNetC,GCNet}.md,
+% tier1/surveys/Poggi_Synergies_TPAMI2021.md.
+% Content: MC-CNN (learned cost, classical rest); DispNetC (first
+% end-to-end, correlation layer); GC-Net (4D cost volume + 3D conv +
+% soft-argmin: the template every later network follows).
+\todo{Write per WRITING\_PLAN section 4.1 row 2.2.}
+
+\todo{Eq 2.2 correlation layer (DispNetC); label eq:correlation.}
+\todo{Eq 2.3 soft-argmin regression (GC-Net); label eq:softargmin.}
+
+\section{The 3D Cost-Volume Era}
+% Sources: tier2/end_to_end/{PSMNet,GWCNet,GANet,AANet,ACVNet,CFNet}.md.
+% Content: PSMNet (SPP + stacked hourglass); GwcNet group-wise
+% correlation (DIRECTLY relevant: our tile initialization uses it, say
+% so); GA-Net learned aggregation; one clause each for AANet/ACVNet/CFNet.
+\todo{Write per WRITING\_PLAN section 4.1 row 2.3.}
+
+\todo{Eq 2.4 group-wise correlation (GwcNet); label eq:gwc\_lit. Note the
+forward reference: our Eq \eqref{eq:gwc} adopts this op at tile scale.}
+
+\section{Iterative Refinement}
+% Sources: tier1/iterative/{RAFT-Stereo,IGEV-Stereo,CREStereo,
+% Selective-Stereo}.md + reference_impls/raft_stereo/, igev_stereo/.
+% Content: RAFT-Stereo (all-pairs correlation + ConvGRU + convex
+% upsampling: three mechanisms our model inherits in modified form, say
+% so explicitly); IGEV (Geometry Encoding Volume: the direct ancestor of
+% our GEV block); CREStereo, Selective-Stereo one paragraph each.
+\todo{Write per WRITING\_PLAN section 4.1 row 2.4.}
+
+\todo{Eq 2.5 ConvGRU update equations (RAFT-Stereo); label eq:convgru\_lit.}
+\todo{Eq 2.6 Geometry Encoding Volume (IGEV); label eq:gev\_lit.}
+
+\begin{figure}[!htbp]
+\centering
+% WRITING_PLAN Fig 2.4: the biggest Ch2 figure. Four redrawn simplified
+% architectures sharing one visual language (drawio, grammar contract in
+% WRITING_PLAN section 9): (a) PSMNet 3D-cost-volume paradigm,
+% (b) RAFT-Stereo iterative paradigm, (c) HITNet tile paradigm,
+% (d) LiteAnyStereo KD-trained efficient paradigm.
+\todo{insert fig\_2\_4\_paradigms (four-panel redrawn architecture comparison)}
+\caption{\textbf{Four stereo-matching paradigms.} \todo{caption naming all four panels}}
+\label{fig:paradigms}
+\end{figure}
+
+\section{Foundation-Model Era}
+% Sources: tier1/foundation_model/{FoundationStereo,DEFOM-Stereo,MonSter,
+% StereoAnywhere}.md + _SYNTHESIS_foundation_model.md; review_paper
+% section 03. Content: the common recipe (monocular prior + massive
+% data); accuracy vs deployability; why these motivate rather than solve
+% the edge problem.
+\todo{Write per WRITING\_PLAN section 4.1 row 2.5.}
+
+\begin{figure}[!htbp]
+\centering
+% WRITING_PLAN Fig 2.2: regenerate review_paper timeline with thesis style.
+\todo{insert fig\_2\_2\_timeline (six-era evolution timeline 2016 to 2026)}
+\caption{\textbf{Evolution of deep stereo matching.} \todo{caption}}
+\label{fig:timeline}
+\end{figure}
+
+\section{Efficient and Edge-Deployable Stereo}
+% THE load-bearing section (~7 pages). Organize by compression technique
+% FAMILY, not by paper; the skeleton is review_paper/sections/
+% 04_compression_taxonomy.tex (REWRITE for thesis register, do not copy).
+% Sources: tier1/efficient/* (18 files), tier3/efficient/{HITNet,
+% StereoNet,AnyNet,MobileStereoNet,DeepPruner}.md, review_paper section 06.
+\todo{Write per WRITING\_PLAN section 4.1 row 2.6. Family order:}
+\subsection{Backbone Substitution}
+\todo{MobileNet/Ghost/YOLO-derived encoders; MobileStereoNet anchor.}
+\subsection{Cost-Volume Compression}
+\todo{cascade volumes, bilateral grid (BGNet), pruning (DeepPruner),
+tile hypotheses (HITNet, our lineage: say so).}
+\subsection{Iterative-Loop Compression}
+\todo{LightStereo, DTP; iteration-count trade-offs.}
+\subsection{Knowledge Distillation}
+\todo{LiteAnyStereo 3-stage KD (anchor, decisive for our future work),
+Distill-then-Prune.}
+\todo{Eq 2.7 generic teacher-student disparity distillation loss
+(LiteAnyStereo form); label eq:kd\_loss.}
+\subsection{Architectural Compression and Adaptive Compute}
+\todo{CoEx guided excitation, CGI-Stereo; AnyNet anytime inference,
+MADNet online adaptation; NAS (LEAStereo) in one paragraph.}
+
+\begin{figure}[!htbp]
+\centering
+% WRITING_PLAN Fig 2.5: recompile review_paper fig_taxonomy_tikz.tex here
+% (watch the dvipsnames xcolor pitfall from CLAUDE.md).
+\todo{insert fig\_2\_5\_taxonomy (compression-family tree)}
+\caption{\textbf{Taxonomy of compression techniques for deep stereo.} \todo{caption}}
+\label{fig:taxonomy}
+\end{figure}
+
+\section{Cross-Domain Generalization}
+% Sources: tier3/domain_shift/*, tier1/efficient/LiteAnyStereo.md,
+% review_paper/sections/05_generalization.tex, CLAUDE.md cross-domain
+% insight. Content: why synthetic-trained models fail on real domains;
+% architecture-level vs training-recipe-level remedies; the evidence that
+% the training pipeline, not iteration, carries generalization.
+\todo{Write per WRITING\_PLAN section 4.1 row 2.7.}
+
+\section{Benchmarks and Datasets}
+% Sources: tier2/datasets/*, review_paper section 02.3.
+% Content: SceneFlow (FT3D/Monkaa/Driving, 35k+ pairs), KITTI 2012/2015,
+% Middlebury 2014 (eval3 protocol: 15 train GT public + 15 test hidden;
+% the zero-shot convention evaluates on GT-public scenes), ETH3D.
+\todo{Write per WRITING\_PLAN section 4.1 row 2.8.}
+
+\begin{table}[!htbp]
+\centering
+\caption{\textbf{Stereo benchmarks and training datasets.} \todo{protocol sentence}}
+\label{tab:datasets}
+% Source content: review_paper/sections/_tables/tab_datasets.tex, reformat.
+\todo{columns: name, size, real/synthetic, GT source, resolution, role}
+\end{table}
+
+\section{Summary and Research Gap}
+% Honesty rule: a review SUMMARISES; no roadmaps. Gap phrasing pattern:
+% "the surveyed literature does not directly address [X]".
+\todo{Write per WRITING\_PLAN section 4.1 row 2.9: synthesis paragraph +
+the gap statement (sub-3 M params, tile+GEV fusion, real-time on
+Orin-class hardware, robustness to imperfect rectification).}
+
+\begin{table}[!htbp]
+\centering
+\caption{\textbf{Representative methods across eras.} \todo{protocol sentence: params, SceneFlow EPE, KITTI D1, latency + hardware, family}}
+\label{tab:method_comparison}
+% Source: papers/verified_performance.md + method_data.py ONLY. Every
+% cell keeps its source breadcrumb as a citation.
+\todo{12 to 15 rows spanning all six eras}
+\end{table}
+
+\begin{figure}[!htbp]
+\centering
+% WRITING_PLAN Fig 2.6: two-panel Pareto (params + latency), our marker on.
+\todo{insert fig\_2\_6\_pareto (accuracy vs params and vs latency, family-coded)}
+\caption{\textbf{Accuracy against parameters and latency.} \todo{caption}}
+\label{fig:pareto}
+\end{figure}
