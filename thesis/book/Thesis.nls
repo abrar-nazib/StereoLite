@@ -1,0 +1,21 @@
+
+\begin{thenomenclature} 
+\nomgroup{A}
+  \item [{$(c_x, c_y)$}]\begingroup principal point of the camera\nomeqref {1.1}\nompageref{1}
+  \item [{$B$}]\begingroup stereo baseline, the distance between the two camera centers\nomeqref {1.1}\nompageref{1}
+  \item [{$d$}]\begingroup disparity, the horizontal pixel shift between rectified views\nomeqref {1.1}\nompageref{1}
+  \item [{$f$}]\begingroup camera focal length in pixels\nomeqref {1.1}\nompageref{1}
+  \item [{$Z$}]\begingroup depth of a scene point along the camera axis\nomeqref {1.1}\nompageref{1}
+  \item [{bad-$t$}]\begingroup percentage of valid pixels with error above $t$ pixels\nomeqref {1.1}\nompageref{1}
+  \item [{D1-all}]\begingroup percentage of pixels with error above 3 px and 5\% of ground truth\nomeqref {1.1}\nompageref{1}
+  \item [{EPE}]\begingroup end-point error, the mean absolute disparity error\nomeqref {1.1}\nompageref{1}
+  \item [{FPS}]\begingroup frames per second\nomeqref {1.1}\nompageref{1}
+  \item [{GEV}]\begingroup geometry encoding volume\nomeqref {1.1}\nompageref{1}
+  \item [{GRU}]\begingroup gated recurrent unit\nomeqref {1.1}\nompageref{1}
+  \item [{GT}]\begingroup ground truth\nomeqref {1.1}\nompageref{1}
+  \item [{INT8}]\begingroup eight-bit integer arithmetic\nomeqref {1.1}\nompageref{1}
+  \item [{KD}]\begingroup knowledge distillation\nomeqref {1.1}\nompageref{1}
+  \item [{SGM}]\begingroup semi-global matching\nomeqref {1.1}\nompageref{1}
+  \item [{TOPS}]\begingroup tera-operations per second\nomeqref {1.1}\nompageref{1}
+
+\end{thenomenclature}

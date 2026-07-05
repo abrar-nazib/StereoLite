@@ -79,6 +79,28 @@ context encoder feeds the recurrent state.
 \label{fig:architecture}
 \end{figure}
 
+Table \ref{tab:scales} summarizes the spatial sizes and the main
+operation at each scale of the pipeline for the default 384 by 640
+input.
+
+\begin{table}[!htbp]
+\centering
+\caption{\textbf{Scales of the pipeline.} Spatial sizes at the default $384\times 640$ input, the encoder channel count at each scale, and the main operation performed there.}
+\label{tab:scales}
+\small
+\begin{tabular}{lccl}
+\toprule
+Scale & Spatial size & Channels & Main operation\\
+\midrule
+Full & $384\times 640$ & 3 & input and output\\
+1/2 & $192\times 320$ & 32 & convex-upsample guidance\\
+1/4 & $96\times 160$ & 128 & GEV fusion and 3 refinements\\
+1/8 & $48\times 80$ & 256 & 3 refinements\\
+1/16 & $24\times 40$ & 256 & cost initialization and 2 refinements\\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \section{Shared Feature Encoder and Context Encoder}
 % Source: FINAL_MODEL_ARCHITECTURE sections 4 + 5. YOLO26s layers 0-6,
 % shared weights via batch concatenation; f4 128 / f8 256 / f16 256 ch;
@@ -86,11 +108,18 @@ context encoder feeds the recurrent state.
 % WHY matching features must not double as recurrent context.
 The matching network is a truncated YOLO26s backbone whose first seven
 blocks are retained, producing features at one quarter, one eighth, and
-one sixteenth resolution with 128, 256, and 256 channels. The two views
+one sixteenth resolution with 128, 256, and 256 channels. A detection
+backbone is a deliberate choice rather than a convenience: its features
+are pretrained to localize objects across scales, which is close to what
+stereo matching needs from an encoder, and the encoder ablation of
+Chapter 4 confirmed that this backbone beats both a hand-built GhostConv
+stack and its own smaller sibling on every accuracy metric at a
+two-millisecond cost. The detection neck and head above the one-sixteenth
+stage are removed at construction rather than merely unused, because
+dead blocks would waste parameters and forward compute. The two views
 are concatenated along the batch dimension and pass through a single
 shared invocation, which guarantees identical weights for both images.
-The detection neck and head above the one-sixteenth stage are removed,
-since only the pyramid features are needed. A separate context encoder
+A separate context encoder
 processes the left image alone. It applies a strided convolution followed
 by two GhostConv blocks with squeeze-and-excitation, and projects to a
 32-channel quarter-resolution context map that is pooled to the coarser
@@ -244,7 +273,13 @@ trained configuration it is narrow: rather than the full 64 disparity
 planes of the base design, it samples 33 hypotheses in a band of plus or
 minus 16 around the current tile disparity, a change validated in
 Chapter 4 as accuracy-neutral while removing roughly a quarter of the
-model's multiply-accumulate operations. The volume is regularized by
+model's multiply-accumulate operations. The band is not as restrictive
+as it sounds: 16 quarter-resolution planes correspond to 64
+full-resolution pixels on either side of the current estimate, and since
+the coarse initialization has already localized the disparity, the
+band's job is correction rather than search. The full-range volume
+spends most of its computation scoring hypotheses the tile state has
+already ruled out, which is why removing them costs nothing. The volume is regularized by
 three three-dimensional convolutions with 16 hidden channels, and the
 softmax distribution yields the expected disparity, a confidence, and a
 projected geometry feature, as in \eqref{eq:gev_expect}. The proposal is
@@ -330,7 +365,16 @@ a Sobel gradient-consistency term, a threshold hinge stack, a KITTI-style
 D1-relative hinge, an edge-aware smoothness term, and a gated
 slant-supervision term that trains the plane slopes only where they are
 trustworthy. The slant term pairs with plane rendering: it makes the
-slopes accurate enough for the rendering step to sharpen boundaries.
+slopes accurate enough for the rendering step to sharpen boundaries. The
+composition of the objective is itself an experimental result rather
+than a guess. The loss ablation of Chapter 4 tested nine formulations
+and found that a plain L1 under-serves the outlier metrics, that hinge
+terms on a single threshold overfit that threshold, and that the
+threshold stack combined with the D1 hinge was the only formulation to
+win the end-point error and the outlier rates together; the production
+objective descends from that winner, with the gradient term retained for
+its sub-pixel benefit and the smoothness term kept at a deliberately
+small weight so it regularizes without blurring.
 
 \begin{equation}
 \begin{aligned}
@@ -524,6 +568,66 @@ every reported measurement.
 where $V$ is the set of valid pixels, $\hat{d}$ the predicted disparity,
 $d^{*}$ the ground truth, and $t \in \{0.5, 1, 2, 3\}$ pixels the bad-rate
 thresholds.
+
+\section{Summary of Design Decisions}
+Every load-bearing decision in this chapter is tied to a controlled
+study in Chapter 4 or to published evidence in Chapter 2. Table
+\ref{tab:design_evidence} collects the mapping so that the design can be
+audited decision by decision.
+
+\begin{table}[!htbp]
+\centering
+\caption{\textbf{Design decisions and their evidence.} Each architectural or training choice with the study or literature that justifies it.}
+\label{tab:design_evidence}
+\small
+\begin{tabular}{p{4.6cm}p{7.6cm}}
+\toprule
+Decision & Evidence\\
+\midrule
+YOLO26s shared encoder & encoder ablation, Table \ref{tab:ablation_encoder}: best EPE of three encoders at +2 ms\\
+Separate left context encoder & RAFT-Stereo lineage \cite{lipson2021raftstereo}; context-gated variants win the family ablation, Table \ref{tab:ablation_gev4line}\\
+Group-wise cost at one coarse scale & GwcNet \cite{guo2019gwcnet} graceful degradation under small aggregation budgets\\
+Iterated coarse-to-fine refinement & refinement ablation, Table \ref{tab:ablation_refinement}: single-pass collapses, finer scales add cost without gain\\
+Local $\pm 2$ correlation lookup & CREStereo \cite{li2022crestereo}: local search beats all-pairs; also confers rectification tolerance, Section \ref{sec:rectification}\\
+Slanted tile planes & HITNet \cite{tankovich2021hitnet}; plane rendering wins the blur study, Table \ref{tab:ablation_blurfix}\\
+Narrow GEV band + fail-soft gate & family ablation best EPE, Table \ref{tab:ablation_gev4line}; narrowing accuracy-neutral, Table \ref{tab:ablation_efficiency}\\
+Rejected: selective recurrent unit & family ablation, Table \ref{tab:ablation_gev4line}: EPE worsens on the compact chassis\\
+Rejected: fresh 1/4 initialization & family ablation, Table \ref{tab:ablation_gev4line}: EPE and bad-1 worsen\\
+Rejected: fix compositions & blur study, Table \ref{tab:ablation_blurfix}: worse than plane rendering alone\\
+Threshold-stack + D1 objective & loss ablation, Table \ref{tab:ablation_loss}: wins EPE, bad-2, D1 together\\
+Native-crop input protocol & input-protocol study, Table \ref{tab:ablation_native}: native axis EPE 6.67 to 2.87 at no resized-axis cost\\
+Augmentation triplet & matched comparison: best val EPE 2.778 to 1.921\\
+OneCycle 60k schedule & training dynamics, Chapter 4: validation floor reached before the budget ends\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{From Disparity to 3D Reconstruction}
+\label{sec:reconstruction_method}
+The disparity map is not the end product of the pipeline; it is the
+carrier of the three-dimensional structure of the scene. Once the
+disparity is known, every valid pixel back-projects to a metric
+three-dimensional point through the pinhole relations
+\begin{equation}
+Z = \frac{f\,B}{d}, \qquad
+X = \frac{(u - c_x)\,Z}{f}, \qquad
+Y = \frac{(v - c_y)\,Z}{f}
+\label{eq:backprojection}
+\end{equation}
+where $(u, v)$ are the pixel coordinates, $(c_x, c_y)$ the principal
+point, $f$ the focal length in pixels, $B$ the stereo baseline, and
+$(X, Y, Z)$ the recovered point in the camera frame. Coloring each point
+with the corresponding left-image pixel yields a dense colored point
+cloud of the scene. For the reconstructions reported in Chapter 4, the
+cloud is post-processed with two standard operations: a statistical
+outlier filter removes the isolated flying points that appear along depth
+discontinuities, and a voxel downsampling makes the point density
+uniform. The stereo rig's calibrated values, a focal length of
+approximately 1005 pixels at the native 1280-pixel width and a baseline
+of 52 millimeters, scale to the inference resolution by the width ratio.
+This reconstruction path is what the thesis title refers to: the network
+provides the dense disparity, and the calibrated geometry turns it into a
+metric three-dimensional model of the scene.
 
 \section{Implementation and Deployment Environment}
 % Sources: meta.json; THESIS_PLAN section 2A. PyTorch 2.11 cu128; Modal
