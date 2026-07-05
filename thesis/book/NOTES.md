@@ -46,7 +46,7 @@ section renders in IEEE style.
 - [ ] Submission month/year (titlepage + acknowledgments; currently July 2026)
 - [ ] Appendix E: review-paper entry vs "none" (supervisor)
 - [ ] MB14 per-scene table: Ch4 body vs appendix (layout-time call)
-- [ ] Rectification-robustness sweep (WRITING_PLAN section 11a): BLOCKS Ch4 section 4.5
+- [x] Rectification-robustness sweep DONE (2026-07-05): objective-2 evidence in Ch4 section 4.5 + Fig 4.9; graceful to ~1px (EPE 1.03 to 1.53)
 - [ ] Export fig_3_1_architecture.drawio to cropped PDF once user finishes hand-adjustments
 - [ ] Jetson Orin Nano board: swap asterisked projections for measurements on arrival
 
