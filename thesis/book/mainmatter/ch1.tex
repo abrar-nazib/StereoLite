@@ -1,0 +1,90 @@
+% =====================================================================
+% CHAPTER 1: Introduction  (~7 pages)
+% WRITING SESSION INSTRUCTIONS (keep until the chapter is done):
+%   - Read thesis/WRITING_PLAN.md section 3 FIRST (content spec, sources,
+%     figures, PO evidence per section).
+%   - Invoke ruet-thesis-expert (format) + research-linguistics-expert
+%     (prose). Register: 4-paragraph funnel stretched to chapter length
+%     (patterns.md section 2); assert, do not hedge.
+%   - Every number cites a repo source; no en/em dashes in prose; log PO
+%     evidence lines to thesis/book/po_tracker_notes.md as you draft.
+%   - POs demonstrated here: PO1 (engineering knowledge), PO2 (problem
+%     analysis). CEP K-profile (K3, K4, K5, K8) stated in section 1.4.
+% =====================================================================
+\chapter{Introduction}
+
+\section{Background and Motivation}
+% Sources: review_paper/sections/01_introduction.tex + 02_background.tex,
+% papers/summaries/tier1/surveys/Tosi_Survey_IJCV2025.md.
+% Content: why machine depth perception matters; passive stereo vs LiDAR
+% vs structured light (cost, power, form factor); state Eq 1.1 EARLY with
+% a where-clause; applications (mobile robots, drones, AR, embedded rigs).
+\todo{Write per WRITING\_PLAN section 3.1 row 1.1.}
+
+% Eq 1.1: the depth-from-disparity relation (introduce with a purpose
+% clause, then a where-clause naming every symbol).
+\begin{equation}
+Z = \frac{f\,B}{d}
+\label{eq:depth_from_disparity}
+\end{equation}
+\todo{where-clause for \eqref{eq:depth_from_disparity}: $Z$ depth, $f$
+focal length in pixels, $B$ baseline, $d$ disparity.}
+
+\begin{figure}[!htbp]
+\centering
+% Regenerate per WRITING_PLAN Fig 1.1: build_intro_figure.py restyled
+% (white background, serif, PDF) into figures/fig_1_1_stereo_geometry.pdf
+\todo{insert fig\_1\_1\_stereo\_geometry (two-camera geometry with $Z=fB/d$ panel)}
+\caption{\textbf{Two-view stereo geometry.} \todo{one dataflow sentence; self-contained caption}}
+\label{fig:stereo_geometry}
+\end{figure}
+
+\section{Problem Statement}
+% Sources: THESIS_PLAN state-of-play; papers/verified_performance.md
+% (FoundationStereo size); review_paper/sections/03_foundation_baseline.tex.
+% Content: accurate deep stereo exists (foundation models, hundreds of M
+% params) but is undeployable on edge; edge envelope 1 to 6 TOPS, 4 GB,
+% 5 to 25 W; accuracy-latency-memory triangle; the concessive gap pivot
+% ("However, ...").
+\todo{Write per WRITING\_PLAN section 3.1 row 1.2.}
+
+\begin{figure}[!htbp]
+\centering
+% WRITING_PLAN Fig 1.3: params (log) vs accuracy scatter, target zone +
+% our star; adapt presentation/figs/build_slide_figs.py::build_research_gap
+% with gev4 numbers (2.963 M, SF-TEST EPE 0.78).
+\todo{insert fig\_1\_3\_edge\_gap (params vs accuracy Pareto with target zone)}
+\caption{\textbf{The edge-deployment gap.} \todo{caption: dataset, metric, and what the target zone means}}
+\label{fig:edge_gap}
+\end{figure}
+
+\section{Research Objectives and Scope}
+% The two objectives are FIXED by the user (2026-07-05), verbatim below.
+% Do NOT reword them. Sub-goals may be listed as scope items.
+The objectives of this thesis are:
+\begin{enumerate}
+\item To design a computationally efficient stereo matching pipeline that
+leverages AI-based disparity refinement to enhance depth estimation on
+resource-limited platforms.
+\item To design an architecture that can withstand camera imperfections
+in terms of rectification.
+\end{enumerate}
+
+\todo{Scope paragraph: passive rectified binocular stereo, supervised
+synthetic training, sub-3 M parameter budget, zero-shot cross-domain
+validation, edge latency qualification; excluded: active sensing,
+self-supervision, deployment SDK productization. Note: objective 2 is
+evidenced by the rectification-robustness sweep (WRITING\_PLAN section
+11a) reported in Chapter 4.}
+
+\section{Rationale and Significance}
+% Content: why a NEW small architecture rather than shrinking a big one;
+% Complex Engineering Problem justification woven in: K3 (engineering
+% fundamentals), K4 (specialist stereo knowledge), K5 (network design),
+% K8 (research-literature grounding), one sentence each.
+\todo{Write per WRITING\_PLAN section 3.1 row 1.4, including the explicit
+CEP K-profile statement (K3, K4, K5, K8).}
+
+\section{Thesis Organization}
+% Write LAST for this chapter: one tight sentence per chapter.
+\todo{One-sentence-per-chapter outline of Chapters 2 to 5 plus appendices.}

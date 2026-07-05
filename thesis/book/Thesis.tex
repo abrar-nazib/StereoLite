@@ -1,0 +1,121 @@
+% =====================================================================
+% RUET MTE B.Sc. Thesis Book (master)
+% Title: AI-Enhanced Stereo Matching for High-Accuracy Depth Mapping
+%        and 3D Reconstruction
+% Authors: Nazib Abrar (2008026), Md. Raihanul Haque Rahi (2008011)
+% Supervisor: Md Zunaid Hossen, Lecturer, Dept. of MTE, RUET
+%
+% Built from the department template with the resolved format decisions
+% (see thesis/WRITING_PLAN.md section 0 and the ruet-thesis-expert skill):
+%   - left margin 3 cm (binding), right/top/bottom 2.54 cm
+%   - Times-like 12 pt body (txfonts), SINGLE line spacing, justified
+%   - headings: chapter 16 pt bold centered, section 13 pt bold,
+%     subsection 12 pt normal, NO sub-subsections
+%   - page numbering: title + certificate unnumbered, roman i from
+%     Declaration, arabic 1 from Chapter 1, bottom centered
+%   - citations: numeric [n] in order of first appearance, IEEEtran
+%   - figure captions BELOW (Figure C.F), table captions ABOVE (Table C.T)
+%   - equations auto-numbered per chapter; reference with \eqref only
+%
+% Compile (from thesis/book/):
+%   pdflatex -interaction=nonstopmode Thesis.tex
+%   bibtex Thesis
+%   makeindex Thesis.nlo -s nomencl.ist -o Thesis.nls
+%   pdflatex -interaction=nonstopmode Thesis.tex
+%   pdflatex -interaction=nonstopmode Thesis.tex
+% =====================================================================
+\documentclass[12pt, oneside, a4paper]{report}
+
+\usepackage{amsmath,amsfonts,amssymb}
+\usepackage[T1]{fontenc}
+\usepackage[varg]{txfonts}          % Times-like text + math
+
+\usepackage{graphicx}
+\graphicspath{{figures/}{images/}}
+% Resolved margins: 3 cm binding edge, 1 in elsewhere (WRITING_PLAN 0.1)
+\usepackage[left=3cm, right=2.54cm, top=2.54cm, bottom=2.54cm]{geometry}
+\usepackage{setspace}               % single spacing is the default
+\usepackage{nomencl}
+\makenomenclature
+
+\usepackage{booktabs}               % professional table rules
+\usepackage{multirow}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{xcolor}
+\usepackage{emptypage}
+\usepackage[nottoc]{tocbibind}      % LoF/LoT/References into ToC
+\usepackage[titletoc]{appendix}
+\usepackage[hidelinks]{hyperref}
+
+% --- heading sizes per the Book Template: 16 / 13 / 12 pt --------------
+\usepackage{titlesec}
+\titleformat{\chapter}[display]
+  {\centering\bfseries\fontsize{16}{19}\selectfont}
+  {Chapter \thechapter}{6pt}{}
+\titlespacing*{\chapter}{0pt}{-20pt}{24pt}
+\titleformat{\section}
+  {\bfseries\fontsize{13}{16}\selectfont}{\thesection}{0.6em}{}
+\titleformat{\subsection}
+  {\normalfont\fontsize{12}{15}\selectfont}{\thesubsection}{0.6em}{}
+% NO \subsubsection anywhere (department rule).
+
+\renewcommand{\contentsname}{List of Contents}
+\renewcommand{\bibname}{References}
+\renewcommand{\nomname}{List of Symbols \& Abbreviations}
+
+\newcommand{\nm}[2]{\nomenclature{#1}{#2}}
+
+% TODO marker for the writing sessions; must be zero at submission:
+%   grep -rn "\\\\todo" thesis/book --include=*.tex
+\newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
+
+\begin{document}
+
+% ----------------------- unnumbered front pages -----------------------
+\pagenumbering{gobble}
+\include{frontmatter/titlepage}
+\include{frontmatter/certificate}
+
+% ----------------------- roman front matter ---------------------------
+\pagenumbering{roman}
+\include{frontmatter/declaration}
+\include{frontmatter/acknowledgments}
+
+\addcontentsline{toc}{chapter}{Abstract}
+\include{frontmatter/abstract}
+
+\tableofcontents
+\listoffigures
+\listoftables
+
+\mbox{}
+\addcontentsline{toc}{chapter}{List of Symbols \& Abbreviations}
+\printnomenclature
+\cleardoublepage
+
+% ----------------------- main matter ----------------------------------
+\pagenumbering{arabic}
+
+\include{mainmatter/ch1}
+\include{mainmatter/ch2}
+\include{mainmatter/ch3}
+\include{mainmatter/ch4}
+\include{mainmatter/ch5}
+
+\cleardoublepage
+\phantomsection
+\bibliographystyle{IEEEtran}
+\bibliography{Reference}
+
+\cleardoublepage
+\phantomsection
+\begin{appendices}
+\include{appendices/app_a}
+\include{appendices/app_b}
+\include{appendices/app_c}
+\include{appendices/app_d}
+\include{appendices/app_e}
+\end{appendices}
+
+\end{document}
