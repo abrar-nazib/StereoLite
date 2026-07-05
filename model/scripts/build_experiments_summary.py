@@ -48,7 +48,12 @@ def render_run(run_dir: Path) -> str:
             continue
         meta_path = variant_dir / "meta.json"
         if not meta_path.exists():
-            continue
+            # Tolerate one extra nesting level (<run>/<arm>/<arch>/meta.json,
+            # e.g. 20260703_blurfix_n500/control500/gev4_opt_narrow/).
+            nested = sorted(variant_dir.glob("*/meta.json"))
+            if len(nested) != 1:
+                continue
+            meta_path = nested[0]
         meta = load_meta(meta_path)
         if meta is None:
             continue
@@ -90,6 +95,10 @@ def render_run(run_dir: Path) -> str:
         kind = "Standalone training run"
     elif name.startswith("temptile"):
         kind = "TempTile temporal warm-start A/B (4-arm)"
+    elif "blurfix" in name:
+        kind = "Blur-fix A/B (control / bundle1 / plane / bimodal, 450/50 windowed split)"
+    elif name.startswith("eff"):
+        kind = "Efficiency-fix A/B (gev4 vs opt vs opt_narrow, 80/20 heldout)"
     else:
         kind = "Unknown"
 
@@ -151,7 +160,7 @@ def main():
     for p in sorted(BENCH.iterdir(), reverse=True):
         if not p.is_dir():
             continue
-        if any((p / sub / "meta.json").exists()
+        if any((sub / "meta.json").exists() or list(sub.glob("*/meta.json"))
                for sub in p.iterdir() if sub.is_dir()):
             runs.append(p)
 
