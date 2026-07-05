@@ -46,9 +46,15 @@ number was produced by a streaming eval (`modal/eval_full_testset.py`). Both the
 trainer's final block and the standalone driver now stream shard-by-shard and
 use nanmean; the bug cannot recur.
 
-**Remaining post-run gates (unchanged):** MB14 zero-shot on this checkpoint
-(mandatory), resized-checkpoint native-inference ablation, real-camera panels,
-RTX 3050 latency bench, Jetson Orin Nano reading when the borrowed board arrives.
+**Post-run gates:** MB14 zero-shot **DONE (2026-07-05): EPE 1.71 / D1-all
+10.86%** (23 perfect scenes, 384x640 resize protocol, 2.963 M params, zero-shot;
+legacy chassis was 40.1% on the same protocol, so collapse is gone; sits between
+legacy and LiteAnyStereo 6.9% / IGEV 5.0%). Driver
+`model/scripts/modal/eval_gev4_middlebury2014.py`; report on the results volume +
+local mirror `model/benchmarks/20260704_fullsf_gev4onp_nc/mb14_zero_shot.json`.
+RTX 3050 latency bench DONE (fp16 49.8 ms). Still open: resized-checkpoint
+native-inference ablation, real-camera panels regenerated on the trained
+checkpoint, Jetson Orin Nano reading when the borrowed board arrives.
 
 ---
 
@@ -127,7 +133,7 @@ resized-protocol model is kept as an ablation asset:
 |---|---|---|
 | A1 | Trained gev4 checkpoint | **NOT coming from Rahi** (his `checkpoint.pth` is the 20-pair overfit; pipeline validation only). **WE TRAIN IT** — Modal A100 full Scene Flow run with the locked config (Section 3b). ~$10-15, ~1 day wall clock. This is the single critical-path item |
 | A2 | Edge-device latency | **Calculated* now, real later.** RTX 3050 MEASURED (2026-07-03, batch 1, 384x640, eager PyTorch): gev4 fp32 106.7 / fp16 75.4 ms; **gev4_opt_narrow fp32 61.4 / fp16 49.8 ms (1.74x)**; plane variant ~62.5 ms fp32 (rendering overhead ~1 ms). Orin Nano projection below. Real Jetson readings when the user borrows the device; every projected number carries * in the thesis until swapped |
-| A3 | MB14 zero-shot on the trained checkpoint | Run on Modal immediately after A1 finishes; driver adaptation (legacy import at eval_middlebury2014.py:61) can be prepared during training |
+| A3 | MB14 zero-shot on the trained checkpoint | **DONE (2026-07-05): EPE 1.71 / D1-all 10.86%**, 23 scenes, 384x640 resize protocol, zero-shot. Driver `model/scripts/modal/eval_gev4_middlebury2014.py` (reuses `train_full_sceneflow.build_model` + `_forward_pad16`, RGB/255, same metric protocol as legacy `eval_middlebury2014.py`). Report: `widener-results:/middlebury2014_eval/mb14_zero_shot_20260704_fullsf_gev4onp_nc.json` + local mirror. Legacy chassis 40.1% -> ours 10.86% (collapse gone); LiteAnyStereo 6.9% / IGEV 5.0% remain ahead (both use KD; ours is FT+Monkaa+Driving SceneFlow supervised only) |
 | A4 | Real-camera qualitative panels | **Pipeline VALIDATED** (2026-07-03): gev4 runs end-to-end on `/media/abrar/AbrarSSD/Datasets/user_cam_1/` (60 indoor pairs + FoundationStereo pseudo-GT reference); smoke panels in `model/benchmarks/gev4_camera_smoke/`. Regenerate with the trained checkpoint, same script |
 | A5 | Matched-protocol baseline table | After A3; IGEV + LiteAnyStereo reference JSONs already exist on the results volume; add LightStereo-S from the OpenStereo zoo |
 | A6 | Inference memory | **DONE**: 0.26 GB (fp16) / 0.35 GB (fp32) measured on 3050 — replaces the misleading 7.6 GB training peak |
@@ -252,6 +258,15 @@ the most contribution-shaped piece of the thesis.
 ---
 
 ## 4. Writing plan (phases; ~3-4 weeks calendar)
+
+> **SUPERSEDED FOR EXECUTION (2026-07-05):** the phases below were the
+> pre-run planning view. The evidence sprint is complete (checkpoint trained,
+> SF-TEST 0.7807, MB14 zero-shot 10.86% D1). The detailed, executable,
+> section-by-section writing plan now lives in **`thesis/WRITING_PLAN.md`**:
+> per-chapter section tables with research sources, the full figure/table/
+> equation master lists (26 figures, 13 tables, 16 equations), the figure
+> style contract, QA gates, and the day-by-day execution order. Any writing
+> session starts THERE. This file remains the strategic/evidence record.
 
 ### Phase 0 — unblock (status 2026-07-04)
 1. ~~Efficiency pass (test-first)~~ **DONE** — F1-F7 implemented,
