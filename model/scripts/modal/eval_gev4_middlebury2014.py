@@ -53,7 +53,8 @@ image = (
               volumes={"/data": datasets_vol, "/cache": cache_vol,
                        "/results": results_vol},
               cpu=8, memory=32768, timeout=3600, retries=0)
-def run_eval(run_name: str, arch: str, ckpt: str) -> dict:
+def run_eval(run_name: str, arch: str, ckpt: str,
+             save_viz: bool = False) -> dict:
     import os, sys, time, json, zipfile, glob, shutil
     from pathlib import Path
     import numpy as np
@@ -189,6 +190,26 @@ def run_eval(run_name: str, arch: str, ckpt: str) -> dict:
               f"bad_2={bad2:.1f}  D1={d1:.1f}  med={median:.3f}  "
               f"ms={ms:.1f}  W_native={W_n}")
 
+        if save_viz:
+            # left + turbo GT + turbo prediction, shared per-scene scale
+            viz_dir = Path(f"/results/middlebury2014_eval/viz_{run_name}")
+            viz_dir.mkdir(parents=True, exist_ok=True)
+            vmax = max(float(np.percentile(D[valid > 0], 98)), 1e-6)
+
+            def _turbo(x):
+                n = np.clip(x / vmax, 0, 1)
+                t = (cv2.applyColorMap((n * 255).astype(np.uint8),
+                                       cv2.COLORMAP_TURBO))
+                t[valid <= 0] = 30
+                return t
+
+            cv2.imwrite(str(viz_dir / f"{scene_name}_left.png"), L_in)
+            cv2.imwrite(str(viz_dir / f"{scene_name}_gt.png"), _turbo(D))
+            cv2.imwrite(str(viz_dir / f"{scene_name}_pred.png"),
+                        cv2.applyColorMap(
+                            (np.clip(pred_np / vmax, 0, 1) * 255
+                             ).astype(np.uint8), cv2.COLORMAP_TURBO))
+
         per_scene.append({
             "scene": scene_name, "epe": epe, "rmse": rmse, "median": median,
             "bad_0.5": bad05, "bad_1.0": bad1, "bad_2.0": bad2,
@@ -229,10 +250,11 @@ def run_eval(run_name: str, arch: str, ckpt: str) -> dict:
 
 @app.local_entrypoint()
 def main(run_name: str = "20260704_fullsf_gev4onp_nc",
-         arch: str = "gev4_opt_narrow_plane", ckpt: str = "best.pth"):
+         arch: str = "gev4_opt_narrow_plane", ckpt: str = "best.pth",
+         save_viz: bool = False):
     print(f"Zero-shot MB14 eval of thesis checkpoint: {run_name} / {ckpt}")
     print("(trained on full SceneFlow: FT3D+Monkaa+Driving, never saw Middlebury)")
-    summary = run_eval.remote(run_name, arch, ckpt)
+    summary = run_eval.remote(run_name, arch, ckpt, save_viz)
     print("\n=== DONE ===")
     print(f"  Aggregate over {summary['n_scenes']} scenes "
           f"(step {summary['best_step']}, {summary['params_M']:.3f} M):")
