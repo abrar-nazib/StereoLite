@@ -51,18 +51,20 @@ yields a dense depth map, which downstream perception and reconstruction
 consume directly, and computing that disparity map accurately and quickly
 is the task this thesis addresses.
 
-The applications that motivate this thesis share a common trait: they
-carry a small power and compute budget and demand results in real time,
-but they stress depth differently. A mobile robot needs reliable obstacle
-depth at a few meters and tolerates modest resolution; a drone needs the
-same at higher frame rates because its closing speeds are larger; an
-augmented-reality headset needs sharp depth boundaries so that virtual
-content occludes correctly against real edges; and an embedded sensing
-rig needs metric accuracy so that the recovered geometry can be measured
-and reconstructed. A single network that serves all four must therefore
-balance accuracy, boundary sharpness, latency, and memory rather than
-excel at any one of them, and that balance is the design objective of
-this thesis.
+The systems considered in this thesis operate under similar constraints:
+limited computational resources, restricted power availability, and a
+need for real-time estimates. Their depth requirements, however, are not
+identical. A mobile robot primarily requires dependable obstacle depth
+over short and medium ranges, whereas a drone also demands a high update
+rate because it may approach obstacles more rapidly. In augmented
+reality, accurate object boundaries are especially important for
+realistic occlusion between virtual and physical content. A compact
+sensing platform, by contrast, places greater emphasis on metric accuracy
+for measurement and three-dimensional reconstruction. An embedded stereo
+network intended for these settings must therefore achieve a practical
+compromise among accuracy, boundary fidelity, inference time, and memory
+use. Establishing this compromise is a central concern of the proposed
+design.
 
 \nm{$d$}{disparity, the horizontal pixel shift between rectified views}
 \nm{$Z$}{depth of a scene point along the camera axis}
@@ -177,16 +179,17 @@ literature study through design, training, evaluation, and writing. The
 work plan below records the schedule that was followed.
 
 \subsection{Work Plan}
-The project ran from February to July 2026. Figure \ref{fig:gantt} shows
-the schedule: an initial phase of paper collection and study overlapping a
-review-paper draft, followed by architecture design and an ablation
-campaign, then the production training run and its evaluation gates, with
-thesis writing in the final weeks.
+The project ran from December 2025 to July 2026. Paper collection and the
+initial literature review had begun during the fourth-year odd semester
+(the seventh semester), and provided the basis for model selection at
+the start of this schedule. Figure \ref{fig:gantt} shows the subsequent
+overlap among model setup, training, real-data acquisition, ablation,
+benchmarking, evaluation, and thesis writing.
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=\textwidth]{fig_b_1_gantt}
-\caption{\textbf{Project timeline.} The seven work phases from February to July 2026.}
+\includegraphics[width=\textwidth]{fig_b_1_gantt_fixed}
+\caption{\textbf{Project timeline.} The seven work phases from December 2025 to July 2026.}
 \label{fig:gantt}
 \end{figure}
 
