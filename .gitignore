@@ -77,3 +77,4 @@ thesis/**/*.nlo
 thesis/**/*.out
 thesis/**/*.toc
 thesis/**/*.synctex.gz
+.env
