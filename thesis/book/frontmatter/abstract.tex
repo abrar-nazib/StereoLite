@@ -27,7 +27,9 @@ network attains 0.78 px end-point error and 3.40 percent D1-all on the
 full FlyingThings3D test set of 4,370 pairs. Zero-shot evaluation on the
 unseen Middlebury 2014 benchmark yields 10.9 percent D1-all, and
 inference at $384 \times 640$ resolution takes 49.8 ms on a laptop
-RTX 3050 GPU in half precision. Projections indicate roughly 30 ms on
+RTX 3050 GPU in half precision. The predicted disparity back-projects
+through the calibrated rig geometry into metric colored point clouds,
+demonstrated on real indoor scenes. Projections indicate roughly 30 ms on
 Jetson Orin Nano class hardware after INT8 optimization; these projected
 values await confirmation on the physical device. All training code,
 evaluation drivers, and the trained checkpoint are archived in the

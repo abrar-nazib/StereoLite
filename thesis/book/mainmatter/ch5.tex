@@ -65,21 +65,35 @@ holds only for small vertical offsets and does not extend to large
 de-rectification.
 
 \section{Future Work}
-Several directions follow from these limitations. The most promising is a
-three-stage knowledge-distillation pipeline in the manner of
-LiteAnyStereo, in which the model is first trained on synthetic data, then
-self-distilled under perturbation, and finally distilled from a foundation
-teacher on unlabeled real pairs. The cross-domain evidence of Chapter 4
-points to the training pipeline as the largest remaining lever, and this
-model's supervised-only recipe leaves that lever unused. A second
-direction is eight-bit export to TensorRT and a direct latency measurement
-on the Jetson Orin Nano, which would replace the projected figure with a
-measured one; the operators that block export were already identified in
-Section 3.12. A third direction is to complete the zero-shot evaluation
-quartet with KITTI and ETH3D, so that generalization is characterized
-across driving and mixed domains rather than the indoor domain alone. A
-fourth is a temporal extension that propagates the tile-plane state across
-video frames, which the plane representation is well suited to carry. We
-believe that a compact tile-hypothesis network trained with the
-distillation pipeline above will be useful as an off-the-shelf edge stereo
-component, and establishing that is the natural next step of this work.
+Several directions follow from these limitations, ordered by expected
+return. The most promising is a three-stage knowledge-distillation
+pipeline in the manner of LiteAnyStereo. In the first stage the model
+trains on synthetic data with dense supervision, exactly as in this
+thesis; in the second it self-distills under input perturbation, with a
+frozen copy of itself supplying feature targets for perturbed inputs; and
+in the third it distills from a frozen foundation teacher on a large set
+of unlabeled real pairs, for which the teacher pipeline already exists in
+the project's tooling. The cross-domain evidence of Chapter 4 points to
+the training pipeline as the largest remaining lever, the per-scene
+analysis shows the failure concentrated in a scene type that real-data
+distillation addresses, and this model's supervised-only recipe leaves
+that lever entirely unused. A second direction is eight-bit export and a
+direct latency measurement on the Jetson Orin Nano, which would replace
+the projected figure with a measured one. The operators that block export
+were identified in Section 3.12 together with their replacements, so the
+remaining work is engineering: exporting the graph, calibrating the
+quantization, and profiling on the device. A third direction is to
+complete the zero-shot evaluation quartet with KITTI and ETH3D, so that
+generalization is characterized across driving and mixed domains rather
+than the indoor domain alone; both datasets are already staged in the
+project's evaluation infrastructure. A fourth is a temporal extension
+that propagates the tile-plane state across video frames. The plane
+representation is well suited to this, since a slanted-plane hypothesis
+is exactly the quantity a small ego-motion warps predictably, and a
+temporal version would amortize the initialization cost over a video
+stream. Finally, the reconstruction path of Chapter 4 invites a mapping
+extension, fusing per-frame point clouds into a persistent scene model.
+We believe that a compact tile-hypothesis network trained with the
+distillation pipeline above will be useful as an off-the-shelf edge
+stereo component, and establishing that is the natural next step of this
+work.
