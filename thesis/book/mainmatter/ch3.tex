@@ -54,8 +54,8 @@
 
 \begin{figure}[!htbp]
 \centering
-\todo{insert fig\_3\_2\_encoders (encoder + context encoder detail; drawio)}
-\caption{\textbf{Feature and context encoders.} \todo{caption with channel counts and strides}}
+\includegraphics[width=0.95\textwidth]{fig_3_2_encoders_preview}
+\caption{\textbf{Feature and context encoders.} The shared YOLO26s encoder processes both views and emits matching features at three scales (f4 128, f8 256, f16 256 channels); a separate GhostConv context encoder sees only the left image and produces a 32-channel quarter-resolution context map, pooled to the coarser scales.}
 \label{fig:encoders}
 \end{figure}
 
@@ -86,8 +86,8 @@ the disparity dimension.}
 
 \begin{figure}[!htbp]
 \centering
-\todo{insert fig\_3\_3\_tile\_init (volume construction + 3-D aggregation + soft-argmax; drawio)}
-\caption{\textbf{Tile-state initialization.} \todo{caption}}
+\includegraphics[width=0.95\textwidth]{fig_3_3_tile_init_preview}
+\caption{\textbf{Tile-state initialization at 1/16 resolution.} A group-wise correlation volume (8 groups, 24 hypotheses) is regularized by a small 3-D CNN; soft-argmax and the distribution maximum yield the initial disparity and confidence, and the context map replaces the zero hidden state.}
 \label{fig:tile_init}
 \end{figure}
 
@@ -123,8 +123,8 @@ the element-wise product.}
 
 \begin{figure}[!htbp]
 \centering
-\todo{insert fig\_3\_4\_refinement (one unrolled iteration: warp, lookup, GRU, gated update; drawio)}
-\caption{\textbf{One recurrent refinement iteration.} \todo{caption}}
+\includegraphics[width=\textwidth]{fig_3_4_refinement_preview}
+\caption{\textbf{One recurrent refinement iteration.} The right features are warped by the current disparity, a five-offset local correlation is evaluated, and the assembled input updates the persistent hidden state through a convolutional GRU; four sigmoid gates control the residual updates of disparity, both slopes, and confidence.}
 \label{fig:refinement}
 \end{figure}
 
@@ -145,8 +145,8 @@ accounts for the disparity unit change across scales.}
 
 \begin{figure}[!htbp]
 \centering
-\todo{insert fig\_3\_5\_plane\_prop (parent tile to four children with slope terms; small drawio)}
-\caption{\textbf{Plane-aware propagation between scales.} \todo{caption}}
+\includegraphics[width=0.9\textwidth]{fig_3_5_plane_prop_preview}
+\caption{\textbf{Plane-aware propagation between scales.} Each parent tile spawns four children whose disparities follow the local plane defined by the slopes, per \eqref{eq:plane_prop}, instead of plain bilinear interpolation.}
 \label{fig:plane_prop}
 \end{figure}
 
@@ -183,8 +183,8 @@ maximum of the two estimates.}
 
 \begin{figure}[!htbp]
 \centering
-\todo{insert fig\_3\_6\_gev\_fusion (narrow band around tile d + gate; drawio)}
-\caption{\textbf{Geometry encoding volume and fail-soft fusion.} \todo{caption}}
+\includegraphics[width=\textwidth]{fig_3_6_gev_fusion_preview}
+\caption{\textbf{Narrow-band geometry encoding volume and fail-soft fusion.} The volume samples 33 hypotheses in a $\pm 16$ band around the current tile disparity; a learned gate with bias initialized to $-4$ blends the GEV proposal into the tile estimate only where it helps.}
 \label{fig:gev_fusion}
 \end{figure}
 
@@ -200,8 +200,8 @@ structure absent at 1/4).}
 
 \begin{figure}[!htbp]
 \centering
-\todo{insert fig\_3\_7\_upsample (convex upsample mechanics; drawio)}
-\caption{\textbf{Learned convex upsampling.} \todo{caption}}
+\includegraphics[width=0.92\textwidth]{fig_3_7_upsample_preview}
+\caption{\textbf{Learned convex upsampling.} Every output subpixel is a softmax-weighted convex combination of its $3\times 3$ coarse neighborhood, with masks predicted from the left features; two 2$\times$ stages recover full resolution.}
 \label{fig:upsample}
 \end{figure}
 
@@ -237,8 +237,8 @@ $\mathcal{L}_{\mathrm{slant}}$ the gated slant supervision.}
 
 \begin{figure}[!htbp]
 \centering
-\todo{insert fig\_3\_8\_supervision (which outputs receive which terms at which scales; drawio)}
-\caption{\textbf{Multi-scale supervision.} \todo{caption}}
+\includegraphics[width=\textwidth]{fig_3_8_supervision_preview}
+\caption{\textbf{Multi-scale supervision.} Six disparity outputs receive weighted L1 terms against the ground truth per \eqref{eq:loss}; the full-resolution prediction additionally receives the gradient, threshold, D1, smoothness, and gated slant terms.}
 \label{fig:supervision}
 \end{figure}
 
@@ -256,17 +256,30 @@ $\mathcal{L}_{\mathrm{slant}}$ the gated slant supervision.}
 
 \begin{figure}[!htbp]
 \centering
-\todo{insert fig\_3\_10\_input\_protocol (native-crop vs global-resize illustration)}
-\caption{\textbf{Native-crop input protocol.} \todo{caption}}
+\includegraphics[width=\textwidth]{fig_3_10_input_protocol}
+\caption{\textbf{Native-crop input protocol.} Training samples random $384\times 640$ co-located windows of the native $960\times 540$ frame (left), preserving native disparity magnitudes; the legacy protocol (right) downscales the whole frame and shrinks every disparity by the same factor.}
 \label{fig:input_protocol}
 \end{figure}
 
 \begin{table}[!htbp]
 \centering
-\caption{\textbf{Training configuration.} \todo{protocol sentence}}
+\caption{\textbf{Training configuration of the production run.} Values verbatim from the run's configuration record (meta.json of run 20260704).}
 \label{tab:train_config}
-% Source: meta.json args block, verbatim values.
-\todo{optimizer, schedule, steps, batch, crop, augmentation, precision, hardware}
+\small
+\begin{tabular}{ll}
+\toprule
+Element & Value\\
+\midrule
+Optimizer & AdamW, weight decay $10^{-5}$\\
+Schedule & OneCycle, 60{,}000 steps, peak LR $8\times 10^{-4}$\\
+Batch size / precision & 32 / bfloat16 mixed\\
+Input protocol & random native $384\times 640$ co-located crops\\
+Augmentation & asymmetric color jitter, right-only erase, random scale\\
+Training data & full SceneFlow finalpass, 35{,}454 pairs\\
+Validation & fixed 400-pair FlyingThings3D subset, every 1k steps\\
+Hardware & one NVIDIA A100 80 GB (cloud)\\
+\bottomrule
+\end{tabular}
 \end{table}
 
 \section{Design-Space Exploration Methodology}
@@ -288,11 +301,31 @@ $\mathcal{L}_{\mathrm{slant}}$ the gated slant supervision.}
 
 \begin{table}[!htbp]
 \centering
-\caption{\textbf{Inference optimizations and their equivalence status.} \todo{protocol sentence}}
+\caption{\textbf{Inference optimizations and their equivalence status.} Savings measured at $384\times 640$ on RTX 3050; equivalence class states how each change was proven safe before adoption.}
 \label{tab:efficiency_findings}
-% Source: THESIS_PLAN section 3 table, reworded for the thesis.
-\todo{rows F1 to F7: finding, saving, accuracy risk / proof}
+\small
+\begin{tabular}{p{5.6cm}p{4.2cm}l}
+\toprule
+Optimization & Saving & Equivalence\\
+\midrule
+Zero-copy padded views in cost-volume loops & 5 to 15\% latency & bitwise\\
+Batched correlation lookups, cached grids & 3 to 8\% latency & identical math\\
+Static GRU input channels hoisted per scale & 8 to 10\% of MACs & exact\\
+Fused gate convolutions and output heads & 1 to 3\% latency & bitwise\\
+Dead inference-path code removed & memory + launches & exact\\
+Narrow GEV band ($\pm 16$ around tile $d$) & 25 to 30\% of MACs & matched A/B (Ch.~4)\\
+\midrule
+Combined & fp32 61.4 ms vs 106.7 ms base ($1.74\times$) & \\
+\bottomrule
+\end{tabular}
 \end{table}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.8\textwidth]{fig_3_11_param_budget}
+\caption{\textbf{Parameter budget of the trained model.} Module split computed directly from the trained checkpoint's state dictionary; the shared encoder and the three refinement stages hold 95 percent of the 2.96 M parameters.}
+\label{fig:param_budget}
+\end{figure}
 
 \section{Evaluation Metrics}
 % Source: FINAL_MODEL_ARCHITECTURE section 16.
