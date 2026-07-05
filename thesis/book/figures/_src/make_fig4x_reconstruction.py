@@ -1,14 +1,13 @@
 """Fig 4.10: 3D reconstruction from the model's predicted disparity.
 
-Runs best.pth on indoor pairs from the project's AR0144 stereo rig,
-back-projects the predicted disparity to a colored point cloud through
-the pinhole relations (Z = f B / d), cleans it with Open3D, and renders
-three viewpoints per scene offscreen for a print figure.
-
-Intrinsics per model/scripts/disparity_to_pointcloud.py (verified rig
-values): per-eye 1280x720, HFOV 65 deg -> fx ~= 1005 px at W=1280,
-baseline 0.052 m. At the 640-wide inference resolution fx scales to
-1005 * 640/1280 = 502.5 px.
+Reuses the ready-made cleaned point clouds rendered during the
+presentation from the trained checkpoint's disparity on the low-cost
+AR0144 rig (stereo_samples_20260425_104147/point_clouds_top3). Each
+cloud is the back-projection of the model's predicted disparity through
+the calibrated rig geometry, statistical-outlier filtered and voxel
+downsampled. This figure loads those .ply clouds and renders three
+viewpoints per scene offscreen for a print figure, paired with the left
+image; no re-inference is performed.
 
 Fallback: if the Filament OffscreenRenderer fails (Wayland/EGL), a
 matplotlib 3D scatter path renders the same clouds.
@@ -22,68 +21,51 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-import torch
 from PIL import Image
 
 ROOT = Path("/home/abrar/Research/stero_research_claude")
-sys.path.insert(0, str(ROOT / "model/scripts"))
-sys.path.insert(0, str(ROOT / "model/designs"))
-import os
-os.chdir(ROOT)
-from train_full_sceneflow import _forward_pad16, build_model  # noqa: E402
-
-RUN = ROOT / "model/benchmarks/20260704_fullsf_gev4onp_nc"
-CAM = ROOT / "data/user_cam_1"
 OUT = ROOT / "thesis/book/figures"
-PLY_OUT = ROOT / "model/benchmarks/thesis_reconstruction"
-PAIRS = ["00000", "00025"]
-H, W = 384, 640
-FX = 1005.0 * (W / 1280.0)   # 502.5 px at inference width
-BASELINE = 0.052             # metres
-MAX_DEPTH = 4.0              # metres, indoor scene cap
+DS = Path("/media/abrar/AbrarSSD/Datasets/stereo_samples_20260425_104147")
+PC = DS / "point_clouds_top3"
+
+# (frame id for the left image, ready cleaned cloud)
+SCENES = [
+    ("01282", PC / "pair_00_01282_epe0.297_clean.ply"),
+    ("00038", PC / "pair_01_00038_epe0.258_clean.ply"),
+    ("01077", PC / "pair_07_01077_epe0.315_clean.ply"),
+]
 
 plt.rcParams.update({"font.family": "DejaVu Serif"})
 
 
-def predict(model, device, pid):
-    L = np.array(Image.open(CAM / "left" / f"{pid}.png")
-                 .convert("RGB").resize((W, H)))
-    R = np.array(Image.open(CAM / "right" / f"{pid}.png")
-                 .convert("RGB").resize((W, H)))
-    Lt = torch.from_numpy(L).float().permute(2, 0, 1)[None].to(device) / 255
-    Rt = torch.from_numpy(R).float().permute(2, 0, 1)[None].to(device) / 255
-    with torch.no_grad():
-        d = _forward_pad16(model, Lt, Rt)[0, 0].cpu().numpy()
-    return L, d
+def _crop_content(img, pad=14):
+    """Crop a uniform-background render to its content bounding box."""
+    bg = img[2, 2].astype(int)
+    mask = (np.abs(img.astype(int) - bg).max(axis=2) > 8)
+    ys, xs = np.where(mask)
+    if len(ys) == 0:
+        return img
+    y0, y1 = max(0, ys.min() - pad), min(img.shape[0], ys.max() + pad)
+    x0, x1 = max(0, xs.min() - pad), min(img.shape[1], xs.max() + pad)
+    return img[y0:y1, x0:x1]
 
 
-def to_cloud(L, disp):
-    cx, cy = W / 2.0, H / 2.0
-    valid = (disp > 1.0) & np.isfinite(disp)
-    Z = np.zeros_like(disp)
-    Z[valid] = FX * BASELINE / disp[valid]
-    valid &= (Z > 0.2) & (Z < MAX_DEPTH)
-    yy, xx = np.meshgrid(np.arange(H), np.arange(W), indexing="ij")
-    X = (xx - cx) * Z / FX
-    Y = (yy - cy) * Z / FX
-    pts = np.stack([X[valid], Y[valid], Z[valid]], axis=1)
-    cols = L[valid].astype(np.float64) / 255.0
-    return pts, cols
-
-
-def clean_cloud(pts, cols):
-    import open3d as o3d
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(pts.astype(np.float64))
-    pcd.colors = o3d.utility.Vector3dVector(cols)
-    pcd, _ = pcd.remove_statistical_outlier(nb_neighbors=20, std_ratio=2.0)
-    pcd = pcd.voxel_down_sample(voxel_size=0.008)
-    return pcd
+def _pad_to(img, aspect=4.0 / 3.0, bg=255):
+    """White-pad an image to a fixed W:H aspect so grid cells align."""
+    h, w = img.shape[:2]
+    W, H = w, h
+    if w / h > aspect:
+        H = int(round(w / aspect))
+    else:
+        W = int(round(h * aspect))
+    out = np.full((H, W, 3), bg, dtype=img.dtype)
+    y0 = (H - h) // 2
+    x0 = (W - w) // 2
+    out[y0:y0 + h, x0:x0 + w] = img[..., :3]
+    return out
 
 
 def render_offscreen(pcd, views):
-    """Render the cloud from several viewpoints; white background."""
-    import open3d as o3d
     import open3d.visualization.rendering as r
     RW, RH = 900, 640
     ren = r.OffscreenRenderer(RW, RH)
@@ -104,20 +86,7 @@ def render_offscreen(pcd, views):
     return imgs
 
 
-def _crop_content(img, pad=14, thresh=None):
-    """Crop a uniform-background render to its content bounding box."""
-    bg = img[2, 2].astype(int)
-    mask = (np.abs(img.astype(int) - bg).max(axis=2) > 8)
-    ys, xs = np.where(mask)
-    if len(ys) == 0:
-        return img
-    y0, y1 = max(0, ys.min() - pad), min(img.shape[0], ys.max() + pad)
-    x0, x1 = max(0, xs.min() - pad), min(img.shape[1], xs.max() + pad)
-    return img[y0:y1, x0:x1]
-
-
 def render_matplotlib(pcd, views):
-    """Fallback: matplotlib 3D scatter from the same viewpoints."""
     pts = np.asarray(pcd.points)
     cols = np.asarray(pcd.colors)
     sel = np.random.RandomState(0).choice(
@@ -140,24 +109,13 @@ def render_matplotlib(pcd, views):
 
 
 def main():
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    model, _ = build_model("gev4_opt_narrow_plane")
-    ck = torch.load(RUN / "best.pth", map_location=device,
-                    weights_only=False)
-    model.load_state_dict(ck["model"])
-    model.to(device).eval()
-    print(f"loaded step {ck.get('step')}")
-
-    PLY_OUT.mkdir(parents=True, exist_ok=True)
     import open3d as o3d
-
     rows = []
-    for pid in PAIRS:
-        L, disp = predict(model, device, pid)
-        pts, cols = to_cloud(L, disp)
-        pcd = clean_cloud(pts, cols)
-        o3d.io.write_point_cloud(str(PLY_OUT / f"cam_{pid}.ply"), pcd)
-        print(f"pair {pid}: {len(pcd.points)} points after cleaning")
+    for fid, ply in SCENES:
+        pcd = o3d.io.read_point_cloud(str(ply))
+        print(f"scene {fid}: {len(pcd.points)} points from {ply.name}")
+        L = np.array(Image.open(DS / "left" / f"{fid}.png")
+                     .convert("RGB").resize((640, 384)))
         try:
             views = [("camera view", (0.0, 0.0, -1.6)),
                      ("oblique", (1.1, -0.5, -1.2)),
@@ -169,21 +127,20 @@ def main():
             views = [("camera view", (5, -90)), ("oblique", (25, -55)),
                      ("top-down", (75, -90))]
             imgs = render_matplotlib(pcd, views)
-        rows.append((pid, L, imgs))
+        rows.append((fid, L, imgs))
 
-    # assemble figure: one row per scene = [left image | 3 views]
     ncol = 4
     fig, axes = plt.subplots(len(rows), ncol,
                              figsize=(6.3, 1.55 * len(rows)))
     if len(rows) == 1:
         axes = axes[None, :]
-    for r_i, (pid, L, imgs) in enumerate(rows):
-        axes[r_i, 0].imshow(L)
+    for r_i, (fid, L, imgs) in enumerate(rows):
+        axes[r_i, 0].imshow(_pad_to(L))
         axes[r_i, 0].axis("off")
         if r_i == 0:
             axes[r_i, 0].set_title("Left image", fontsize=8)
         for c_i, (name, img) in enumerate(imgs, start=1):
-            axes[r_i, c_i].imshow(img)
+            axes[r_i, c_i].imshow(_pad_to(img))
             axes[r_i, c_i].axis("off")
             if r_i == 0:
                 axes[r_i, c_i].set_title(name, fontsize=8)

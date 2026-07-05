@@ -77,7 +77,8 @@ thesis/**/*.nlo
 thesis/**/*.out
 thesis/**/*.toc
 thesis/**/*.synctex.gz
-.envthesis/**/*.nls
+.env
+thesis/**/*.nls
 thesis/**/*.ilg
 thesis/book/Thesis.pdf
 thesis/**/*.fdb_latexmk

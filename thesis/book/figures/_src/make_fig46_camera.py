@@ -1,9 +1,9 @@
 """Fig 4.6: real-camera qualitative panels. Runs the trained checkpoint
-(best.pth, step 53k) on indoor pairs from the CCB stereo rig
-(data/user_cam_1, 1280x720 rectified) at 384x640 and shows
-left image + predicted disparity for four scenes. No ground truth
-exists for these pairs; the figure shows zero-shot visual plausibility.
-Local RTX 3050 inference (~seconds)."""
+(best.pth, step 53k) on indoor pairs from the low-cost AR0144 stereo rig
+(stereo_samples_20260425_104147, 1280x720 rectified) at 384x640 and shows
+left image + predicted disparity for four scenes. The rig's factory
+rectification is imperfect; the figure shows zero-shot visual
+plausibility on real data. Local RTX 3050 inference (~seconds)."""
 from __future__ import annotations
 
 import sys
@@ -24,9 +24,9 @@ os.chdir(ROOT)  # yolo26s.pt lives at repo root
 from train_full_sceneflow import _forward_pad16, build_model  # noqa: E402
 
 RUN = ROOT / "model/benchmarks/20260704_fullsf_gev4onp_nc"
-CAM = ROOT / "data/user_cam_1"
+CAM = Path("/media/abrar/AbrarSSD/Datasets/stereo_samples_20260425_104147")
 OUT = ROOT / "thesis/book/figures"
-PAIRS = ["00000", "00012", "00025", "00047"]
+PAIRS = ["00038", "01077", "01282", "00195"]
 H, W = 384, 640
 
 plt.rcParams.update({"font.family": "DejaVu Serif"})
