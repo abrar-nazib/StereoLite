@@ -42,7 +42,7 @@ section renders in IEEE style.
 
 ## Open items
 
-- [ ] Head of MTE name (certificate countersign block)
+- [x] Head of MTE name: Md. Firoj Ali, Associate Professor and Head (mte.ruet.ac.bd/mfa_mte, 2026-07-05)
 - [ ] Submission month/year (titlepage + acknowledgments; currently July 2026)
 - [ ] Appendix E: review-paper entry vs "none" (supervisor)
 - [ ] MB14 per-scene table: Ch4 body vs appendix (layout-time call)
