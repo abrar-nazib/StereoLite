@@ -37,10 +37,8 @@ preemption robustness note; qualitative convergence.}
 
 \begin{figure}[!htbp]
 \centering
-% Build via build_viz_filmstrip.py or a custom mosaic over
-% images/val_XX/step_*.png at steps {1k, 5k, 15k, 30k, 53k}.
-\todo{insert fig\_4\_2\_convergence (2 to 3 scenes, prediction at five checkpoints + GT)}
-\caption{\textbf{Qualitative convergence.} \todo{caption: scenes, steps, colormap}}
+\includegraphics[width=\textwidth]{fig_4_2_convergence}
+\caption{\textbf{Qualitative convergence over training.} Predictions for two held-out FlyingThings3D scenes at five checkpoints (1k to 53k steps) against ground truth; turbo colormap, per-scene normalization. Object boundaries and thin structures sharpen progressively as training advances.}
 \label{fig:convergence}
 \end{figure}
 
@@ -176,8 +174,8 @@ plausibility, boundary sharpness; tie to the plane-render fix).}
 
 \begin{figure}[!htbp]
 \centering
-\todo{insert fig\_4\_3\_sceneflow\_qualitative (4 scenes x left / GT / ours / error)}
-\caption{\textbf{Qualitative results on the FlyingThings3D test set.} \todo{caption}}
+\includegraphics[width=\textwidth]{fig_4_3_sceneflow_qualitative}
+\caption{\textbf{Qualitative results on held-out FlyingThings3D scenes.} Left image, ground-truth disparity, prediction at the best checkpoint (step 53k), and absolute error clipped at 3 px. Residual error concentrates on occlusion boundaries and sub-pixel structure.}
 \label{fig:sceneflow_qualitative}
 \end{figure}
 

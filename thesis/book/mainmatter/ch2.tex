@@ -98,9 +98,8 @@ forward reference: our Eq \eqref{eq:gwc} adopts this op at tile scale.}
 
 \begin{figure}[!htbp]
 \centering
-% WRITING_PLAN Fig 2.2: regenerate review_paper timeline with thesis style.
-\todo{insert fig\_2\_2\_timeline (six-era evolution timeline 2016 to 2026)}
-\caption{\textbf{Evolution of deep stereo matching.} \todo{caption}}
+\includegraphics[width=\textwidth]{fig_2_2_timeline}
+\caption{\textbf{Evolution of deep stereo matching, 2016 to 2026.} Representative methods arranged by year within six paradigm lanes, from early end-to-end networks through 3D cost-volume, iterative-refinement, and foundation-model eras to the modern efficient family surveyed in Section 2.6.}
 \label{fig:timeline}
 \end{figure}
 
@@ -129,10 +128,8 @@ MADNet online adaptation; NAS (LEAStereo) in one paragraph.}
 
 \begin{figure}[!htbp]
 \centering
-% WRITING_PLAN Fig 2.5: recompile review_paper fig_taxonomy_tikz.tex here
-% (watch the dvipsnames xcolor pitfall from CLAUDE.md).
-\todo{insert fig\_2\_5\_taxonomy (compression-family tree)}
-\caption{\textbf{Taxonomy of compression techniques for deep stereo.} \todo{caption}}
+\includegraphics[width=\textwidth]{fig_2_5_taxonomy}
+\caption{\textbf{Taxonomy of compression techniques for deep stereo matching.} Seven technique families organized by the pipeline stage they compress; the family structure of this tree organizes Section 2.6.}
 \label{fig:taxonomy}
 \end{figure}
 
@@ -177,8 +174,16 @@ Orin-class hardware, robustness to imperfect rectification).}
 
 \begin{figure}[!htbp]
 \centering
-% WRITING_PLAN Fig 2.6: two-panel Pareto (params + latency), our marker on.
-\todo{insert fig\_2\_6\_pareto (accuracy vs params and vs latency, family-coded)}
-\caption{\textbf{Accuracy against parameters and latency.} \todo{caption}}
+\begin{subfigure}{\textwidth}
+\centering
+\includegraphics[width=0.94\textwidth]{fig_2_6a_param_pareto}
+\caption{accuracy against trainable parameters}
+\end{subfigure}\\[6pt]
+\begin{subfigure}{\textwidth}
+\centering
+\includegraphics[width=0.94\textwidth]{fig_2_6b_latency_pareto}
+\caption{KITTI 2015 D1-all against reported latency}
+\end{subfigure}
+\caption{\textbf{Accuracy against parameters and latency across the surveyed literature.} Marker shape encodes the method family; every value carries a per-cell source citation in the underlying data table.}
 \label{fig:pareto}
 \end{figure}

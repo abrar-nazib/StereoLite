@@ -1,7 +1,7 @@
 # Thesis Plan — "Edge-Deployable Deep Stereo Matching" (yolo_ctx_gev4)
 
-Working plan for the RUET MTE B.Sc. thesis book. Authors: Nazib Abrar
-(2008026), Md. Raihanul Haque Rahi (2008011). Supervisor: Md Zunaid Hossen,
+Working plan for the RUET MTE B.Sc. thesis book. Authors: Md. Raihanul
+Haque Rahi (2008011), Nazib Abrar (2008026). Supervisor: Md Zunaid Hossen,
 Lecturer, Dept. of Mechatronics Engineering. Format authority:
 `.claude/skills/ruet-thesis-expert/SKILL.md`. Branch: `thesis`.
 

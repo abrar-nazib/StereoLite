@@ -37,10 +37,11 @@
 
 \begin{figure}[!htbp]
 \centering
-% Export figures/fig_3_1_architecture.drawio as cropped PDF from draw.io
-% and place as figures/fig_3_1_architecture.pdf. Preview PNG exists.
-\todo{insert fig\_3\_1\_architecture (full StereoLite pipeline; consider sidewaysfigure)}
-\caption{\textbf{Overview of the proposed StereoLite architecture.} \todo{one dataflow sentence tracing left to right; name stages (1) to (5)}}
+% INTERIM: viewer render of figures/fig_3_1_architecture.drawio. Once
+% hand-adjustments in draw.io are done, export a cropped PDF over
+% fig_3_1_architecture.pdf and swap the filename below.
+\includegraphics[width=\textwidth]{fig_3_1_architecture_preview}
+\caption{\textbf{Overview of the proposed StereoLite architecture.} A shared feature encoder (1) feeds a group-wise cost volume whose 3-D regularization initializes the slanted tile state (2); convolutional GRU updates refine the state across three scales (3) with plane-aware propagation between them; a narrow-band geometry encoding volume corrects the estimate through a learned fail-soft gate (4); plane rendering with learned convex upsampling recovers the full-resolution disparity (5). Red dots mark supervised outputs.}
 \label{fig:architecture}
 \end{figure}
 
