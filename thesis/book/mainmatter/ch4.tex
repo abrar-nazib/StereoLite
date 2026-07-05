@@ -2,18 +2,15 @@
 % CHAPTER 4: Results and Discussions  (~18 pages)
 % WRITING SESSION INSTRUCTIONS (keep until the chapter is done):
 %   - Read thesis/WRITING_PLAN.md section 6 FIRST.
-%   - Register: PAST tense for what was done/found; every claim carries
-%     its number in the same sentence; "As shown in Table N" pointers;
-%     honest-cost sentences for every trade-off (patterns.md section 8).
-%   - Numbers ONLY from: model/benchmarks/20260704_fullsf_gev4onp_nc/
-%     meta.json (final_metrics_all), mb14_zero_shot.json, train.csv,
-%     model/benchmarks/EXPERIMENTS.md, THESIS_PLAN section 2A (latency,
-%     memory, Jetson projections). Baselines: verified_performance.md.
-%   - Asterisk convention: calculated Jetson values carry * and the
-%     methodology sentence; footnote lives at Table \ref{tab:latency}.
-%   - BLOCKER: section 4.5 needs the rectification-robustness sweep
-%     (WRITING_PLAN section 11a) run first (~30 min, ~$0.10 on T4).
-%   - POs: PO4 (investigation), PO6 + PO7 (section 4.8).
+%   - Register: PAST tense; every claim carries its number in the same
+%     sentence; "As shown in Table N" pointers; honest-cost sentences.
+%   - All tables and figures below are DONE (filled from meta.json,
+%     mb14_zero_shot.json, EXPERIMENTS.md, comparison.md,
+%     verified_performance.md); write prose around them, do not alter
+%     numbers.
+%   - Section 4.5 (rectification) still needs its sweep run first
+%     (WRITING_PLAN section 11a, ~30 min, ~$0.10 on T4).
+%   - POs: PO4 (investigation), PO6 + PO7 (section 4.9).
 % =====================================================================
 \chapter{Results and Discussions}
 
@@ -22,10 +19,8 @@
 Sections 3.10 to 3.14. Source: meta.json.}
 
 \section{Training Dynamics}
-% Sources: train.csv (dedupe restart legs, keep last per step);
-% images/ tracked-scene folders; best.pth at step 53k semantics.
 \todo{Write per WRITING\_PLAN section 6.1 row 4.2: loss/LR behaviour,
-best at 53k of 60k (LR floored, validation flat for the last ~7k steps),
+best at 53k of 60k (LR floored, validation flat for the final 7k steps),
 preemption robustness note; qualitative convergence.}
 
 \begin{figure}[!htbp]
@@ -43,42 +38,78 @@ preemption robustness note; qualitative convergence.}
 \end{figure}
 
 \section{In-Domain Accuracy: SceneFlow Test}
-% Source: meta.json final_metrics_all (4,370 pairs, native axis).
-% Numbers: EPE 0.7807, bad-0.5 15.32, bad-1 8.92, bad-2 5.34, bad-3 4.00,
-% D1-all 3.40, RMSE 3.64, median 0.130; 4 degenerate frames excluded
-% (STATE THIS). Comparison rows from verified_performance.md with the
-% protocol caveat stated honestly (our native-axis eval vs published
-% standard protocol; do not imply same-protocol equality).
-\todo{Write per WRITING\_PLAN section 6.1 row 4.3.}
+\todo{Write per WRITING\_PLAN section 6.1 row 4.3 around Tables
+\ref{tab:sceneflow_results} and \ref{tab:sceneflow_comparison}. State
+the 4 degenerate frames excluded from the macro-average. State the axis
+caveat honestly: published numbers follow each paper's standard
+protocol; ours is the native-axis full test set.}
 
 \begin{table}[!htbp]
 \centering
-\caption{\textbf{Full FlyingThings3D test-set results.} All eight metrics over 4,370 pairs at the native 960$\times$540 axis, best checkpoint (step 53k). \todo{finalize protocol sentence}}
+\caption{\textbf{Full FlyingThings3D test-set results.} All eight metrics over 4{,}370 pairs at the native $960\times 540$ axis, best checkpoint (step 53k); four frames with no valid ground-truth pixels are excluded from the macro-average.}
 \label{tab:sceneflow_results}
-\todo{single-row 8-metric table from meta.json final\_metrics\_all}
+\small
+\begin{tabular}{cccccccc}
+\toprule
+EPE (px) & RMSE & Median & bad-0.5 (\%) & bad-1 (\%) & bad-2 (\%) & bad-3 (\%) & D1-all (\%)\\
+\midrule
+0.781 & 3.64 & 0.130 & 15.32 & 8.92 & 5.34 & 4.00 & 3.40\\
+\bottomrule
+\end{tabular}
 \end{table}
 
 \begin{table}[!htbp]
 \centering
-\caption{\textbf{Comparison with published methods on SceneFlow.} \todo{protocol sentence + axis caveat footnote}}
+\caption{\textbf{Comparison with published methods on SceneFlow.} Published EPE values follow each paper's standard SceneFlow protocol; the StereoLite value is the full FlyingThings3D test set at the native axis and is therefore not strictly protocol-identical. Latency hardware differs across papers.}
 \label{tab:sceneflow_comparison}
-% Source: verified_performance.md ONLY; params, EPE, latency + hardware.
-\todo{ours + 8 to 10 methods}
+\small
+\begin{tabular}{lcccc}
+\toprule
+Method & Params (M) & SF EPE (px) & Latency (ms) & Hardware\\
+\midrule
+PSMNet \cite{chang2018psmnet} & 5.2 & 1.09 & 410 & Titan Xp\\
+HITNet (L) \cite{tankovich2021hitnet} & 0.97 & 0.43 & 54 & Titan V\\
+CoEx \cite{bangunharcana2021coex} & 2.72 & 0.69 & 27 & RTX 2080Ti\\
+RAFT-Stereo \cite{lipson2021raftstereo} & 11.23 & 0.61 & 380 & RTX 6000\\
+IGEV-Stereo \cite{xu2023igev} & 12.60 & 0.47 & 180 & RTX 3090\\
+LightStereo-S \cite{guo2025lightstereo} & 3.44 & 0.73 & 17 & RTX 3090\\
+FoundationStereo \cite{wen2025foundationstereo} & ${\sim}340$ & 0.34 & ${\sim}470$ & RTX 4090\\
+\midrule
+StereoLite (ours) & 2.96 & 0.78 & 49.8 (fp16) & RTX 3050 laptop\\
+\bottomrule
+\end{tabular}
 \end{table}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{fig_4_3_sceneflow_qualitative}
+\caption{\textbf{Qualitative results on held-out FlyingThings3D scenes.} Left image, ground-truth disparity, prediction at the best checkpoint (step 53k), and absolute error clipped at 3 px. Residual error concentrates on occlusion boundaries and sub-pixel structure.}
+\label{fig:sceneflow_qualitative}
+\end{figure}
 
 \section{Zero-Shot Cross-Domain: Middlebury 2014}
-% Source: mb14_zero_shot.json (aggregate + per_scene). Numbers: EPE 1.71,
-% bad-1 23.9, bad-2 14.5, D1-all 10.86; references on the SAME protocol:
-% legacy chassis 40.1 D1, LiteAnyStereo 6.9 (7.60 M, 3-stage KD),
-% IGEV-Stereo 5.0 (12.60 M, 16 iters). Interpretation: collapse closed
-% by training pipeline + native crops; the KD gap is future work.
-\todo{Write per WRITING\_PLAN section 6.1 row 4.4.}
+\todo{Write per WRITING\_PLAN section 6.1 row 4.4 around Table
+\ref{tab:mb14_comparison} and Figs \ref{fig:mb14_perscene},
+\ref{fig:mb14_qualitative}. Interpretation: the training pipeline
+(augmentation + native crops + full data) closed the legacy chassis's
+cross-domain collapse; the remaining gap to the KD-trained LiteAnyStereo
+is the future-work lever. Per-scene results in Appendix A.}
 
 \begin{table}[!htbp]
 \centering
-\caption{\textbf{Zero-shot Middlebury 2014 comparison.} 23 perfect-set scenes, 384$\times$640 inference, identical protocol across all rows. \todo{finalize}}
+\caption{\textbf{Zero-shot Middlebury 2014 comparison.} 23 perfect-set scenes, $384\times 640$ inference, identical protocol across all rows (disparity ground truth scaled to the inference width, values above 192 px masked). Reference rows from the repository's matched-protocol evaluations of the public checkpoints \cite{jing2025liteanystereo,xu2023igev}. Latency is the per-scene median on a cloud T4 in fp32 eager mode.}
 \label{tab:mb14_comparison}
-\todo{rows: legacy chassis, ours, LiteAnyStereo, IGEV; columns: params, T4 ms, all 8 metrics}
+\small
+\begin{tabular}{lcccccccc}
+\toprule
+Model & Params (M) & T4 (ms) & EPE & bad-0.5 & bad-1 & bad-2 & bad-3 & D1-all (\%)\\
+\midrule
+Legacy tile chassis & 0.87 & 26 & 5.53 & 79.7 & 66.0 & 50.2 & 40.9 & 40.1\\
+\textbf{StereoLite (ours)} & 2.96 & 86 & \textbf{1.71} & 39.6 & 23.9 & 14.5 & 11.2 & \textbf{10.9}\\
+LiteAnyStereo \cite{jing2025liteanystereo} & 7.60 & 64 & 1.17 & 35.1 & 19.7 & 10.5 & 7.4 & 6.9\\
+IGEV-Stereo (16 it.) \cite{xu2023igev} & 12.60 & 305 & 0.86 & 22.2 & 12.4 & 7.2 & 5.2 & 5.0\\
+\bottomrule
+\end{tabular}
 \end{table}
 
 \begin{figure}[!htbp]
@@ -90,122 +121,149 @@ preemption robustness note; qualitative convergence.}
 
 \begin{figure}[!htbp]
 \centering
-% Requires the --save_viz extension of eval_gev4_middlebury2014.py rerun.
-\todo{insert fig\_4\_5\_mb14\_qualitative (3 best + 2 hardest scenes: left, GT, ours)}
-\caption{\textbf{Zero-shot qualitative results on Middlebury 2014.} \todo{caption}}
+\includegraphics[width=0.9\textwidth]{fig_4_5_mb14_qualitative}
+\caption{\textbf{Zero-shot qualitative results on Middlebury 2014.} The three easiest and two hardest scenes by D1-all: left image, ground truth, and our prediction (turbo colormap, per-scene scale, invalid ground truth dark). The hardest scenes combine thin structures with disparities near the evaluation cap.}
 \label{fig:mb14_qualitative}
 \end{figure}
 
 \section{Robustness to Rectification Imperfection}
 % BLOCKER: run the WRITING_PLAN section 11a sweep first
-% (eval_rectification_robustness.py: right-image vertical shifts
-% {0, 0.5, 1, 2, 4} px on the 400-pair val subset, all 8 metrics per
-% perturbation; optional small-rotation axis; ~$0.10 T4).
-% HONESTY: if degradation is graceful, objective 2 is supported by
-% measurement; if not, report as a limitation. Never claim robustness
-% without the table below.
+% (right-image vertical shifts {0, 0.5, 1, 2, 4} px on the 400-pair val
+% subset; ~$0.10 T4). HONESTY: never claim robustness without the table.
 \todo{Write per WRITING\_PLAN section 6.1 row 4.4b after the sweep runs.}
 
 \begin{table}[!htbp]
 \centering
-\caption{\textbf{Accuracy under vertical rectification error.} \todo{protocol sentence: perturbation set, val subset, metrics}}
+\caption{\textbf{Accuracy under vertical rectification error.} \todo{fill after the WRITING\_PLAN 11a sweep: rows = vertical shift 0 / 0.5 / 1 / 2 / 4 px; columns = EPE, bad-1, bad-2, D1-all}}
 \label{tab:rectification}
-\todo{rows: vertical shift 0 / 0.5 / 1 / 2 / 4 px; columns: EPE, bad-1, bad-2, D1-all}
+\todo{run eval\_rectification\_robustness.py first}
 \end{table}
 
 \section{Ablation Studies}
-% Sources: model/benchmarks/EXPERIMENTS.md sections named in
-% WRITING_PLAN 6.1 row 4.5. Four studies, each: compact table + two
-% paragraphs of interpretation. Include the composition NEGATIVE result
-% (plane + bimodal worse than plane alone); negative results are results.
-\todo{(a) augmentation lever (best val EPE 2.778 to 1.921); (b)
-efficiency A/B (46.6 to 30.2 ms at equal accuracy); (c) blur-fix round
-(plane rendering bad-0.5 minus 22.5 percent) + composition negative
-result; (d) native-vs-resize input protocol.}
+\todo{Prose per WRITING\_PLAN section 6.1 row 4.5 around the tables
+below and Fig \ref{fig:ablations}: (a) the augmentation triplet was the
+largest single lever (best val EPE 2.778 to 1.921 on the matched 9-arm
+comparison); (b) the efficiency pass holds accuracy while cutting
+latency by a third; (c) plane rendering wins the blur study and the
+compositions are WORSE than plane alone (report the negative result);
+(d) native crops beat global resize decisively on the native axis at no
+cost on the legacy axis.}
 
 \begin{table}[!htbp]
 \centering
-\caption{\textbf{Efficiency ablation.} \todo{protocol}}
+\caption{\textbf{Efficiency ablation.} 100-pair matched harness, 9k steps, identical seed and data; latency at $384\times 640$, batch 1.}
 \label{tab:ablation_efficiency}
-\todo{3 arms x metrics + latency; source EXPERIMENTS.md eff\_gev4\_n100}
+\small
+\begin{tabular}{lccccc}
+\toprule
+Variant & Params (M) & EPE & bad-1 (\%) & D1-all (\%) & Latency (ms)\\
+\midrule
+base (gev4) & 2.962 & 2.908 & 30.32 & 16.31 & 46.6\\
++ exact-equivalence fixes & 2.962 & 3.021 & 32.09 & 17.79 & 35.8\\
++ narrow GEV band & 2.962 & 2.906 & 32.29 & 16.88 & 30.2\\
+\bottomrule
+\end{tabular}
 \end{table}
 
 \begin{table}[!htbp]
 \centering
-\caption{\textbf{Boundary-sharpness fixes and their composition.} \todo{protocol}}
+\caption{\textbf{Boundary-sharpness fixes and their composition.} 500-pair windowed split; the composition rows show that combining fixes is worse than plane rendering alone.}
 \label{tab:ablation_blurfix}
-\todo{control / bundle1 / plane / bimodal / pb / allin; source EXPERIMENTS.md blurfix runs}
+\small
+\begin{tabular}{lcccc}
+\toprule
+Variant & EPE & bad-0.5 (\%) & D1-all (\%) & Latency (ms)\\
+\midrule
+control (narrow) & 2.006 & 55.36 & 12.57 & 22.2\\
++ bundle1 (top-k init) & 1.982 & 49.95 & 12.14 & 21.9\\
++ bimodal aux head & 1.779 & 43.26 & 11.53 & 25.2\\
+\textbf{+ plane rendering (adopted)} & 1.826 & \textbf{42.91} & 12.19 & 15.0\\
+\midrule
+plane + bimodal & 1.847 & 44.40 & 11.62 & 25.5\\
+plane + bimodal + bundle1 & 1.853 & 46.58 & 11.93 & 17.2\\
+\bottomrule
+\end{tabular}
 \end{table}
 
 \begin{table}[!htbp]
 \centering
-\caption{\textbf{Input-protocol ablation (native crop against global resize).} \todo{protocol; both eval axes}}
+\caption{\textbf{Input-protocol ablation.} Dual-axis final evaluation on the same 50 validation frames; each arm evaluated on both axes. Native crops win the native axis outright at no accuracy cost on the legacy resized axis.}
 \label{tab:ablation_native}
-\todo{3 arms; source 20260704\_native\_vs\_resize\_n500}
+\small
+\begin{tabular}{lcccccc}
+\toprule
+& \multicolumn{3}{c}{Native axis ($960\times 540$)} & \multicolumn{3}{c}{Resized axis ($640\times 384$)}\\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+Arm & EPE & bad-1 & D1-all & EPE & bad-1 & D1-all\\
+\midrule
+global resize (legacy) & 6.672 & 58.69 & 35.81 & 1.783 & 29.91 & 11.44\\
+\textbf{native crop (adopted)} & \textbf{2.869} & \textbf{36.75} & \textbf{16.47} & 1.783 & \textbf{29.30} & \textbf{10.71}\\
+native full frame & 2.967 & 38.68 & 16.74 & 2.557 & 36.45 & 16.36\\
+\bottomrule
+\end{tabular}
 \end{table}
 
 \begin{figure}[!htbp]
 \centering
-\todo{insert fig\_4\_7\_ablations (grouped bars, one panel per study)}
-\caption{\textbf{Ablation summary.} \todo{caption}}
+\includegraphics[width=\textwidth]{fig_4_7_ablations}
+\caption{\textbf{Ablation summary.} (a) OpenStereo augmentation triplet (matched 9-arm comparison, best validation EPE). (b) The edge-inference optimization pass (100-pair harness). (c) Boundary blur fixes and their compositions (500-pair split, bad-0.5). (d) Input protocol on the native evaluation axis.}
 \label{fig:ablations}
 \end{figure}
 
 \section{Efficiency and Deployment Measurements}
-% Source: THESIS_PLAN section 2A (A2 latency, A6 memory, Jetson
-% projection block WITH its methodology sentence). Measured: RTX 3050
-% fp32 61.4 / fp16 49.8 ms (optimized narrow variant); memory 0.26 GB
-% fp16 / 0.35 GB fp32. Projected (asterisked): Orin Nano INT8 ~30 ms*
-% (~33 FPS*). The asterisk footnote lives on the table.
-\todo{Write per WRITING\_PLAN section 6.1 row 4.6.}
+\todo{Write per WRITING\_PLAN section 6.1 row 4.6 around Table
+\ref{tab:latency}: measured RTX 3050 values, measured inference memory,
+and the starred Orin Nano projections with the projection-methodology
+sentence (eager-to-TensorRT factor 1.8, fp16-to-INT8 factor 1.2, device
+factor 1.15).}
 
 \begin{table}[!htbp]
 \centering
-\caption{\textbf{Latency and memory.} Measured values on RTX 3050 Laptop (batch 1, 384$\times$640); starred values are projections for Jetson Orin Nano INT8 TensorRT, replaced by measurements when hardware is available. \todo{finalize + methodology footnote}}
+\caption{\textbf{Latency and memory.} Measured values on RTX 3050 Laptop (batch 1, $384\times 640$, eager PyTorch); starred values are projections for Jetson Orin Nano INT8 TensorRT and are replaced by measurements when the device is available.}
 \label{tab:latency}
-\todo{rows: fp32, fp16, INT8*; columns: latency, FPS, memory}
+\small
+\begin{tabular}{lcccc}
+\toprule
+Configuration & Latency (ms) & FPS & Inference memory (GB)\\
+\midrule
+RTX 3050, fp32 & 61.4 & 16.3 & 0.35\\
+RTX 3050, fp16 & 49.8 & 20.1 & 0.26\\
+Jetson Orin Nano, INT8 TensorRT & ${\sim}30^{*}$ & ${\sim}33^{*}$ & ${\sim}0.15^{*}$\\
+\bottomrule
+\end{tabular}
 \end{table}
 
 \section{Qualitative Results}
-% Sources: run images/ folders; regenerated camera panels (best.pth).
-\todo{Write per WRITING\_PLAN section 6.1 row 4.7: SceneFlow good/typical/
-failure panels; MB14 panels; real-camera panels (no GT: visual
-plausibility, boundary sharpness; tie to the plane-render fix).}
+\todo{Write per WRITING\_PLAN section 6.1 row 4.7 around Figs
+\ref{fig:sceneflow_qualitative}, \ref{fig:mb14_qualitative}, and
+\ref{fig:camera}: visual plausibility, boundary sharpness, and the tie
+back to the plane-rendering fix.}
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=\textwidth]{fig_4_3_sceneflow_qualitative}
-\caption{\textbf{Qualitative results on held-out FlyingThings3D scenes.} Left image, ground-truth disparity, prediction at the best checkpoint (step 53k), and absolute error clipped at 3 px. Residual error concentrates on occlusion boundaries and sub-pixel structure.}
-\label{fig:sceneflow_qualitative}
-\end{figure}
-
-\begin{figure}[!htbp]
-\centering
-\todo{insert fig\_4\_6\_camera (3 to 4 indoor pairs: left + predicted disparity)}
-\caption{\textbf{Real-camera qualitative results.} \todo{caption: rig, resolution, no fine-tuning}}
+\includegraphics[width=\textwidth]{fig_4_6_camera}
+\caption{\textbf{Real-camera qualitative results.} Four indoor pairs from the project's stereo rig ($1280\times 720$, rectified, no fine-tuning): left image and the model's predicted disparity at $384\times 640$. No ground truth exists for these pairs; the panels demonstrate zero-shot visual plausibility on real data.}
 \label{fig:camera}
 \end{figure}
 
 \section{Societal, Environmental and Sustainability Aspects}
-% REQUIRED by the OBE mapping (PO6, PO7). Keep claims modest, cited or
-% clearly reasoned: edge inference vs cloud (privacy, no video egress,
-% energy per inference at 7 to 15 W vs datacenter round trip); passive
-% stereo vs LiDAR (no emitted radiation, lower cost, fewer exotic
-% materials); training cost transparency (one A100 day, ~$15 Modal
-% spend); accessibility (low-cost robotics in developing regions).
-\todo{Write per WRITING\_PLAN section 6.1 row 4.8.}
+% REQUIRED by the OBE mapping (PO6, PO7).
+\todo{Write per WRITING\_PLAN section 6.1 row 4.8: edge inference vs
+cloud (privacy, no video egress, energy at 7 to 15 W); passive stereo vs
+LiDAR (no emitted radiation, lower cost); training cost transparency
+(one A100 day, ~\$15 cloud spend); accessibility.}
 
 \section{Discussion}
-% Answer RQ1 to RQ4 explicitly; position on the Pareto figure; what the
-% results imply about "iteration vs training pipeline" for
-% generalization; honest boundaries: no on-device Jetson number yet,
-% single run (no seed variance), no KITTI leaderboard submission. Use
-% FINAL_MODEL_ARCHITECTURE section 18 pre-vetted claim wording.
-\todo{Write per WRITING\_PLAN section 6.1 row 4.9.}
+\todo{Write per WRITING\_PLAN section 6.1 row 4.9 around Fig
+\ref{fig:pareto_ours}: answer RQ1 to RQ4 explicitly; the
+"iteration vs training pipeline" implication for generalization; honest
+boundaries (no on-device Jetson number yet, single run, no KITTI
+leaderboard submission). Use FINAL\_MODEL\_ARCHITECTURE section 18
+pre-vetted wording.}
 
 \begin{figure}[!htbp]
 \centering
-\todo{insert fig\_4\_8\_pareto\_ours (params vs accuracy with our star + references)}
-\caption{\textbf{StereoLite on the accuracy-efficiency Pareto front.} \todo{caption}}
+\includegraphics[width=0.78\textwidth]{fig_4_8_pareto_ours}
+\caption{\textbf{StereoLite on the zero-shot accuracy-efficiency front.} Middlebury 2014 D1-all against trainable parameters; all four points share the identical 23-scene protocol of Table \ref{tab:mb14_comparison}.}
 \label{fig:pareto_ours}
 \end{figure}

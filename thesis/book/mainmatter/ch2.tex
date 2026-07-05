@@ -6,20 +6,15 @@
 %   - Invoke ruet-thesis-expert + research-linguistics-expert. Register:
 %     flagship for background, "[SYSTEM] [ref] [verb]s [mechanism]" for
 %     minor works, fuller treatment for the ~10 anchor architectures.
-%     Present tense for a paper's claim, past for its specific finding.
-%   - The stereo-vision-expert agent arbitrates any claim the summaries
-%     leave ambiguous. Numbers ONLY from papers/verified_performance.md
-%     or review_paper/figures/_data/method_data.py (both carry per-cell
-%     source breadcrumbs).
-%   - Architecture figures are REDRAWN (drawio pipeline, WRITING_PLAN
-%     section 9), never pasted from papers. References for fidelity:
-%     model/designs/StereoLite/arch_refs/*.png and
-%     .claude/skills/stereo-vision-expert/reference_impls/.
-%   - Cap reproduced equations at the seven below. Cite the origin paper
-%     at each. PO demonstrated: PO2 throughout.
-%   - BibTeX keys: Reference.bib already holds the 72 PDF-verified
-%     entries copied from review_paper/references.bib; cite with those
-%     keys, add new entries only after PDF verification.
+%   - The stereo-vision-expert agent arbitrates ambiguous claims.
+%     Numbers ONLY from papers/verified_performance.md (per-cell paper/
+%     table/page breadcrumbs) or method_data.py.
+%   - Figures and tables below are DONE (embedded, cited); do not move
+%     them; write the prose around them.
+%   - Architecture panels in Fig \ref{fig:paradigms} are REPRODUCED from
+%     the original papers with citation (user-approved practice for the
+%     thesis); all other diagrams are our own redrawn .drawio figures.
+%   - PO demonstrated: PO2 throughout.
 % =====================================================================
 \chapter{Literature Review}
 
@@ -27,149 +22,204 @@
 % Sources: tier1/surveys/Scharstein_Taxonomy_IJCV2002.md,
 % tier1/surveys/Hirschmuller_SGM_TPAMI2007.md, papers/CONCEPTS.md,
 % review_paper/sections/02_background.tex.
-% Content: rectification, epipolar constraint, disparity; the
-% Scharstein-Szeliski 4-step taxonomy; classical costs (SAD, NCC,
-% census); SGM as the classical apex.
-\todo{Write per WRITING\_PLAN section 4.1 row 2.1.}
+\todo{Write per WRITING\_PLAN section 4.1 row 2.1: rectification,
+epipolar constraint, disparity; the four-step taxonomy
+\cite{scharstein2002taxonomy}; classical costs (SAD, NCC, census);
+SGM \cite{hirschmuller2008sgm} as the classical apex.}
 
 \begin{figure}[!htbp]
 \centering
-\todo{insert fig\_2\_1\_classical\_pipeline (4-step taxonomy flow; small drawio)}
-\caption{\textbf{The classical stereo pipeline.} \todo{caption}}
+\includegraphics[width=\textwidth]{fig_2_1_classical_preview}
+\caption{\textbf{The classical stereo pipeline.} The four canonical steps of the Scharstein and Szeliski taxonomy \cite{scharstein2002taxonomy}: matching cost computation, cost aggregation, disparity optimization, and disparity refinement.}
 \label{fig:classical_pipeline}
 \end{figure}
 
-% Eq 2.1: SGM energy (Hirschmuller). Introduce, display, where-clause.
-\todo{Eq 2.1 SGM energy $E(D)$ with $P_1$/$P_2$ smoothness terms; source:
-tier1 SGM summary; label eq:sgm\_energy.}
+\todo{Eq 2.1 SGM energy $E(D)$ with $P_1$/$P_2$ terms
+\cite{hirschmuller2008sgm}; label eq:sgm\_energy.}
 
 \section{The Deep Learning Transition}
 % Sources: tier2/end_to_end/{MC-CNN,DispNetC,GCNet}.md,
 % tier1/surveys/Poggi_Synergies_TPAMI2021.md.
-% Content: MC-CNN (learned cost, classical rest); DispNetC (first
-% end-to-end, correlation layer); GC-Net (4D cost volume + 3D conv +
-% soft-argmin: the template every later network follows).
-\todo{Write per WRITING\_PLAN section 4.1 row 2.2.}
+\todo{Write per WRITING\_PLAN section 4.1 row 2.2: MC-CNN
+\cite{zbontar2016mccnn} (learned cost, classical rest); DispNetC
+\cite{mayer2016sceneflow} (first end-to-end, correlation layer); GC-Net
+\cite{kendall2017gcnet} (4D cost volume + 3D conv + soft-argmin).}
 
-\todo{Eq 2.2 correlation layer (DispNetC); label eq:correlation.}
-\todo{Eq 2.3 soft-argmin regression (GC-Net); label eq:softargmin.}
+\todo{Eq 2.2 correlation layer \cite{mayer2016sceneflow}; label
+eq:correlation.}
+\todo{Eq 2.3 soft-argmin regression \cite{kendall2017gcnet}; label
+eq:softargmin.}
 
 \section{The 3D Cost-Volume Era}
 % Sources: tier2/end_to_end/{PSMNet,GWCNet,GANet,AANet,ACVNet,CFNet}.md.
-% Content: PSMNet (SPP + stacked hourglass); GwcNet group-wise
-% correlation (DIRECTLY relevant: our tile initialization uses it, say
-% so); GA-Net learned aggregation; one clause each for AANet/ACVNet/CFNet.
-\todo{Write per WRITING\_PLAN section 4.1 row 2.3.}
+\todo{Write per WRITING\_PLAN section 4.1 row 2.3: PSMNet
+\cite{chang2018psmnet}; GwcNet group-wise correlation
+\cite{guo2019gwcnet} (our tile initialization adopts this op, say so);
+GA-Net \cite{zhang2019ganet}; one clause each for AANet
+\cite{xu2020aanet}, ACVNet \cite{xu2022acvnet}, CFNet \cite{shen2021cfnet}.}
 
-\todo{Eq 2.4 group-wise correlation (GwcNet); label eq:gwc\_lit. Note the
-forward reference: our Eq \eqref{eq:gwc} adopts this op at tile scale.}
+\todo{Eq 2.4 group-wise correlation \cite{guo2019gwcnet}; label
+eq:gwc\_lit; forward-reference our \eqref{eq:gwc}.}
 
 \section{Iterative Refinement}
-% Sources: tier1/iterative/{RAFT-Stereo,IGEV-Stereo,CREStereo,
-% Selective-Stereo}.md + reference_impls/raft_stereo/, igev_stereo/.
-% Content: RAFT-Stereo (all-pairs correlation + ConvGRU + convex
-% upsampling: three mechanisms our model inherits in modified form, say
-% so explicitly); IGEV (Geometry Encoding Volume: the direct ancestor of
-% our GEV block); CREStereo, Selective-Stereo one paragraph each.
-\todo{Write per WRITING\_PLAN section 4.1 row 2.4.}
+% Sources: tier1/iterative/* + reference_impls/raft_stereo, igev_stereo.
+\todo{Write per WRITING\_PLAN section 4.1 row 2.4: RAFT-Stereo
+\cite{lipson2021raftstereo} (all-pairs correlation + ConvGRU + convex
+upsampling: three mechanisms our model inherits in modified form);
+IGEV \cite{xu2023igev} (Geometry Encoding Volume: direct ancestor of our
+GEV block); CREStereo \cite{li2022crestereo}; Selective-Stereo
+\cite{wang2024selective}.}
 
-\todo{Eq 2.5 ConvGRU update equations (RAFT-Stereo); label eq:convgru\_lit.}
-\todo{Eq 2.6 Geometry Encoding Volume (IGEV); label eq:gev\_lit.}
+\todo{Eq 2.5 ConvGRU update \cite{lipson2021raftstereo}; label
+eq:convgru\_lit.}
+\todo{Eq 2.6 Geometry Encoding Volume \cite{xu2023igev}; label
+eq:gev\_lit.}
 
 \begin{figure}[!htbp]
 \centering
-% WRITING_PLAN Fig 2.4: the biggest Ch2 figure. Four redrawn simplified
-% architectures sharing one visual language (drawio, grammar contract in
-% WRITING_PLAN section 9): (a) PSMNet 3D-cost-volume paradigm,
-% (b) RAFT-Stereo iterative paradigm, (c) HITNet tile paradigm,
-% (d) LiteAnyStereo KD-trained efficient paradigm.
-\todo{insert fig\_2\_4\_paradigms (four-panel redrawn architecture comparison)}
-\caption{\textbf{Four stereo-matching paradigms.} \todo{caption naming all four panels}}
+\begin{subfigure}{0.49\textwidth}
+\centering
+\includegraphics[width=\textwidth,height=3.4cm,keepaspectratio]{fig_2_4a_psmnet}
+\caption{PSMNet: 3D cost-volume paradigm \cite{chang2018psmnet}}
+\end{subfigure}\hfill
+\begin{subfigure}{0.49\textwidth}
+\centering
+\includegraphics[width=\textwidth,height=3.4cm,keepaspectratio]{fig_2_4b_raftstereo}
+\caption{RAFT-Stereo: iterative paradigm \cite{lipson2021raftstereo}}
+\end{subfigure}\\[6pt]
+\begin{subfigure}{0.49\textwidth}
+\centering
+\includegraphics[width=\textwidth,height=3.4cm,keepaspectratio]{fig_2_4c_hitnet}
+\caption{HITNet: tile-hypothesis paradigm \cite{tankovich2021hitnet}}
+\end{subfigure}\hfill
+\begin{subfigure}{0.49\textwidth}
+\centering
+\includegraphics[width=\textwidth,height=3.4cm,keepaspectratio]{fig_2_4d_liteanystereo}
+\caption{LiteAnyStereo: efficient KD-trained paradigm \cite{jing2025liteanystereo}}
+\end{subfigure}
+\caption{\textbf{Four stereo-matching paradigms.} Architecture overviews reproduced from the original publications for comparison; each caption cites the source. The proposed StereoLite combines the tile-hypothesis state of (c) with the recurrent refinement of (b) and a geometry encoding volume in the spirit of IGEV.}
 \label{fig:paradigms}
 \end{figure}
 
 \section{Foundation-Model Era}
-% Sources: tier1/foundation_model/{FoundationStereo,DEFOM-Stereo,MonSter,
-% StereoAnywhere}.md + _SYNTHESIS_foundation_model.md; review_paper
-% section 03. Content: the common recipe (monocular prior + massive
-% data); accuracy vs deployability; why these motivate rather than solve
-% the edge problem.
-\todo{Write per WRITING\_PLAN section 4.1 row 2.5.}
+% Sources: tier1/foundation_model/* + review_paper section 03.
+\todo{Write per WRITING\_PLAN section 4.1 row 2.5: FoundationStereo
+\cite{wen2025foundationstereo}, DEFOM-Stereo \cite{jiang2025defom},
+MonSter \cite{cheng2025monster}, Stereo-Anywhere
+\cite{bartolomei2025stereoanywhere}; the common recipe (monocular prior
++ massive data); why these motivate rather than solve the edge problem.}
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=\textwidth]{fig_2_2_timeline}
-\caption{\textbf{Evolution of deep stereo matching, 2016 to 2026.} Representative methods arranged by year within six paradigm lanes, from early end-to-end networks through 3D cost-volume, iterative-refinement, and foundation-model eras to the modern efficient family surveyed in Section 2.6.}
+\includegraphics[width=\textwidth]{fig_2_2_timeline_preview}
+\caption{\textbf{Evolution of deep stereo matching, 2016 to 2026.} Representative methods arranged by publication year within six paradigm lanes; the outlined marker places this thesis relative to the modern efficient family surveyed in Section 2.6.}
 \label{fig:timeline}
 \end{figure}
 
 \section{Efficient and Edge-Deployable Stereo}
-% THE load-bearing section (~7 pages). Organize by compression technique
-% FAMILY, not by paper; the skeleton is review_paper/sections/
-% 04_compression_taxonomy.tex (REWRITE for thesis register, do not copy).
-% Sources: tier1/efficient/* (18 files), tier3/efficient/{HITNet,
-% StereoNet,AnyNet,MobileStereoNet,DeepPruner}.md, review_paper section 06.
-\todo{Write per WRITING\_PLAN section 4.1 row 2.6. Family order:}
-\subsection{Backbone Substitution}
-\todo{MobileNet/Ghost/YOLO-derived encoders; MobileStereoNet anchor.}
-\subsection{Cost-Volume Compression}
-\todo{cascade volumes, bilateral grid (BGNet), pruning (DeepPruner),
-tile hypotheses (HITNet, our lineage: say so).}
-\subsection{Iterative-Loop Compression}
-\todo{LightStereo, DTP; iteration-count trade-offs.}
-\subsection{Knowledge Distillation}
-\todo{LiteAnyStereo 3-stage KD (anchor, decisive for our future work),
-Distill-then-Prune.}
-\todo{Eq 2.7 generic teacher-student disparity distillation loss
-(LiteAnyStereo form); label eq:kd\_loss.}
-\subsection{Architectural Compression and Adaptive Compute}
-\todo{CoEx guided excitation, CGI-Stereo; AnyNet anytime inference,
-MADNet online adaptation; NAS (LEAStereo) in one paragraph.}
+% THE load-bearing section (~7 pages). Skeleton: review_paper section 04
+% (rewrite for thesis register, do not copy).
+\todo{Family-by-family prose per WRITING\_PLAN section 4.1 row 2.6,
+following the tree of Fig \ref{fig:taxonomy}.}
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=\textwidth]{fig_2_5_taxonomy}
-\caption{\textbf{Taxonomy of compression techniques for deep stereo matching.} Seven technique families organized by the pipeline stage they compress; the family structure of this tree organizes Section 2.6.}
+\includegraphics[width=\textwidth]{fig_2_5_taxonomy_preview}
+\caption{\textbf{Taxonomy of compression techniques for deep stereo matching.} Seven technique families organized by the pipeline stage they compress, each with representative methods; this tree organizes the survey of Section 2.6.}
 \label{fig:taxonomy}
 \end{figure}
 
+\subsection{Backbone Substitution}
+\todo{MobileStereoNet \cite{shamsafar2022mobilestereonet};
+lightweight encoders.}
+\subsection{Cost-Volume Compression}
+\todo{cascade volumes \cite{gu2020cascade}, bilateral grid
+\cite{xu2021bgnet}, pruning \cite{duggal2019deeppruner}, tile
+hypotheses \cite{tankovich2021hitnet} (our lineage, say so).}
+\subsection{Iterative-Loop Compression}
+\todo{LightStereo \cite{guo2025lightstereo}, DTP \cite{pan2024dtp}.}
+\subsection{Knowledge Distillation}
+\todo{LiteAnyStereo three-stage KD \cite{jing2025liteanystereo}
+(anchor; decisive for our future work), Distill-then-Prune.}
+\todo{Eq 2.7 teacher-student disparity distillation loss
+\cite{jing2025liteanystereo}; label eq:kd\_loss.}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{fig_2_7_kd_stages}
+\caption{\textbf{The three-stage knowledge-distillation pipeline of LiteAnyStereo.} Reproduced from \cite{jing2025liteanystereo}: supervised synthetic training, self-distillation with perturbation, and fine-tuning on unlabeled real data with pseudo labels from a frozen accurate model.}
+\label{fig:kd_stages}
+\end{figure}
+
+\subsection{Architectural Compression and Adaptive Compute}
+\todo{CoEx guided excitation \cite{bangunharcana2021coex}, CGI-Stereo
+\cite{xu2023cgistereo}; AnyNet anytime inference \cite{wang2019anynet},
+MADNet online adaptation \cite{tonioni2019madnet}; NAS: LEAStereo
+\cite{cheng2020leastereo} in one paragraph.}
+
 \section{Cross-Domain Generalization}
-% Sources: tier3/domain_shift/*, tier1/efficient/LiteAnyStereo.md,
-% review_paper/sections/05_generalization.tex, CLAUDE.md cross-domain
-% insight. Content: why synthetic-trained models fail on real domains;
-% architecture-level vs training-recipe-level remedies; the evidence that
-% the training pipeline, not iteration, carries generalization.
-\todo{Write per WRITING\_PLAN section 4.1 row 2.7.}
+% Sources: tier3/domain_shift/*, review_paper section 05.
+\todo{Write per WRITING\_PLAN section 4.1 row 2.7: why synthetic-trained
+models fail on real domains; architecture-level remedies (DSMNet
+\cite{zhang2020dsmnet}, HVT \cite{chang2023hvt}) vs training-recipe
+remedies (StereoAnything \cite{guo2024stereoanything}, LiteAnyStereo
+\cite{jing2025liteanystereo}); the evidence that the training pipeline,
+not iteration, carries generalization.}
 
 \section{Benchmarks and Datasets}
 % Sources: tier2/datasets/*, review_paper section 02.3.
-% Content: SceneFlow (FT3D/Monkaa/Driving, 35k+ pairs), KITTI 2012/2015,
-% Middlebury 2014 (eval3 protocol: 15 train GT public + 15 test hidden;
-% the zero-shot convention evaluates on GT-public scenes), ETH3D.
-\todo{Write per WRITING\_PLAN section 4.1 row 2.8.}
+\todo{Prose around Table \ref{tab:datasets} per WRITING\_PLAN section 4.1
+row 2.8, including the Middlebury eval3 protocol (15 training pairs with
+public GT + 15 test pairs with hidden GT; the zero-shot convention
+evaluates on the GT-public scenes).}
 
 \begin{table}[!htbp]
 \centering
-\caption{\textbf{Stereo benchmarks and training datasets.} \todo{protocol sentence}}
+\caption{\textbf{Stereo benchmarks and training datasets.} Pair counts are the standard training/test splits; SceneFlow counts follow the canonical finalpass split used in this thesis.}
 \label{tab:datasets}
-% Source content: review_paper/sections/_tables/tab_datasets.tex, reformat.
-\todo{columns: name, size, real/synthetic, GT source, resolution, role}
+\small
+\begin{tabular}{lllllc}
+\toprule
+Dataset & Domain & Train/Test & Resolution & Ground truth & Ref.\\
+\midrule
+SceneFlow & synthetic & 35{,}454 / 4{,}370 & $960{\times}540$ & dense, rendered & \cite{mayer2016sceneflow}\\
+KITTI 2012 & driving & 194 / 195 & $1242{\times}375$ & sparse LiDAR & \cite{geiger2012kitti}\\
+KITTI 2015 & driving & 200 / 200 & $1242{\times}375$ & sparse LiDAR + CAD & \cite{menze2015kitti}\\
+Middlebury 2014 & indoor & 15 / 15 & up to ${\sim}3000{\times}2000$ & structured light & \cite{scharstein2014middlebury}\\
+ETH3D & mixed & 27 / 20 & ${\sim}940{\times}490$ & laser scan & \cite{schops2017eth3d}\\
+\bottomrule
+\end{tabular}
 \end{table}
 
 \section{Summary and Research Gap}
-% Honesty rule: a review SUMMARISES; no roadmaps. Gap phrasing pattern:
-% "the surveyed literature does not directly address [X]".
-\todo{Write per WRITING\_PLAN section 4.1 row 2.9: synthesis paragraph +
-the gap statement (sub-3 M params, tile+GEV fusion, real-time on
-Orin-class hardware, robustness to imperfect rectification).}
+\todo{Synthesis prose around Table \ref{tab:method_comparison} per
+WRITING\_PLAN section 4.1 row 2.9; the gap statement uses the pattern
+"the surveyed literature does not directly address [sub-3 M tile+GEV
+fusion, real-time on Orin-class hardware, robustness to imperfect
+rectification]". A review summarises; no roadmaps.}
 
 \begin{table}[!htbp]
 \centering
-\caption{\textbf{Representative methods across eras.} \todo{protocol sentence: params, SceneFlow EPE, KITTI D1, latency + hardware, family}}
+\caption{\textbf{Representative methods across eras.} Parameters, SceneFlow end-point error, KITTI 2015 D1-all, and reported latency; every value verified against the cited paper's tables (latency hardware differs across papers and is not normalized). The StereoLite row reports our full FlyingThings3D test result at the native axis (Chapter 4) and RTX 3050 fp16 latency.}
 \label{tab:method_comparison}
-% Source: papers/verified_performance.md + method_data.py ONLY. Every
-% cell keeps its source breadcrumb as a citation.
-\todo{12 to 15 rows spanning all six eras}
+\small
+\begin{tabular}{lccccc}
+\toprule
+Method & Year & Params (M) & SF EPE (px) & KITTI D1 (\%) & Latency (ms)\\
+\midrule
+PSMNet \cite{chang2018psmnet} & 2018 & 5.2 & 1.09 & 2.32 & 410\\
+HITNet (L) \cite{tankovich2021hitnet} & 2021 & 0.97 & 0.43 & 1.98 & 54\\
+BGNet \cite{xu2021bgnet} & 2021 & ${\sim}2.9$ & 1.17 & 2.51 & 25\\
+CoEx \cite{bangunharcana2021coex} & 2021 & 2.72 & 0.69 & 2.13 & 27\\
+RAFT-Stereo \cite{lipson2021raftstereo} & 2021 & 11.23 & 0.61 & 1.82 & 380\\
+IGEV-Stereo \cite{xu2023igev} & 2023 & 12.60 & 0.47 & 1.59 & 180\\
+LightStereo-S \cite{guo2025lightstereo} & 2025 & 3.44 & 0.73 & 2.30 & 17\\
+DEFOM-Stereo \cite{jiang2025defom} & 2025 & 47.3 & 0.42 & 1.55 & 316\\
+FoundationStereo \cite{wen2025foundationstereo} & 2025 & ${\sim}340$ & 0.34 & 1.46 & ${\sim}470$\\
+\midrule
+StereoLite (ours) & 2026 & 2.96 & 0.78 & — & 49.8\\
+\bottomrule
+\end{tabular}
 \end{table}
 
 \begin{figure}[!htbp]

@@ -15,20 +15,30 @@ records decisions and open items only.
 | 2026-07-05 | Model public name "StereoLite" thesis-wide; variant slug only in Appendix A |
 | 2026-07-05 | Two title pages skipped: single merged title page (Book Template style) implemented in frontmatter/titlepage.tex |
 
-## Figure ledger (2026-07-05)
+## Figure ledger (updated 2026-07-05, second pass)
 
-PLACED (embedded, final captions): fig 1.1 geometry, fig 1.3 edge gap,
-fig 2.2 timeline, fig 2.5 taxonomy, fig 2.6a/b Pareto pair, fig 3.1
-architecture (INTERIM preview PNG; swap for the drawio PDF export),
-fig 4.1 training curves, fig 4.2 convergence filmstrip, fig 4.3
-qualitative grid, fig 4.4 MB14 per-scene bars.
+ALL figures placed. Architecture diagrams are .drawio (editable; a
+viewer-render preview PNG is embedded until the user exports cropped
+PDFs from draw.io): 1.1 geometry, 2.1 classical pipeline, 2.3 timeline,
+2.5 taxonomy, 3.1 overview, 3.2-3.8 per-block. Reproduced-with-citation
+paper figures: 2.4 four-paradigm panel (PSMNet/RAFT/HITNet/
+LiteAnyStereo), 2.7 KD stages (LiteAnyStereo). Data charts (matplotlib,
+final PDFs): 1.3 edge gap, 2.6a/b Pareto pair, 3.10 input protocol,
+3.11 param budget, 4.1 curves, 4.2 convergence, 4.3 qualitative,
+4.4 MB14 bars, 4.5 MB14 qualitative, 4.6 camera panels, 4.7 ablation
+summary, 4.8 final Pareto.
 
-STILL TODO (stubs with instructions in the tex): fig 2.1 classical
-pipeline, fig 2.4 four-paradigm panel, figs 3.2 to 3.8 per-block drawio,
-fig 3.10 input protocol, fig 4.5 MB14 qualitative (needs --save_viz
-Modal rerun), fig 4.6 camera panels (regenerate with best.pth), fig 4.7
-ablation bars, fig 4.8 final Pareto. Architecture figures follow the
-drawio grammar contract (WRITING_PLAN section 9).
+ALL tables filled with verified numbers (sources: meta.json,
+mb14_zero_shot.json, EXPERIMENTS.md, comparison.md,
+verified_performance.md): 2.1 datasets, 2.2 method comparison,
+3.2 training config, 3.3 efficiency findings, 4.1 SF results,
+4.2 SF comparison, 4.3 MB14 ladder, 4.5-4.7 ablations, 4.8 latency,
+A.1 architecture config, A.2 MB14 per-scene. ONLY Table 4.4
+(rectification sweep) awaits its experiment.
+
+Citations wired: figure captions, tables, and section stubs carry
+\cite keys from the 72 PDF-verified Reference.bib entries; References
+section renders in IEEE style.
 
 ## Open items
 

@@ -5,10 +5,72 @@
 \chapter{Technical Specifications}
 
 \section{Model Configuration}
-\todo{Full architecture configuration table from
-FINAL\_MODEL\_ARCHITECTURE section 11 (channels, groups, hypotheses,
-iteration schedule, 2.9623 M parameters) + the trained variant flags
-(narrow GEV half-range 16, plane rendering, slant weight 0.3).}
+The trained architecture is the \texttt{gev4\_opt\_narrow\_plane}
+variant of the StereoLite family; Table \ref{tab:arch_config} lists the
+full configuration.
+
+\begin{table}[!htbp]
+\centering
+\caption{\textbf{Architecture configuration of the trained model.} Values from the architecture record and the training run's checkpoint (2.9631~M trainable parameters).}
+\label{tab:arch_config}
+\small
+\begin{tabular}{ll}
+\toprule
+Hyperparameter & Value\\
+\midrule
+Backbone & YOLO26s layers 0--6, pretrained\\
+Context base / output channels & 24 / 32\\
+Tile hidden channels & 32\\
+Refinement-head hidden channels & 48\\
+Initialization groups / disparities & 8 / 24 (at 1/16)\\
+GEV band & $\pm 16$ around tile $d$ (33 bins)\\
+GEV geometry / 3-D hidden channels & 16 / 16\\
+Local correlation half-range & 2 (five offsets)\\
+Refinements at 1/16, 1/8, 1/4 & 2, 3, 3\\
+Plane rendering & on (gated slant supervision, weight 0.3)\\
+Trainable parameters & 2.9631~M\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Per-Scene Zero-Shot Results}
+\begin{table}[!htbp]
+\centering
+\caption{\textbf{Per-scene zero-shot Middlebury 2014 results.} 23 perfect-set scenes, $384\times 640$ inference protocol of Chapter 4.}
+\label{tab:mb14_perscene_full}
+\small
+\begin{tabular}{lcccc}
+\toprule
+Scene & EPE (px) & bad-1 (\%) & bad-2 (\%) & D1-all (\%)\\
+\midrule
+Adirondack & 0.59 & 11.4 & 4.0 & 2.38\\
+Backpack & 0.92 & 13.1 & 8.5 & 6.35\\
+Bicycle1 & 1.64 & 24.4 & 16.3 & 12.55\\
+Cable & 0.92 & 16.0 & 8.4 & 5.83\\
+Classroom1 & 1.08 & 21.5 & 12.2 & 7.56\\
+Couch & 1.86 & 25.4 & 14.5 & 8.79\\
+Flowers & 3.10 & 39.5 & 33.1 & 30.30\\
+Jadeplant & 9.25 & 57.2 & 44.1 & 34.85\\
+Mask & 3.14 & 37.4 & 28.4 & 24.68\\
+Motorcycle & 1.04 & 14.4 & 8.2 & 6.33\\
+Piano & 0.92 & 20.2 & 10.8 & 7.25\\
+Pipes & 2.26 & 30.0 & 21.7 & 17.90\\
+Playroom & 1.51 & 31.3 & 17.8 & 12.62\\
+Playtable & 0.85 & 21.3 & 8.0 & 4.36\\
+Recycle & 0.59 & 12.1 & 4.3 & 2.90\\
+Shelves & 0.94 & 25.2 & 11.0 & 6.34\\
+Shopvac & 1.93 & 22.9 & 12.2 & 7.71\\
+Sticks & 0.95 & 18.8 & 8.3 & 5.77\\
+Storage & 0.83 & 10.8 & 5.6 & 4.17\\
+Sword1 & 0.94 & 16.5 & 9.0 & 6.46\\
+Sword2 & 1.42 & 17.9 & 12.1 & 9.55\\
+Umbrella & 1.15 & 28.8 & 12.6 & 9.08\\
+Vintage & 1.61 & 33.7 & 21.7 & 15.96\\
+\midrule
+Mean & 1.71 & 23.9 & 14.5 & 10.86\\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \section{Software and Hardware Environment}
 \todo{PyTorch 2.11 cu128, Python 3.10+, Modal A100-80GB (training), T4
