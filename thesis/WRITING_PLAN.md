@@ -22,7 +22,7 @@ Every writing session MUST:
    and the resolved format conflicts. Non-negotiables repeated here:
    - Department is **Mechatronics** everywhere (template placeholder says
      Mechanical; always replace).
-   - 2 authors: Nazib Abrar (2008026), Md. Raihanul Haque Rahi (2008011).
+   - 2 authors: Md. Raihanul Haque Rahi (2008011), Nazib Abrar (2008026).
      Md Zunaid Hossen (Lecturer, MTE) is SUPERVISOR, never co-author.
    - Geometry: left margin 3 cm (binding), right/top/bottom 2.54 cm.
    - Times New Roman 12 pt body, single spacing, justified.
@@ -420,7 +420,7 @@ of the field's trajectory). One reserved forward claim maximum ("we believe
 |---|---|---|
 | A: Technical Specifications | Full model config (dump FINAL_MODEL_ARCHITECTURE §11 + meta.json cfg as formatted tables); software stack versions; hardware specs (A100, T4, RTX 3050, camera rig, Orin Nano target spec); reproduction pointers (the three Modal drivers by name) | Ready-made content; PO5 |
 | B: Project Management and Financial Aspects | Expense table (Modal spend: itemize training ~$15, ablations, eval runs ~$0.05 each; camera hardware; SSD); Gantt chart of the actual project timeline (Feb to Jul 2026: paper study, review paper, architecture iterations, ablation campaign, production run, writing); seed from the deck's Time Plan slide | NEW Gantt via matplotlib (`figures/_src/make_gantt.py`); PO11 |
-| C: Ethics, Teamwork and Communication | (i) Similarity report (Turnitin via SUPERVISOR account). **TIMING DECIDED (user, 2026-07-05): similarity + AI report are obtained AFTER the thesis book is completely written**, so they are the LAST step of Phase 4 QA, not a day-0 external clock; leave placeholder pages in the appendix until then; (ii) **AI report + AI-usage disclosure: mandatory, this thesis is AI-assisted; disclose scope honestly** (drafting assistance, code assistance, analysis tooling); (iii) Research Ethics Compliance Checklist + Conflict-of-Interest statement + signatures; (iv) CRediT contribution statement for the 2 students (draft from the actual division: Abrar X, Rahi Y; confirm with both); (v) communication statement (supervisor meetings cadence) | ruet-thesis-expert §4; PO8/9/10 |
+| C: Ethics, Teamwork and Communication | (i) Similarity report (Turnitin via SUPERVISOR account). **TIMING DECIDED (user, 2026-07-05): similarity + AI report are obtained AFTER the thesis book is completely written**, so they are the LAST step of Phase 4 QA, not a day-0 external clock; leave placeholder pages in the appendix until then; (ii) **AI report + AI-usage disclosure: mandatory, this thesis is AI-assisted; disclose scope honestly** (drafting assistance, code assistance, analysis tooling); (iii) Research Ethics Compliance Checklist + Conflict-of-Interest statement + signatures; (iv) CRediT contribution statement for the 2 students (draft from the actual division: Rahi Y, Abrar X; confirm with both); (v) communication statement (supervisor meetings cadence) | ruet-thesis-expert §4; PO8/9/10 |
 | D: PO and KPA Attainment Tracker | Assemble from `po_tracker_notes.md` accumulated during writing; per-PO: where demonstrated + one-line evidence; CEP K3/K4/K5/K8 statement | Last thing written before QA |
 | E: List of Publications | The review-paper draft ("Compression Techniques for Deep Stereo Matching", 17-page IEEE-format manuscript, status: draft/in preparation) or "none" if supervisor prefers | Confirm with supervisor |
 

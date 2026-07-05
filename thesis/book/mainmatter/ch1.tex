@@ -32,10 +32,8 @@ focal length in pixels, $B$ baseline, $d$ disparity.}
 
 \begin{figure}[!htbp]
 \centering
-% Regenerate per WRITING_PLAN Fig 1.1: build_intro_figure.py restyled
-% (white background, serif, PDF) into figures/fig_1_1_stereo_geometry.pdf
-\todo{insert fig\_1\_1\_stereo\_geometry (two-camera geometry with $Z=fB/d$ panel)}
-\caption{\textbf{Two-view stereo geometry.} \todo{one dataflow sentence; self-contained caption}}
+\includegraphics[width=0.92\textwidth]{fig_1_1_stereo_geometry}
+\caption{\textbf{Two-view stereo geometry.} A scene point $P$ projects to $x_L$ and $x_R$ on two rectified image planes separated by the baseline $B$; the disparity $d = x_L - x_R$ recovers depth through $Z = fB/d$.}
 \label{fig:stereo_geometry}
 \end{figure}
 
@@ -50,11 +48,8 @@ focal length in pixels, $B$ baseline, $d$ disparity.}
 
 \begin{figure}[!htbp]
 \centering
-% WRITING_PLAN Fig 1.3: params (log) vs accuracy scatter, target zone +
-% our star; adapt presentation/figs/build_slide_figs.py::build_research_gap
-% with gev4 numbers (2.963 M, SF-TEST EPE 0.78).
-\todo{insert fig\_1\_3\_edge\_gap (params vs accuracy Pareto with target zone)}
-\caption{\textbf{The edge-deployment gap.} \todo{caption: dataset, metric, and what the target zone means}}
+\includegraphics[width=\textwidth]{fig_1_3_edge_gap}
+\caption{\textbf{The edge-deployment gap.} SceneFlow end-point error against trainable parameters for representative methods of each family; the shaded band marks the sub-3 M parameter edge budget targeted in this thesis. Published values follow each paper's standard SceneFlow protocol; the StereoLite point is our full FlyingThings3D test result at the native evaluation axis (Chapter 4).}
 \label{fig:edge_gap}
 \end{figure}
 
