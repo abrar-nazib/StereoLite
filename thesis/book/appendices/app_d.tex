@@ -2,8 +2,9 @@
 % Assembled LAST, from thesis/book/po_tracker_notes.md (one line per PO
 % per section, accumulated during writing). Mapping is fixed
 % (ruet-thesis-expert section 5):
-%   Ch1 PO1+PO2 · Ch2 PO2 · Ch3 PO2+PO3+PO5 · Ch4 PO4+PO6+PO7 ·
-%   Ch5 PO12 · App A PO5 · App B PO11 · App C PO8+PO9+PO10
+%   9-chapter template: Ch1 PO1+PO2 . Ch2 PO2 . Ch3 PO2+PO3 .
+%   Ch4 PO6+PO7 . Ch5 CEP/CEA . Ch6 PO11 . Ch7 PO4+PO5 . Ch8 PO4 .
+%   Ch9 PO12 . App A PO5 . App B PO8+PO9+PO10
 \chapter{PO and KPA Attainment Tracker}
 
 \section{Program Outcome Mapping}
@@ -22,29 +23,15 @@ PO & Location & Evidence\\
 PO1 & Ch.~1 & Engineering knowledge of stereo geometry, sensing trade-offs, and the depth-from-disparity relation.\\
 PO2 & Ch.~1, 2, 3 & Problem analysis: the accuracy-latency-memory constraint, the literature gap, and the formal design requirements.\\
 PO3 & Ch.~3 & Design and development of the StereoLite architecture block by block.\\
-PO4 & Ch.~4 & Investigation through controlled ablation studies and in-domain, cross-domain, and robustness evaluation.\\
-PO5 & Ch.~3, App.~A & Modern tool usage: PyTorch, cloud GPU training, mixed precision, and profiling.\\
+PO4 & Ch.~7, 8 & Investigation through controlled ablation studies and in-domain, cross-domain, and robustness evaluation.\\
+PO5 & Ch.~7, App.~A & Modern tool usage: PyTorch, cloud GPU training, mixed precision, and profiling.\\
 PO6 & Ch.~4 & Engineer and society: on-device privacy and accessibility of a low-cost depth sensor.\\
 PO7 & Ch.~4 & Environment and sustainability: passive sensing, low power, and a transparent training footprint.\\
-PO8 & App.~C & Ethics: AI-usage disclosure, conflict-of-interest statement, and similarity report.\\
-PO9 & App.~C & Individual and teamwork: the CRediT contribution statement of the two authors.\\
-PO10 & App.~C, whole thesis & Communication: the written report, figures, and the supervisor-consultation record.\\
-PO11 & App.~B & Project management and finance: the timeline and the itemized expense record.\\
-PO12 & Ch.~5 & Life-long learning: the future-work directions grounded in the field's trajectory.\\
+PO8 & App.~B & Ethics: AI-usage disclosure, conflict-of-interest statement, and similarity report.\\
+PO9 & App.~B & Individual and teamwork: the CRediT contribution statement of the two authors.\\
+PO10 & App.~B, whole thesis & Communication: the written report, figures, and the supervisor-consultation record.\\
+PO11 & Ch.~6 & Project management and finance: the timeline and the itemized expense record.\\
+PO12 & Ch.~9 & Life-long learning: the future-work directions grounded in the field's trajectory.\\
 \bottomrule
 \end{tabular}
 \end{table}
-
-\section{Complex Engineering Problem Attributes}
-The thesis addresses a complex engineering problem, which requires depth
-of knowledge beyond natural science and mathematics alone. The
-load-bearing knowledge profile is K3, K4, K5, and K8. Attribute K3,
-engineering fundamentals, is exercised in the stereo pipeline and the
-cost-volume mechanisms of Chapters 2 and 3. Attribute K4, specialist
-knowledge, is exercised in the selection and adaptation of the
-tile-hypothesis, recurrent, and geometry-volume building blocks in
-Chapter 3. Attribute K5, engineering design, is exercised in the design
-of the StereoLite architecture and its inference-optimization pass under
-hard resource constraints. Attribute K8, research-literature grounding, is
-exercised in the literature review of Chapter 2, which grounds every
-design choice in published evidence.

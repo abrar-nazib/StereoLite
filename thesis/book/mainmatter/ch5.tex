@@ -1,100 +1,144 @@
 % =====================================================================
-% CHAPTER 5: Conclusions and Future Work  (~5 pages)
-% WRITING SESSION INSTRUCTIONS (keep until the chapter is done):
-%   - Read thesis/WRITING_PLAN.md section 7 FIRST.
-%   - Register: contribution list per patterns.md section 3 (3 to 4 "We"
-%     bullets, LAST bullet is the result claim); limitations hedge
-%     HONESTLY (name real limits); at most ONE reserved forward claim
-%     ("we believe ... will be useful as ...").
-%   - Mirror the two Chapter 1 objectives ONE-TO-ONE: objective, what was
-%     done, the number that proves it.
-%   - PO demonstrated: PO12 (life-long learning) in future work.
+% CHAPTER 5: Addressing Complex Engineering Problems and Activities
+% (9-chapter RUET MTE template)
+% Assembled per thesis/RESTRUCTURE_PLAN.md from:
+%   - old appendices/app_d.tex section "Complex Engineering Problem
+%     Attributes" (K3/K4/K5/K8 profile)
+%   - old mainmatter/ch1.tex "Rationale and Significance" CEP paragraph
+% New prose: 5.1 Introduction, the P-attribute table and its prose, the
+% whole of 5.3 (A-attribute mapping), 5.4 Summary. No new numbers.
+% Chapter references follow the 9-chapter layout: design Ch3,
+% implementation Ch7, results Ch8, socio-economic impact Ch4.
 % =====================================================================
-\chapter{Conclusions and Future Work}
+\chapter{Addressing Complex Engineering Problems and Activities}
 
-\section{Summary of Findings and Contributions}
-This thesis set out to build an edge-deployable deep stereo matching
-network under two objectives, and both were met. The first objective, a
-computationally efficient pipeline with AI-based disparity refinement for
-resource-limited platforms, is answered by the trained model: StereoLite
-uses 2.96 million parameters, reaches 0.78 pixel end-point error on the
-SceneFlow test set and 10.9 percent D1-all zero-shot on Middlebury 2014,
-and runs in 49.8 milliseconds in half precision on a laptop RTX 3050 and,
-in its optimized eight-bit form, was measured at 36.3 milliseconds on the
-Jetson Orin Nano, which is 27.5 frames per second and close to the
-real-time target.
-The second objective, tolerance to imperfect rectification, is answered by
-the perturbation study of Section \ref{sec:rectification}: accuracy is
-retained across the sub-pixel to one-pixel vertical misalignment that a
-calibrated rig produces, with the end-point error rising only from 1.03 to
-1.53 pixels, owing to the local correlation lookup in the refinement
-stage.
+\section{Introduction}
+The accreditation framework of the Washington Accord, which the BAETE
+program-outcome system adopts, distinguishes routine engineering work
+from work that addresses a Complex Engineering Problem (CEP) and involves
+Complex Engineering Activities (CEA). A problem is complex when it cannot
+be resolved without in-depth engineering knowledge, characterized by a
+set of P attributes of which the first, depth of knowledge, is
+mandatory; an activity is complex when carrying it out demands the A
+attributes, such as diverse resources, conflicting requirements, and
+innovation. This chapter demonstrates that the present thesis satisfies
+both. Section 5.2 maps the P attributes of the problem to the concrete
+parts of this thesis that exhibit them, and Section 5.3 does the same
+for the A attributes of the activities performed.
 
-The contributions of this thesis are the following.
-\begin{itemize}
-\item We present StereoLite, a 2.96 million parameter stereo network that
-combines a truncated YOLO feature encoder, a left-image recurrent context
-stream, plane-aware coarse-to-fine tile refinement, and a fail-soft
-quarter-resolution geometry encoding volume, designed for the edge budget.
-\item We show that a controlled training pipeline, combining native-crop
-sampling, augmentation, and full-dataset training, closes the cross-domain
-gap of the tile-hypothesis family, reducing the zero-shot Middlebury 2014
-D1-all rate from 40.1 percent on an earlier chassis to 10.9 percent at a
-comparable parameter count.
-\item We provide an equivalence-proven inference-optimization pass that
-reduces latency by a factor of 1.74 with no loss of accuracy, and we
-identify the operators that block eight-bit deployment.
-\item We achieve 0.78 pixel end-point error on the SceneFlow test set with
-real-time inference on a laptop GPU, and we demonstrate zero-shot transfer
-to an unseen benchmark and to a real camera without adaptation.
-\end{itemize}
+\FloatBarrier
+\section{Addressing Complex Engineering Problems}
+Designing the network of this thesis is a complex engineering problem in
+the formal sense: it cannot be solved by natural science or mathematics
+alone. It requires in-depth engineering knowledge of the stereo
+pipeline, specialist knowledge of the deep-stereo literature and its
+building blocks, the design of a novel architecture under hard resource
+constraints, and grounding in a large body of research literature to
+select and combine the right mechanisms. In the terms of the Washington
+Accord knowledge profile, these four demands correspond to profiles K3,
+K4, K5, and K8. Attribute K3, engineering fundamentals, is exercised in
+the stereo pipeline and the cost-volume mechanisms of Chapters 2 and 3.
+Attribute K4, specialist knowledge, is exercised in the selection and
+adaptation of the tile-hypothesis, recurrent, and geometry-volume
+building blocks in Chapter 3. Attribute K5, engineering design, is
+exercised in the design of the StereoLite architecture in Chapter 3 and
+its inference-optimization pass under hard resource constraints in
+Chapter 7. Attribute K8, research-literature grounding, is exercised in
+the literature review of Chapter 2, which grounds every design choice in
+published evidence.
 
-\section{Limitations}
-The present work has several limitations, stated plainly. The results
-come from a single training run, so run-to-run variance is not
-characterized. A gap remains on cross-domain accuracy: at 10.9 percent
-zero-shot D1-all the model is well behind the distillation-trained
-LiteAnyStereo at 6.9 percent and the iterative IGEV-Stereo at 5.0 percent.
-The maximum disparity is capped at 192 pixels at the inference resolution,
-supervision is synthetic only, and the model has not been submitted to the
-KITTI leaderboard. Architecturally, the final recurrent reasoning stops at
-one quarter resolution, which limits the recovery of thin and distant
-structures, and the network carries no explicit left-right consistency or
-occlusion reasoning. The rectification tolerance measured in Chapter 4
-holds only for small vertical offsets and does not extend to large
-de-rectification.
+Table \ref{tab:cep_attributes} maps the P attributes of the Washington
+Accord definition to the parts of this thesis that satisfy them.
+Attribute P1 is the mandatory one and is carried by the K profile just
+described; the remaining rows record where the thesis exhibits the other
+characteristics of a complex problem.
 
-\section{Future Work}
-Several directions follow from these limitations, ordered by expected
-return. The most promising is a three-stage knowledge-distillation
-pipeline in the manner of LiteAnyStereo. In the first stage the model
-trains on synthetic data with dense supervision, exactly as in this
-thesis; in the second it self-distills under input perturbation, with a
-frozen copy of itself supplying feature targets for perturbed inputs; and
-in the third it distills from a frozen foundation teacher on a large set
-of unlabeled real pairs, for which the teacher pipeline already exists in
-the project's tooling. The cross-domain evidence of Chapter 4 points to
-the training pipeline as the largest remaining lever, the per-scene
-analysis shows the failure concentrated in a scene type that real-data
-distillation addresses, and this model's supervised-only recipe leaves
-that lever entirely unused. A second direction concerns deployment.
-On-device latency on the Jetson Orin Nano is now measured at 36.3
-milliseconds, so the remaining engineering is to validate that the
-eight-bit quantization preserves accuracy, since the operators that
-block export were identified in Section 3.12 together with their
-replacements; the graph export and calibration are the work that remains.
-A third direction is to
-complete the zero-shot evaluation quartet with KITTI and ETH3D, so that
-generalization is characterized across driving and mixed domains rather
-than the indoor domain alone; both datasets are already staged in the
-project's evaluation infrastructure. A fourth is a temporal extension
-that propagates the tile-plane state across video frames. The plane
-representation is well suited to this, since a slanted-plane hypothesis
-is exactly the quantity a small ego-motion warps predictably, and a
-temporal version would amortize the initialization cost over a video
-stream. Finally, the reconstruction path of Chapter 4 invites a mapping
-extension, fusing per-frame point clouds into a persistent scene model.
-We believe that a compact tile-hypothesis network trained with the
-distillation pipeline above will be useful as an off-the-shelf edge
-stereo component, and establishing that is the natural next step of this
-work.
+\begin{table}[!htbp]
+\centering
+\caption{\textbf{Complex Engineering Problem attributes and their evidence in this thesis.} P1 is the mandatory attribute; its knowledge profile is K3, K4, K5, and K8.}
+\label{tab:cep_attributes}
+\small
+\begin{tabular}{lp{4.2cm}p{7.2cm}}
+\toprule
+Attribute & Definition & Evidence in this thesis\\
+\midrule
+P1 & Depth of knowledge required & Cannot be solved without in-depth engineering knowledge: K3 stereo fundamentals (Chapters 2, 3), K4 specialist deep-stereo knowledge (Chapter 3), K5 design under hard constraints (Chapters 3, 7), K8 research-literature grounding (Chapter 2).\\
+P2 & Range of conflicting requirements & Accuracy, latency, memory, and parameter count pull against one another; the design criteria of Chapter 3 demand balance across all of them jointly, and the studies of Chapter 8 resolve the conflicts by measurement.\\
+P3 & Depth of analysis required & No obvious correct architecture exists; candidates were analyzed through controlled ablation (Chapter 8) rather than selected by inspection, and several plausible additions were rejected on evidence.\\
+P4 & Familiarity of issues & The problem involves infrequently encountered issues: cross-domain generalization failure and edge-inference optimization, both beyond routine practice (Chapters 7, 8).\\
+P5 & Extent of applicable codes & The work operates outside prescriptive engineering codes; community benchmark protocols and metric definitions (Chapter 3) are the closest standards, and they had to be applied and matched carefully rather than followed mechanically.\\
+P6 & Extent of stakeholder involvement & The design serves stakeholders with differing needs: platform builders needing real-time latency, end users needing privacy and safety, and cost-sensitive deployments (Chapter 4).\\
+P7 & Interdependence & The system is composed of interacting sub-parts, encoder, initialization, recurrent refinement, geometry volume, and upsampling, whose interactions the ablations of Chapter 8 show are not separable.\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The attributes in the table are not asserted abstractly; each points at a
+concrete artifact. The conflicting requirements of P2 are the hard design
+envelope stated in Chapter 3 and verified by the efficiency measurements
+of Chapter 8. The depth of analysis of P3 is the ablation record of
+Chapter 8, in which candidate mechanisms were added one at a time under a
+matched protocol and several were rejected because they degraded
+accuracy. The interdependence of P7 is visible in the same record: the
+value of one block depends on which others are present, which is
+precisely why the design proceeded by controlled composition rather than
+independent selection.
+
+\FloatBarrier
+\section{Addressing Complex Engineering Activities}
+The Washington Accord likewise characterizes complex engineering
+activities by five A attributes. The work performed in this thesis
+exhibits each of them, as follows.
+
+\textbf{A1, range of resources.} The activity drew on a diverse resource
+set: rented cloud GPUs for training and ablation, multiple public stereo
+datasets for training and cross-domain evaluation, a physical calibrated
+stereo camera rig for real-data experiments, an embedded accelerator as
+the deployment target, and the open-source deep-learning tooling on
+which the implementation of Chapter 7 is built. Managing these resources,
+including their cost, is documented in Chapter 6.
+
+\textbf{A2, level of interaction.} The central technical interactions of
+the project are the conflicts among accuracy, latency, and memory: an
+addition that improves one routinely degrades another. These conflicts
+could not be resolved analytically; they were resolved by the controlled
+ablation methodology of Chapter 3, under which every candidate change was
+measured on all metrics jointly and adopted only when the trade-off was
+favorable, as the studies of Chapter 8 record.
+
+\textbf{A3, innovation.} The activity was creative rather than routine.
+The architecture of Chapter 3 is a novel composition of building blocks
+adapted from distinct families of the literature, and it includes the
+fail-soft fusion of the geometry encoding volume, a mechanism designed
+in this work so that the added evidence sharpens the estimate when it is
+reliable and degrades gracefully rather than catastrophically when it is
+not.
+
+\textbf{A4, consequences to society and the environment.} The activity
+has identifiable consequences beyond the laboratory: on-device privacy,
+robot and drone safety, eye-safe passive sensing, accessibility of
+low-cost depth, energy saved by avoiding cloud round trips, and a
+transparent training footprint. These are examined in Chapter 4.
+
+\textbf{A5, familiarity.} The activity extends beyond textbook material
+and prior experience. Its subject matter, compact recurrent stereo
+architectures, cross-domain generalization, and edge-inference
+optimization, exists only in the recent research literature reviewed in
+Chapter 2, and engaging with it required reading, evaluating, and
+adapting published research rather than applying established practice.
+
+\FloatBarrier
+\section{Summary}
+This chapter demonstrated that the thesis addresses a complex
+engineering problem and that the work carried out constitutes complex
+engineering activities in the Washington Accord sense. The problem
+satisfies the mandatory attribute P1 through the knowledge profile K3,
+K4, K5, and K8, and Table \ref{tab:cep_attributes} grounds the remaining
+P attributes in concrete parts of the thesis: the conflicting
+requirements of the edge envelope, the ablation-driven depth of
+analysis, and the interdependence of the architectural blocks. The
+activities exhibit the five A attributes through the diversity of
+resources used, the measured resolution of conflicting requirements, the
+novel block composition with fail-soft fusion, the societal and
+environmental consequences of Chapter 4, and the beyond-textbook
+research grounding of Chapter 2.

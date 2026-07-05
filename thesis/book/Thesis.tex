@@ -64,7 +64,7 @@
 
 \renewcommand{\contentsname}{List of Contents}
 \renewcommand{\bibname}{References}
-\renewcommand{\nomname}{List of Symbols \& Abbreviations}
+\renewcommand{\nomname}{List of Abbreviations}
 
 \newcommand{\nm}[2]{\nomenclature{#1}{#2}}
 
@@ -81,7 +81,9 @@
 
 % ----------------------- roman front matter ---------------------------
 \pagenumbering{roman}
+\addcontentsline{toc}{chapter}{Declaration}
 \include{frontmatter/declaration}
+\addcontentsline{toc}{chapter}{Acknowledgement}
 \include{frontmatter/acknowledgments}
 
 \addcontentsline{toc}{chapter}{Abstract}
@@ -92,7 +94,7 @@
 \listoftables
 
 \mbox{}
-\addcontentsline{toc}{chapter}{List of Symbols \& Abbreviations}
+\addcontentsline{toc}{chapter}{List of Abbreviations}
 \printnomenclature
 \cleardoublepage
 
@@ -108,6 +110,10 @@
 \include{mainmatter/ch3}
 \include{mainmatter/ch4}
 \include{mainmatter/ch5}
+\include{mainmatter/ch6}
+\include{mainmatter/ch7}
+\include{mainmatter/ch8}
+\include{mainmatter/ch9}
 
 \cleardoublepage
 \phantomsection
@@ -123,7 +129,6 @@
   {\centering\bfseries\fontsize{16}{19}\selectfont}
   {Appendix \thechapter}{6pt}{}
 \include{appendices/app_a}
-\include{appendices/app_b}
 \include{appendices/app_c}
 \include{appendices/app_d}
 \include{appendices/app_e}

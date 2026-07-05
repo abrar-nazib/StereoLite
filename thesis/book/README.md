@@ -21,7 +21,7 @@ pdflatex -interaction=nonstopmode Thesis.tex
 
 The three `pdflatex` passes plus the `bibtex` pass resolve the table of
 contents, the figure and table lists, the numeric citations, and all
-cross-references. The output is `Thesis.pdf` (about 77 pages, A4).
+cross-references. The output is `Thesis.pdf` (about 99 pages, A4).
 
 One-liner:
 
@@ -46,9 +46,17 @@ document loads: `txfonts`, `titlesec`, `placeins`, `geometry`, `graphicx`,
 Thesis.tex              master document (geometry, headings, page numbering)
 frontmatter/            title page, certificate, declaration,
                         acknowledgments, abstract, nomenclature
-mainmatter/             ch1.tex .. ch5.tex (Introduction .. Conclusion)
-appendices/             app_a.tex .. app_e.tex (specs, project mgmt,
-                        ethics/AI disclosure, PO/KPA tracker, publications)
+mainmatter/             ch1.tex .. ch9.tex, per the department's 9-chapter
+                        TOC template (thesis-or-project-template_1745300785.pdf):
+                        1 Introduction, 2 Literature Review and Methodology,
+                        3 Design of StereoLite, 4 Socio-Economic Impact and
+                        Sustainability, 5 Complex Engineering Problems and
+                        Activities, 6 Thesis Management and Finance, 7 Design
+                        Methodology and Implementation, 8 Results and
+                        Discussion, 9 Conclusions, Limitations and Future Works
+appendices/             app_a app_c app_d app_e -> Appendix A Technical
+                        Specifications, B Ethics/AI disclosure, C PO/KPA
+                        tracker, D Publications
 Reference.bib           verified BibTeX entries
 figures/                embedded figure PDFs/PNGs
 figures/_src/           Python scripts that GENERATE the figures
