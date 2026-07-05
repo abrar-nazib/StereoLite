@@ -443,6 +443,25 @@ All thesis figures obey ONE style so the book reads as a single artifact:
   `thesis/book/figures/fig_<chapter>_<slug>.{pdf,png}`. Adapted scripts get
   COPIED into `_src/` and modified there; never mutate `presentation/` or
   `review_paper/` scripts for thesis needs.
+- **Architecture diagrams are draw.io files (DECIDED 2026-07-05 after user
+  review).** matplotlib box-drawing was rejected for architecture figures:
+  it produced diagonal arrows, text overflow, and a non-standard look.
+  Architecture figures are emitted as `.drawio` XML by a Python generator
+  (see `_src/make_fig31_drawio.py` as the pattern: node/edge builder class,
+  base64-embedded real thumbnails, orthogonal-only edges). This gives the
+  user hand-editability in draw.io. The visual grammar contract, distilled
+  from IGEV/BANet/CREStereo/DEFOM/FoundationStereo/StereoAnywhere figures:
+  strictly Manhattan (90 degree) routing, encoders as layer-stack bar
+  glyphs with the module name OUTSIDE below, volumes as 3-D cuboids with
+  captions below, 3-D regularization as bar stacks, numbered red stage
+  markers tied to Ch 3 subsections, over-the-top dashed rails instead of
+  diagonals, operator circles with a legend, generous whitespace, drawio
+  default pastel palette. Headless QA loop: emit the viewer URL
+  (deflate+base64 fragment for viewer.diagrams.net), open via a local
+  redirect page in the browser, screenshot, LOOK, fix, repeat (minimum 2
+  rounds). Final export: open the .drawio in draw.io and export cropped
+  PDF for the LaTeX build. matplotlib remains the right tool for DATA
+  charts (curves, bars, Pareto) only.
 - **Caption discipline:** self-contained (dataset, split, metric named every
   time); figure captions = bold noun phrase + one dataflow sentence; table
   captions = bold noun phrase + protocol sentence (patterns.md §7).
