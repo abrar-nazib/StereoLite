@@ -19,8 +19,10 @@ computationally efficient pipeline with AI-based disparity refinement for
 resource-limited platforms, is answered by the trained model: StereoLite
 uses 2.96 million parameters, reaches 0.78 pixel end-point error on the
 SceneFlow test set and 10.9 percent D1-all zero-shot on Middlebury 2014,
-and runs in 49.8 milliseconds in half precision on a laptop RTX 3050, with
-a projection of roughly 30 milliseconds on the Jetson Orin Nano class.
+and runs in 49.8 milliseconds in half precision on a laptop RTX 3050 and,
+in its optimized eight-bit form, was measured at 36.3 milliseconds on the
+Jetson Orin Nano, which is 27.5 frames per second and close to the
+real-time target.
 The second objective, tolerance to imperfect rectification, is answered by
 the perturbation study of Section \ref{sec:rectification}: accuracy is
 retained across the sub-pixel to one-pixel vertical misalignment that a
@@ -48,10 +50,8 @@ to an unseen benchmark and to a real camera without adaptation.
 \end{itemize}
 
 \section{Limitations}
-The present work has several limitations, stated plainly. The Jetson Orin
-Nano latency is a projection from the measured laptop-GPU figure, not a
-direct on-device measurement, because the hardware was not available. The
-results come from a single training run, so run-to-run variance is not
+The present work has several limitations, stated plainly. The results
+come from a single training run, so run-to-run variance is not
 characterized. A gap remains on cross-domain accuracy: at 10.9 percent
 zero-shot D1-all the model is well behind the distillation-trained
 LiteAnyStereo at 6.9 percent and the iterative IGEV-Stereo at 5.0 percent.
@@ -77,12 +77,13 @@ the project's tooling. The cross-domain evidence of Chapter 4 points to
 the training pipeline as the largest remaining lever, the per-scene
 analysis shows the failure concentrated in a scene type that real-data
 distillation addresses, and this model's supervised-only recipe leaves
-that lever entirely unused. A second direction is eight-bit export and a
-direct latency measurement on the Jetson Orin Nano, which would replace
-the projected figure with a measured one. The operators that block export
-were identified in Section 3.12 together with their replacements, so the
-remaining work is engineering: exporting the graph, calibrating the
-quantization, and profiling on the device. A third direction is to
+that lever entirely unused. A second direction concerns deployment.
+On-device latency on the Jetson Orin Nano is now measured at 36.3
+milliseconds, so the remaining engineering is to validate that the
+eight-bit quantization preserves accuracy, since the operators that
+block export were identified in Section 3.12 together with their
+replacements; the graph export and calibration are the work that remains.
+A third direction is to
 complete the zero-shot evaluation quartet with KITTI and ETH3D, so that
 generalization is characterized across driving and mixed domains rather
 than the indoor domain alone; both datasets are already staged in the

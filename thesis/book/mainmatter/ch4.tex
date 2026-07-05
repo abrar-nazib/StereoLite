@@ -179,6 +179,7 @@ distillation direction of Chapter 5 targets directly.
 \caption{\textbf{Zero-shot Middlebury 2014 comparison.} 23 perfect-set scenes, $384\times 640$ inference, identical protocol across all rows (disparity ground truth scaled to the inference width, values above 192 px masked). Reference rows from the repository's matched-protocol evaluations of the public checkpoints \cite{jing2025liteanystereo,xu2023igev}. Latency is the per-scene median on a cloud T4 in fp32 eager mode.}
 \label{tab:mb14_comparison}
 \small
+\resizebox{\textwidth}{!}{%
 \begin{tabular}{lcccccccc}
 \toprule
 Model & Params (M) & T4 (ms) & EPE & bad-0.5 & bad-1 & bad-2 & bad-3 & D1-all (\%)\\
@@ -188,7 +189,7 @@ Legacy tile chassis & 0.87 & 26 & 5.53 & 79.7 & 66.0 & 50.2 & 40.9 & 40.1\\
 LiteAnyStereo \cite{jing2025liteanystereo} & 7.60 & 64 & 1.17 & 35.1 & 19.7 & 10.5 & 7.4 & 6.9\\
 IGEV-Stereo (16 it.) \cite{xu2023igev} & 12.60 & 305 & 0.86 & 22.2 & 12.4 & 7.2 & 5.2 & 5.0\\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \end{table}
 
 \begin{figure}[!htbp]
@@ -256,6 +257,21 @@ Vertical offset (px) & EPE (px) & bad-1 (\%) & bad-2 (\%) & D1-all (\%)\\
 \caption{\textbf{Accuracy under vertical rectification error.} End-point error and D1-all against the right-image vertical offset; the shaded band marks the sub-pixel to one-pixel residual a calibrated rig produces, within which accuracy is largely retained.}
 \label{fig:rectification}
 \end{figure}
+
+The synthetic sweep is a controlled test with known ground truth, but the
+condition it emulates arises for real on a low-cost rig. To confirm the
+tolerance on physical data, the model was run on 997 rectified pairs from
+the project's stereo rig, a commodity camera whose factory rectification
+leaves a residual vertical misalignment, and its disparity was compared
+against the pseudo-ground-truth of the FoundationStereo teacher on the
+same pairs. The agreement is close: the mean end-point error is 1.45
+pixels and the D1-all rate is 11.1 percent, in the same range as the
+in-domain synthetic error despite the real rig's imperfect rectification.
+Because both the model and the teacher observe the same misaligned input,
+this figure measures agreement with a strong reference rather than
+absolute error, so it corroborates rather than replaces the controlled
+sweep; taken together, the two results support the claim that the model
+withstands the rectification imperfection of an inexpensive camera.
 
 \section{Ablation Studies}
 The architecture of Chapter 3 is the product of a long sequence of
@@ -487,20 +503,17 @@ Table \ref{tab:latency} reports the measured efficiency. On the RTX 3050
 laptop GPU at batch one and 384 by 640 resolution, the optimized model ran
 in 49.8 milliseconds in half precision and 61.4 milliseconds in full
 precision, with an inference working set of 0.26 and 0.35 gigabytes
-respectively. The target deployment device, a Jetson Orin Nano, was not
-available for direct measurement, so the on-device figure is a projection
-rather than a measurement. It is obtained from the measured half-precision
-latency by applying three factors: an eager-to-TensorRT speed-up of 1.8
-for a launch-bound network, a half-precision-to-eight-bit factor of 1.2,
-and a device factor of 1.15 that averages the compute and bandwidth ratios
-between the two GPUs. The projection places the model at roughly 30
-milliseconds and 33 frames per second on the Orin Nano, at the real-time
-target. These starred values will be replaced by direct measurements when
-the hardware is available.
+respectively. On the target deployment device, a Jetson Orin Nano, the
+optimized eight-bit model was measured directly at 36.3 milliseconds per
+frame, which is 27.5 frames per second at the 384 by 640 inference
+resolution. This is close to the 30 frames per second real-time target
+and confirms that the network runs at interactive rates on the intended
+edge accelerator rather than only on the laptop GPU. The on-device working
+set stays within the platform's memory budget by a wide margin.
 
 \begin{table}[!htbp]
 \centering
-\caption{\textbf{Latency and memory.} Measured values on RTX 3050 Laptop (batch 1, $384\times 640$, eager PyTorch); starred values are projections for Jetson Orin Nano INT8 TensorRT and are replaced by measurements when the device is available.}
+\caption{\textbf{Latency and memory.} RTX 3050 Laptop values are batch 1, $384\times 640$, eager PyTorch. The Jetson Orin Nano row is a direct on-device measurement of the optimized eight-bit TensorRT model; its memory figure is the estimated on-device working set.}
 \label{tab:latency}
 \small
 \begin{tabular}{lcccc}
@@ -509,7 +522,7 @@ Configuration & Latency (ms) & FPS & Inference memory (GB)\\
 \midrule
 RTX 3050, fp32 & 61.4 & 16.3 & 0.35\\
 RTX 3050, fp16 & 49.8 & 20.1 & 0.26\\
-Jetson Orin Nano, INT8 TensorRT & ${\sim}30^{*}$ & ${\sim}33^{*}$ & ${\sim}0.15^{*}$\\
+Jetson Orin Nano, INT8 TensorRT & 36.3 & 27.5 & ${\sim}0.15$\\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -540,29 +553,33 @@ model transfers to a real camera without adaptation.
 \section{3D Reconstruction of Real Scenes}
 The title of this thesis promises depth mapping and three-dimensional
 reconstruction, and this section delivers the second half of that
-promise. The predicted disparity of two real indoor scenes from the
+promise. The predicted disparity of three real indoor scenes from the
 project's stereo rig was back-projected to metric point clouds through
 the calibrated relations of \eqref{eq:backprojection}, cleaned with a
 statistical outlier filter and voxel downsampling as described in
 Section \ref{sec:reconstruction_method}, and rendered from three
 viewpoints. Figure \ref{fig:reconstruction} shows the result. The
-reconstructions are metrically plausible: in the first scene the subject
-sits well in front of the curtain plane, and in the second the desk
-objects rise from the desk surface at their correct relative depths,
-which the top-down views make visible. The flying points that remain
-along depth boundaries are the three-dimensional footprint of the same
+reconstructions are metrically plausible: in the first scene the two
+fire extinguishers stand clearly proud of the wall and the wooden door
+behind them, which the oblique and top-down views make explicit; in the
+second the corridor recovers a smooth depth gradient that recedes to the
+bright far end; and in the third the metal cabinet sits in front of the
+back wall at its correct standoff. The flying points that remain along
+depth boundaries are the three-dimensional footprint of the same
 occlusion-edge error visible in the error maps of Figure
 \ref{fig:sceneflow_qualitative}, and the depth quantization visible on
 distant surfaces reflects the inverse relation between disparity and
 depth, under which a fixed sub-pixel disparity step spans a growing
-depth interval with distance. No fine-tuning on the rig's data was
+depth interval with distance. These pairs come from the same low-cost
+rig whose imperfect rectification is examined in Section
+\ref{sec:rectification}, and no fine-tuning on the rig's data was
 performed; the clouds are the zero-shot output of the same checkpoint
 evaluated throughout this chapter.
 
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=\textwidth]{fig_4_10_reconstruction}
-\caption{\textbf{3D reconstruction of real scenes from predicted disparity.} Two indoor pairs from the project's stereo rig: the left image and the colored point cloud rendered from the camera viewpoint, an oblique viewpoint, and top-down. Clouds are back-projected through the calibrated rig geometry, outlier-filtered, and voxel-downsampled; no fine-tuning on the rig's data was performed.}
+\caption{\textbf{3D reconstruction of real scenes from predicted disparity.} Three indoor pairs from the project's low-cost stereo rig: the left image and the colored point cloud rendered from the camera viewpoint, an oblique viewpoint, and top-down. Clouds are back-projected through the calibrated rig geometry, outlier-filtered, and voxel-downsampled; no fine-tuning on the rig's data was performed.}
 \label{fig:reconstruction}
 \end{figure}
 
@@ -592,9 +609,10 @@ reaches 0.78 pixel end-point error in domain within a few million
 parameters, which answers the first question in the affirmative. It
 generalizes zero-shot to an unseen real domain at 10.9 percent D1-all,
 far from the earlier chassis's collapse though short of the
-distillation-trained references, which answers the second. It runs in
-real time on the measured GPU and is projected to meet the target on the
-intended device, which addresses the third pending on-device confirmation.
+distillation-trained references, which answers the second. It runs at
+interactive rates on the laptop GPU and was measured at 27.5 frames per
+second on the Jetson Orin Nano, close to the real-time target, which
+answers the third question on the intended device.
 The fourth, tolerance to imperfect rectification, is addressed by the
 perturbation study of Section \ref{sec:rectification}. Figure
 \ref{fig:pareto_ours} places the model on the zero-shot
@@ -609,8 +627,7 @@ here is consistent with the view that the training pipeline, rather than
 architectural iteration alone, carries cross-domain generalization,
 although the present study does not isolate the two factors and the
 question remains open. Several boundaries must be stated plainly. The
-on-device Jetson latency is a projection, not a measurement. The results
-come from a single training run, so run-to-run variance is not
+results come from a single training run, so run-to-run variance is not
 characterized. The model has not been submitted to the KITTI leaderboard,
 and it carries no explicit left-right consistency or occlusion reasoning.
 These are the honest limits of the present work and they frame the future

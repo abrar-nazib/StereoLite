@@ -311,28 +311,32 @@ def fig_3_4_refinement():
 
 
 def fig_3_5_plane_prop():
-    d = D("planeprop", 980, 360)
-    d.box(60, 80, 150, 150, "", fill=GREY_F, stroke=EDGE)
-    d.text(60, 140, 150, 30, "<b>parent tile</b><br>d, s<sub>x</sub>, "
-           "s<sub>y</sub>", fs=10.5)
-    # slope arrows inside parent
-    d.line(100, 200, 170, 180, color="#0072B2", arrow="classic", width=1.2)
-    d.text(150, 196, 40, 16, "s<sub>x</sub>", fs=9, color="#0072B2")
-    d.text(245, 108, 120, 24, "<b>↑2 upsample</b>", fs=11)
-    offs = [("−¼, −¼", 0, 0), ("+¼, −¼", 1, 0), ("−¼, +¼", 0, 1),
+    # squarer layout (equation row below) so text stays legible at print
+    d = D("planeprop", 940, 620)
+    d.box(70, 110, 200, 200, "", fill=GREY_F, stroke=EDGE)
+    d.text(70, 190, 200, 44, "<b>parent tile</b><br>d, s<sub>x</sub>, "
+           "s<sub>y</sub>", fs=17)
+    d.line(120, 275, 215, 240, color="#0072B2", arrow="classic", width=1.8)
+    d.text(200, 262, 48, 24, "s<sub>x</sub>", fs=15, color="#0072B2")
+    d.text(300, 150, 190, 32, "<b>&#8593;2 upsample</b>", fs=17)
+    offs = [("&#8722;¼, &#8722;¼", 0, 0),
+            ("+¼, &#8722;¼", 1, 0),
+            ("&#8722;¼, +¼", 0, 1),
             ("+¼, +¼", 1, 1)]
     for lbl, cx, cy in offs:
-        x, y = 420 + cx * 110, 70 + cy * 110
-        d.box(x, y, 100, 100,
-              f"<font style='font-size:8.5px'>Δ = ({lbl})</font>",
+        x, y = 540 + cx * 140, 95 + cy * 140
+        d.box(x, y, 130, 130,
+              f"<font style='font-size:15px'>&#916; = ({lbl})</font>",
               fill="#eef4fb", stroke=BLUE_S)
-    d.line(215, 155, 410, 155, arrow="classic", width=1.4)
-    d.text(650, 100, 300, 90,
-           "d<sub>child</sub> = 2·bilinear(d)<br>"
-           " + 2 s<sub>x</sub> Δx + 2 s<sub>y</sub> Δy<br><br>"
-           "<font style='font-size:9px'>slopes shift each child off the"
-           " parent plane; factor 2 rescales the disparity unit</font>",
-           fs=11, align="left")
+    d.line(280, 210, 530, 210, arrow="classic", width=2.0)
+    d.text(70, 420, 800, 60,
+           "<font style='font-size:19px'>d<sub>child</sub> = "
+           "2&#183;bilinear(d) + 2 s<sub>x</sub> &#916;x + "
+           "2 s<sub>y</sub> &#916;y</font>", fs=19)
+    d.text(70, 500, 810, 44,
+           "<font style='font-size:15px'>the slopes shift each child off "
+           "the parent plane; the factor 2 rescales the disparity unit to "
+           "the finer grid</font>", fs=15, align="left")
     URLS["fig_3_5_plane_prop"] = d.save(OUT / "fig_3_5_plane_prop.drawio")
 
 
