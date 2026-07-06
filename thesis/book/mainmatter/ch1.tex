@@ -146,44 +146,44 @@ starting point for an edge budget.
 
 \FloatBarrier
 \section{Research Methodology}
-The work follows an evidence-gated design methodology: every
-architectural choice is admitted only after it wins a controlled
-comparison, and every trained model is judged on accuracy, latency, and
-memory jointly rather than on any single metric. Design proceeds by
-single-knob ablation on a fixed harness of one hundred training pairs, so
-that competing variants are compared under identical data, seed, and
-compute; the surviving configuration is then trained on the full dataset
-on cloud GPUs, evaluated in domain, zero-shot on an unseen real
-benchmark, and under controlled rectification perturbation, and finally
+The work follows an evidence-gated design methodology. An architectural
+choice is admitted only after it wins a controlled comparison, and every
+trained model is judged on accuracy, latency, and memory together rather
+than on any single metric. Design proceeds by single-knob ablation on a
+fixed harness of one hundred training pairs, so that competing variants
+are compared under identical data, seed, and compute. The surviving
+configuration is then trained on the full dataset on cloud GPUs and
+evaluated in three ways: in domain, zero-shot on an unseen real
+benchmark, and under controlled rectification perturbation. It is finally
 optimized and measured on the target edge device. The steps, elaborated
 in Chapters 3, 7, and 8, are:
 \begin{enumerate}
-\item study of the stereo matching literature and its efficient and
+\item Study of the stereo matching literature and its efficient and
 edge-deployable families;
-\item definition of the design requirements and the edge deployment
+\item Definition of the design requirements and the edge deployment
 envelope;
-\item architecture design by controlled single-knob ablation on a fixed
+\item Architecture design by controlled single-knob ablation on a fixed
 100-pair harness;
-\item full-dataset training of the selected configuration on cloud GPUs;
-\item evaluation in domain, zero-shot on an unseen real domain, and under
+\item Full-dataset training of the selected configuration on cloud GPUs;
+\item Evaluation in domain, zero-shot on an unseen real domain, and under
 rectification perturbation;
-\item optimization of the network for edge inference and on-device
+\item Optimization of the network for edge inference and on-device
 latency measurement.
 \end{enumerate}
 
 \FloatBarrier
 \section{Project Planning}
-The thesis was executed as a sequence of overlapping phases, from
-literature study through design, training, evaluation, and writing. The
-work plan below records the schedule that was followed.
+The thesis proceeded through a series of overlapping phases, moving from
+literature study into design, training, evaluation, and writing. The work
+plan below records the schedule that the project followed.
 
 \subsection{Work Plan}
 The project ran from December 2025 to July 2026. Paper collection and the
-initial literature review had begun during the fourth-year odd semester
-(the seventh semester), and provided the basis for model selection at
-the start of this schedule. Figure \ref{fig:gantt} shows the subsequent
-overlap among model setup, training, real-data acquisition, ablation,
-benchmarking, evaluation, and thesis writing.
+initial literature review had already begun during the fourth-year odd
+semester (the seventh semester), and this early reading supplied the basis
+for model selection at the start of the schedule. Figure \ref{fig:gantt}
+shows how the later stages overlapped: model setup, training, real-data
+acquisition, ablation, benchmarking, evaluation, and thesis writing.
 
 \begin{figure}[!htbp]
 \centering
@@ -194,31 +194,32 @@ benchmarking, evaluation, and thesis writing.
 
 \FloatBarrier
 \section{Organization of the Report}
-The remainder of this report is organized as follows.
+The rest of this report is arranged as follows.
 \begin{itemize}
-\item \textbf{Chapter 2} reviews the stereo-matching literature from the
-classical pipeline through the deep-learning eras to the efficient and
-foundation-model families, states the requirements of edge-deployable
-stereo, and reviews in detail the mechanisms the adopted methodology
-inherits.
-\item \textbf{Chapter 3} presents the design of StereoLite: the problem
-statements, the design requirements and criteria, the design steps, and
-the detailed block-by-block architecture with its assessment metrics.
-\item \textbf{Chapter 4} examines the socio-economic impact of the work
-and its environmental and sustainability aspects.
+\item \textbf{Chapter 2} surveys the stereo-matching literature, moving
+from the classical pipeline through the deep-learning eras to the
+efficient and foundation-model families. It states what edge-deployable
+stereo requires and gives a detailed account of the mechanisms that the
+adopted methodology builds on.
+\item \textbf{Chapter 3} sets out the design of StereoLite. It covers the
+problem statements, the design requirements and criteria, the design
+steps, and the block-by-block architecture together with its assessment
+metrics.
+\item \textbf{Chapter 4} considers the socio-economic impact of the work
+along with its environmental and sustainability aspects.
 \item \textbf{Chapter 5} maps the thesis onto the complex engineering
 problem and complex engineering activity frameworks.
-\item \textbf{Chapter 6} records the management of the thesis, its time
+\item \textbf{Chapter 6} records how the thesis was managed, its time
 frame, and its overall and component-level budget.
-\item \textbf{Chapter 7} details the design methodology and
-implementation: the training objective and protocol, the selection of
-parameters and components, the edge-inference optimization, the
-experimental setup, and the measurement protocols.
-\item \textbf{Chapter 8} reports and discusses the results: training
-dynamics, ablation studies, in-domain and zero-shot accuracy,
-rectification robustness, efficiency and deployment measurements, and
-three-dimensional reconstruction.
-\item \textbf{Chapter 9} concludes the report, states the limitations,
+\item \textbf{Chapter 7} describes the design methodology and
+implementation. It reports the training objective and protocol, how
+parameters and components were selected, the edge-inference optimization,
+the experimental setup, and the measurement protocols.
+\item \textbf{Chapter 8} presents and discusses the results. These
+include the training dynamics, the ablation studies, the in-domain and
+zero-shot accuracy, the rectification robustness, the efficiency and
+deployment measurements, and the three-dimensional reconstruction.
+\item \textbf{Chapter 9} concludes the report, states its limitations,
 and outlines future work.
 \end{itemize}
 The appendices provide the technical specifications, the ethics and
@@ -227,17 +228,18 @@ list of publications.
 
 \FloatBarrier
 \section{Summary}
-This chapter introduced the problem the thesis addresses: dense, accurate
-stereo depth on hardware that offers only a few tera-operations per
-second, a few gigabytes of memory, and a few watts. It motivated passive
-binocular stereo over active sensing for embedded platforms and located
-the gap between the accuracy of foundation-scale stereo networks and the
-budget of edge accelerators. Two objectives were stated: a
-computationally efficient stereo matching pipeline with AI-based
-disparity refinement for resource-limited platforms, and an architecture
-that withstands camera imperfections in rectification. The research
-methodology was outlined as a pipeline of literature study, controlled
-single-knob ablation, full-dataset cloud training, in-domain and
-zero-shot and robustness evaluation, and on-device measurement. The
-chapter closed with the project work plan and the organization of the
-remaining eight chapters.
+This chapter defined the problem the thesis addresses: dense and accurate
+stereo depth on hardware that provides only a few tera-operations per
+second, a few gigabytes of memory, and a few watts of power. It gave the
+case for passive binocular stereo over active sensing on embedded
+platforms, and it identified the gap between the accuracy of
+foundation-scale stereo networks and the budget of edge accelerators.
+Two objectives were set. The first is a computationally efficient stereo
+matching pipeline with AI-based disparity refinement for
+resource-limited platforms. The second is an architecture that tolerates
+imperfect camera rectification. The research methodology was described as
+a sequence of stages: literature study, controlled single-knob ablation,
+full-dataset cloud training, evaluation across in-domain, zero-shot, and
+robustness settings, and on-device measurement. The chapter ended with
+the project work plan and the organization of the remaining eight
+chapters.
