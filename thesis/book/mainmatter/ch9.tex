@@ -9,90 +9,78 @@
 \chapter{Conclusions, Limitations and Future Works}
 
 \section{Conclusion}
-This thesis set out to build an edge-deployable deep stereo matching
-network under two objectives, and both were met. The first objective, a
-computationally efficient pipeline with AI-based disparity refinement for
-resource-limited platforms, is answered by the trained model: StereoLite
-uses 2.96 million parameters, reaches 0.78 pixel end-point error on the
-SceneFlow test set and 10.9 percent D1-all zero-shot on Middlebury 2014,
-and runs in 49.8 milliseconds in half precision on a laptop RTX 3050 and,
-in its optimized eight-bit form, was measured at 36.3 milliseconds on the
-Jetson Orin Nano, which is 27.5 frames per second and close to the
-real-time target.
-The second objective, tolerance to imperfect rectification, is answered by
-the perturbation study of Section \ref{sec:rectification}: accuracy is
-retained across the sub-pixel to one-pixel vertical misalignment that a
-calibrated rig produces, with the end-point error rising only from 1.03 to
-1.53 pixels, owing to the local correlation lookup in the refinement
-stage.
+This thesis set out to build an edge-deployable deep stereo network
+meeting two objectives. The first, an efficient AI-refined disparity
+pipeline for resource-limited platforms, is met by StereoLite: 2.96
+million parameters, 0.78 pixel end-point error on the SceneFlow test set,
+10.9 percent D1-all zero-shot on Middlebury 2014, and 49.8 milliseconds
+at half precision on a laptop RTX 3050. The optimized eight-bit form
+measured 36.3 milliseconds on the Jetson Orin Nano, 27.5 frames per
+second, near the real-time target. The second, tolerance to imperfect
+rectification, is met by the perturbation study in Section
+\ref{sec:rectification}: accuracy holds across the sub-pixel to
+one-pixel vertical misalignment a calibrated rig produces, with
+end-point error rising only from 1.03 to 1.53 pixels from the local
+correlation lookup in the refinement stage.
 
 The contributions of this thesis are the following.
 \begin{itemize}
-\item We present StereoLite, a 2.96 million parameter stereo network that
-combines a truncated YOLO feature encoder, a left-image recurrent context
-stream, plane-aware coarse-to-fine tile refinement, and a fail-soft
-quarter-resolution geometry encoding volume, designed for the edge budget.
-\item We show that a controlled training pipeline, combining native-crop
-sampling, augmentation, and full-dataset training, closes the cross-domain
-gap of the tile-hypothesis family, reducing the zero-shot Middlebury 2014
-D1-all rate from 40.1 percent on an earlier chassis to 10.9 percent at a
-comparable parameter count.
-\item We provide an equivalence-proven inference-optimization pass that
-reduces latency by a factor of 1.74 with no loss of accuracy, and we
-identify the operators that block eight-bit deployment.
-\item We achieve 0.78 pixel end-point error on the SceneFlow test set with
-real-time inference on a laptop GPU, and we demonstrate zero-shot transfer
-to an unseen benchmark and to a real camera without adaptation.
+\item StereoLite, a 2.96 million parameter edge-budget stereo network,
+combines a truncated YOLO feature encoder, a left-image recurrent
+context stream, plane-aware coarse-to-fine tile refinement, and a
+fail-soft quarter-resolution geometry encoding volume.
+\item A controlled training pipeline combining native-crop sampling,
+augmentation, and full-dataset training gives the compact tile-hypothesis
+model its cross-domain accuracy, reaching 10.9 percent zero-shot
+Middlebury 2014 D1-all, within four points of the larger
+distillation-trained LiteAnyStereo.
+\item An equivalence-proven inference-optimization pass cuts latency by a
+factor of 1.74 with no loss of accuracy and identifies the operators
+that block eight-bit deployment.
+\item The model reaches 0.78 pixel end-point error on the SceneFlow test
+set with real-time inference on a laptop GPU and transfers zero-shot to
+an unseen benchmark and a real camera without adaptation.
 \end{itemize}
 
 \FloatBarrier
 \section{Limitations}
-The present work has several limitations, stated plainly. The results
-come from a single training run, so run-to-run variance is not
-characterized. A gap remains on cross-domain accuracy: at 10.9 percent
-zero-shot D1-all the model is well behind the distillation-trained
-LiteAnyStereo at 6.9 percent and the iterative IGEV-Stereo at 5.0 percent.
-The maximum disparity is capped at 192 pixels at the inference resolution,
-supervision is synthetic only, and the model has not been submitted to the
-KITTI leaderboard. Architecturally, the final recurrent reasoning stops at
-one quarter resolution, which limits the recovery of thin and distant
-structures, and the network carries no explicit left-right consistency or
-occlusion reasoning. The rectification tolerance measured in Chapter 8
-holds only for small vertical offsets and does not extend to large
-de-rectification.
+This work has several limitations. Results come from a single training
+run, so run-to-run variance is not characterized. A gap remains in
+cross-domain accuracy: at 10.9 percent zero-shot D1-all the model trails
+the distillation-trained LiteAnyStereo (6.9 percent) and the iterative
+IGEV-Stereo (5.0 percent). The disparity search spans 192 pixels at the 384 by
+640 inference resolution, matching the evaluation protocol; supervision
+is synthetic only; and the model is not yet on the KITTI leaderboard. Architecturally, recurrent reasoning
+stops at one quarter resolution, limiting recovery of thin and distant
+structures, and the network lacks left-right consistency and occlusion
+reasoning. The rectification tolerance measured in Chapter 8 holds only
+for small vertical offsets, not for large de-rectification.
 
 \FloatBarrier
 \section{Future Works}
 Several directions follow from these limitations, ordered by expected
 return. The most promising is a three-stage knowledge-distillation
-pipeline in the manner of LiteAnyStereo. In the first stage the model
-trains on synthetic data with dense supervision, exactly as in this
-thesis; in the second it self-distills under input perturbation, with a
-frozen copy of itself supplying feature targets for perturbed inputs; and
-in the third it distills from a frozen foundation teacher on a large set
-of unlabeled real pairs, for which the teacher pipeline already exists in
-the project's tooling. The cross-domain evidence of Chapter 8 points to
-the training pipeline as the largest remaining lever, the per-scene
-analysis shows the failure concentrated in a scene type that real-data
-distillation addresses, and this model's supervised-only recipe leaves
-that lever entirely unused. A second direction concerns deployment.
-On-device latency on the Jetson Orin Nano is now measured at 36.3
-milliseconds, so the remaining engineering is to validate that the
-eight-bit quantization preserves accuracy, since the operators that
-block export were identified in Chapter 7 together with their
-replacements; the graph export and calibration are the work that remains.
-A third direction is to
-complete the zero-shot evaluation quartet with KITTI and ETH3D, so that
-generalization is characterized across driving and mixed domains rather
-than the indoor domain alone; both datasets are already staged in the
-project's evaluation infrastructure. A fourth is a temporal extension
-that propagates the tile-plane state across video frames. The plane
-representation is well suited to this, since a slanted-plane hypothesis
-is exactly the quantity a small ego-motion warps predictably, and a
-temporal version would amortize the initialization cost over a video
-stream. Finally, the reconstruction path of Chapter 8 invites a mapping
-extension, fusing per-frame point clouds into a persistent scene model.
-We believe that a compact tile-hypothesis network trained with the
-distillation pipeline above will be useful as an off-the-shelf edge
-stereo component, and establishing that is the natural next step of this
-work.
+pipeline following LiteAnyStereo: synthetic training with dense
+supervision as in this thesis, then self-distillation under input
+perturbation with a frozen copy of the model supplying feature targets,
+then distillation from a frozen foundation teacher on unlabeled real
+pairs, using the teacher pipeline built for this project. Chapter 8's
+cross-domain evidence points to the training pipeline as the largest
+remaining lever: failure concentrates in a scene type real-data
+distillation addresses, and the current supervised-only recipe leaves
+it unused. A second direction is deployment hardening: the eight-bit
+TensorRT engine already runs on the Jetson Orin Nano at 36.3 milliseconds
+(Chapter 8), so the next step is a full accuracy audit of the quantized
+engine against the full-precision model and a port to other edge boards
+in the same class. A third is completing the zero-shot evaluation quartet with
+KITTI and ETH3D to characterize generalization beyond the indoor domain,
+across driving and mixed domains; both datasets are staged in the
+project's evaluation infrastructure. A fourth is a temporal
+extension that propagates tile-plane state across frames, since a
+small ego-motion warps a slanted-plane hypothesis predictably and would
+amortize initialization cost over the video stream. Finally, the
+reconstruction path in Chapter 8 invites a mapping extension that fuses
+per-frame point clouds into a persistent scene model. A compact
+tile-hypothesis network trained with the distillation pipeline above
+would serve as an off-the-shelf edge stereo component, the natural next
+step for this work.

@@ -14,7 +14,6 @@ plt.rcParams.update({"font.family": "DejaVu Serif"})
 
 # (label, params M, D1-all %, marker, color)
 POINTS = [
-    ("Legacy tile chassis", 0.87, 40.1, "o", "#999999"),
     ("StereoLite (ours)", 2.96, 10.86, "*", "#D55E00"),
     ("LiteAnyStereo", 7.60, 6.9, "s", "#0072B2"),
     ("IGEV-Stereo (16 it.)", 12.60, 5.0, "^", "#009E73"),
@@ -32,8 +31,8 @@ def main():
                     xytext=(7, dy - 4), fontsize=7.5,
                     fontweight="bold" if m == "*" else "normal", color=c)
     ax.set_xscale("log")
-    ax.set_xlim(0.55, 40)
-    ax.set_ylim(0, 45)
+    ax.set_xlim(1.8, 22)
+    ax.set_ylim(0, 14)
     ax.set_xlabel("trainable parameters (M, log scale)", fontsize=8.5)
     ax.set_ylabel("zero-shot MB14 D1-all (%)", fontsize=8.5)
     ax.tick_params(labelsize=7.5)
