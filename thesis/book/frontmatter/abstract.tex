@@ -16,24 +16,25 @@ that budget: they rely on foundation-scale backbones of hundreds of
 millions of parameters, which embedded hardware cannot hold or run in
 real time. This thesis presents StereoLite, a stereo matching network of
 2.96 million parameters that combines slanted tile-plane hypotheses with
-recurrent, AI-based disparity refinement. A group-wise correlation volume
-at one sixteenth resolution initializes a tile state, and convolutional
-GRU updates refine that state across three scales using a dedicated
-left-image context encoder. A narrow-band geometry encoding volume adds
+recurrent disparity refinement. A group-wise correlation volume at one
+sixteenth resolution initializes a tile state; a dedicated left-image
+context encoder then feeds convolutional GRU updates that refine the
+state across three scales. A narrow-band geometry encoding volume adds
 long-range corrections through a learned fail-soft gate, and
 plane-equation rendering with learned convex upsampling recovers sharp
-full-resolution disparity. Trained on synthetic SceneFlow data alone, the
-network reaches 0.78 px end-point error and 3.40 percent D1-all on the
-full FlyingThings3D test set of 4,370 pairs. On the unseen Middlebury
-2014 benchmark it scores 10.9 percent D1-all zero-shot, and one forward
-pass at $384 \times 640$ takes 49.8 ms on a laptop RTX 3050 GPU in half
-precision. On the target Jetson Orin Nano, the optimized eight-bit model
-runs in 36.3 ms, or 27.5 frames per second. The network also tolerates
-the imperfect rectification of a low-cost stereo rig: under a controlled
-vertical misalignment sweep, end-point error rises only from 1.03 to
-1.53 px across the sub-pixel to one-pixel range that a calibrated rig
-produces. The predicted disparity back-projects through the calibrated
-rig geometry into metric colored point clouds, shown here on real indoor
-scenes. The training code, the evaluation drivers, and the trained
-checkpoint are archived in the project repository so that every reported
-number can be reproduced.
+full-resolution disparity. The network is trained only on synthetic
+SceneFlow data and reaches 0.78 px end-point error and 3.40 percent
+D1-all on the full FlyingThings3D test set of 4,370 pairs. On the unseen
+Middlebury 2014 benchmark it scores 10.9 percent D1-all zero-shot, and
+one forward pass at $384 \times 640$ takes 49.8 ms on a laptop RTX 3050
+GPU in half precision. On the target Jetson Orin Nano, the optimized
+eight-bit model runs in 36.3 ms, or 27.5 frames per second. The network
+also tolerates the imperfect rectification of a low-cost stereo rig:
+under a controlled vertical misalignment sweep, end-point error rises
+only from 1.03 to 1.53 px across the sub-pixel to one-pixel range that a
+calibrated rig produces. The predicted disparity back-projects through
+the calibrated rig geometry into metric colored point clouds on real
+indoor scenes. The project repository
+(\url{https://github.com/abrar-nazib/StereoLite}) archives the training
+code, the evaluation drivers, and the trained checkpoint so that every
+reported number can be reproduced.

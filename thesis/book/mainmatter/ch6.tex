@@ -14,37 +14,39 @@
 
 \section{Introduction}
 This chapter records the schedule, allocation of resources, and
-expenditure associated with the thesis. The main project period extended
-from December 2025 to July 2026, building on the paper collection and
-literature review undertaken during the fourth-year odd semester (the
-seventh semester).
-Model training and experimental studies used rented cloud GPUs, while a
-stereo camera and a Jetson Orin Nano were obtained for data acquisition
-and deployment testing. Section 6.2 describes the management of the work
-and its seven phases, Section 6.3 presents the overall expenditure, and
-Section 6.4 separates the hardware, cloud-computing, and software costs.
+expenditure associated with the thesis. The paper collection and
+literature review took place during the fourth-year odd semester (the
+seventh semester); the main project period then ran from December 2025
+to July 2026.
+Model training and experimental studies used rented cloud GPUs. The
+project also acquired a stereo camera and a Jetson Orin Nano for data
+acquisition and deployment testing. Section 6.2 describes the management
+of the work and its seven phases, Section 6.3 presents the overall
+expenditure, and Section 6.4 separates the hardware, cloud-computing, and
+software costs.
 
 \FloatBarrier
 \section{Management of the Thesis}
-The work was divided into phases with defined outputs and deliberate
-overlap where activities could proceed in parallel. The earlier literature
-review informed the selection of candidate models; setup and preliminary
-training then established the experimental pipeline. Real-data capture
-continued while the architecture was refined through ablation studies.
-The selected model subsequently passed through benchmarking,
-three-dimensional reconstruction, and final evaluation before the results
-were consolidated in the thesis. This arrangement allowed data
-preparation, experimentation, and writing to advance without weakening
-the dependency between design decisions and experimental evidence.
+The work was divided into phases with defined outputs, and some phases
+deliberately overlapped so that activities could run in parallel. The
+literature review guided the selection of candidate models, and the setup
+and preliminary training that followed established the experimental
+pipeline. Real-data capture continued while the architecture was refined
+through ablation studies. The selected model then went through
+benchmarking, three-dimensional reconstruction, and final evaluation
+before the results were consolidated in the thesis. This overlap let data
+preparation, experimentation, and writing proceed together while design
+decisions still depended on the experimental evidence that supported
+them.
 
 \subsection{Time Frame}
 The main project schedule ran from December 2025 to July 2026. Paper
-collection and literature review had already started in the fourth-year
-odd semester (the seventh semester), before the scheduled
-model-development work began. Table
+collection and literature review began earlier, in the fourth-year odd
+semester (the seventh semester), before the scheduled model-development
+work started. Table
 \ref{tab:timeframe} lists the periods and principal outputs of the seven
-project phases. The corresponding Gantt chart is included in the work
-plan of Chapter 1.
+project phases, and Figure \ref{fig:gantt6} shows the corresponding Gantt
+chart of their overlap.
 
 \begin{table}[!htbp]
 \centering
@@ -66,14 +68,21 @@ Phase & Period & Output\\
 \end{tabular}
 \end{table}
 
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{fig_b_1_gantt_fixed}
+\caption{\textbf{Project Gantt chart.} The seven work phases of Table \ref{tab:timeframe} plotted over December 2025 to July 2026, showing their overlap in time.}
+\label{fig:gantt6}
+\end{figure}
+
 \FloatBarrier
 \section{Overall Budget}
-Table \ref{tab:expenses} records the approximate project expenditure.
-Cloud computation accounted for about one third of the total: the A100
-training workload cost approximately USD 100, and the other GPU instances
-used for ablation and evaluation cost approximately USD 40. The stereo
-camera and Jetson Orin Nano together cost about BDT 35,000, equivalent to
-approximately USD 280 at the conversion used for this project record.
+Table \ref{tab:expenses} lists the approximate project expenditure. Cloud
+computation made up about one third of the total: the A100 training
+workload cost approximately USD 100, and the other GPU instances used for
+ablation and evaluation cost approximately USD 40. The stereo camera and
+Jetson Orin Nano together cost about BDT 35,000, which is approximately
+USD 280 at the conversion rate used in this record.
 
 \begin{table}[!htbp]
 \centering
@@ -96,39 +105,36 @@ Total & 420 & 52,500\\
 
 \FloatBarrier
 \section{Component/Software Budget}
-The budget of Table \ref{tab:expenses} divides into a hardware component
-and a cloud and software component.
+The budget in Table \ref{tab:expenses} splits into hardware, cloud
+computing, and software.
 
-The hardware expenditure comprised the stereo camera and the Jetson Orin
-Nano used for real-data acquisition and on-device testing. Together these
-items cost approximately BDT 35,000 (USD 280). Treating the camera and
-edge computer as development hardware, rather than describing the camera
-alone as the entire deployed system, gives a more faithful account of the
-resources required to validate the proposed pipeline.
+Hardware covered the stereo camera and the Jetson Orin Nano, used for
+real-data acquisition and on-device testing, at a combined cost of about
+BDT 35,000 (USD 280). Both count as development hardware for validating
+the pipeline, not as the deployed system itself.
 
-The cloud-computing expenditure was approximately USD 140. Of this, about
-USD 100 was spent on A100 instances for the principal training workload,
-while approximately USD 40 covered the other GPU instances used for
-ablation studies, intermediate checks, and final evaluation. These are
-usage costs accumulated over the development period, rather than the
-price of a single nominal one-day run. Public on-demand GPU rates vary by
-accelerator, region, and storage allocation, so the recorded expenditure
-is more informative here than a provider's current hourly tariff.
+Cloud computing cost about USD 140 in total: roughly USD 100 on A100
+instances for the main training run, and about USD 40 on other GPU
+instances for ablation studies, intermediate checks, and final
+evaluation. These are usage totals accumulated over the whole development
+period, not the rate for a single day, and they will not match a
+provider's current hourly tariff since prices vary by accelerator,
+region, and storage allocation.
 
-The software environment described in Chapter 7 is based on open-source
-tools and incurred no licence fee. Moreover, cloud resources were needed
-for development rather than for normal operation: inference is performed
-locally on the Jetson device. Consequently, deployment does not introduce
-a recurring per-frame cloud-computing charge, although ordinary hardware
-maintenance and electrical consumption remain.
+The software stack, described in Chapter 7, uses open-source tools and
+cost nothing in licence fees. Cloud use was limited to development;
+inference runs locally on the Jetson device, so deployment adds no
+recurring per-frame cloud charge, only ordinary hardware upkeep and
+power.
 
 \FloatBarrier
 \section{Summary}
 This chapter summarized the management and finances of the thesis. The
-main schedule extended from December 2025 to July 2026, following the
-literature work begun in the preceding semester, and comprised seven
-overlapping phases from model setup to final documentation. Total
-expenditure was approximately USD 420 (BDT 52,500): USD 140 for cloud GPU
-usage and USD 280 for the stereo camera and Jetson Orin Nano. The use of
-open-source software avoided licence fees, and local inference on the
-Jetson device avoids a recurring cloud-inference charge during operation.
+main schedule ran from December 2025 to July 2026, following the
+literature review conducted in the preceding semester, and consisted of
+seven overlapping phases from model setup to final documentation. Total
+expenditure was about USD 420 (BDT 52,500): USD 140 for cloud GPU usage
+and USD 280 for the stereo camera and Jetson Orin Nano. Using
+open-source software meant no licence fees, and because inference runs
+locally on the Jetson device, deployment does not add a recurring cloud
+charge.

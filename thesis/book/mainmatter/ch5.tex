@@ -17,11 +17,11 @@ The accreditation framework of the Washington Accord, which the BAETE
 program-outcome system adopts, distinguishes routine engineering work
 from work that addresses a Complex Engineering Problem (CEP) and involves
 Complex Engineering Activities (CEA). A problem is complex when it cannot
-be resolved without in-depth engineering knowledge, characterized by a
-set of P attributes of which the first, depth of knowledge, is
-mandatory; an activity is complex when carrying it out demands the A
-attributes, such as diverse resources, conflicting requirements, and
-innovation. This chapter demonstrates that the present thesis satisfies
+be resolved without in-depth engineering knowledge. This complexity is
+captured by a set of P attributes, the first of which, depth of
+knowledge, is mandatory. An activity is complex when carrying it out
+demands the A attributes, such as diverse resources, conflicting
+requirements, and innovation. This chapter demonstrates that the present thesis satisfies
 both. Section 5.2 maps the P attributes of the problem to the concrete
 parts of this thesis that exhibit them, and Section 5.3 does the same
 for the A attributes of the activities performed.
@@ -34,8 +34,8 @@ alone. It requires in-depth engineering knowledge of the stereo
 pipeline, specialist knowledge of the deep-stereo literature and its
 building blocks, the design of a novel architecture under hard resource
 constraints, and grounding in a large body of research literature to
-select and combine the right mechanisms. In the terms of the Washington
-Accord knowledge profile, these four demands correspond to profiles K3,
+select and combine the right mechanisms. In Washington Accord
+knowledge-profile terms, these four demands correspond to profiles K3,
 K4, K5, and K8. Attribute K3, engineering fundamentals, is exercised in
 the stereo pipeline and the cost-volume mechanisms of Chapters 2 and 3.
 Attribute K4, specialist knowledge, is exercised in the selection and
@@ -73,58 +73,59 @@ P7 & Interdependence & The system is composed of interacting sub-parts, encoder,
 \end{tabular}
 \end{table}
 
-The attributes in the table are not asserted abstractly; each points at a
+The attributes in the table are not asserted abstractly; each points to a
 concrete artifact. The conflicting requirements of P2 are the hard design
 envelope stated in Chapter 3 and verified by the efficiency measurements
 of Chapter 8. The depth of analysis of P3 is the ablation record of
 Chapter 8, in which candidate mechanisms were added one at a time under a
 matched protocol and several were rejected because they degraded
 accuracy. The interdependence of P7 is visible in the same record: the
-value of one block depends on which others are present, which is
-precisely why the design proceeded by controlled composition rather than
-independent selection.
+value of one block depends on which others are present, which is why
+the design proceeded by controlled composition rather than independent
+selection.
 
 \FloatBarrier
 \section{Addressing Complex Engineering Activities}
 The Washington Accord likewise characterizes complex engineering
-activities by five A attributes. The work performed in this thesis
-exhibits each of them, as follows.
+activities by five A attributes. The work carried out in this thesis
+exhibits each of them.
 
-\textbf{A1, range of resources.} The activity drew on a diverse resource
-set: rented cloud GPUs for training and ablation, multiple public stereo
-datasets for training and cross-domain evaluation, a physical calibrated
-stereo camera rig for real-data experiments, an embedded accelerator as
-the deployment target, and the open-source deep-learning tooling on
-which the implementation of Chapter 7 is built. Managing these resources,
-including their cost, is documented in Chapter 6.
+\textbf{A1, range of resources.} The activity used several distinct
+kinds of resources: rented cloud GPUs for training and ablation,
+multiple public stereo datasets for training and cross-domain
+evaluation, a physical calibrated stereo camera rig for real-data
+experiments, an embedded accelerator as the deployment target, and the
+open-source deep-learning tooling on which the implementation of
+Chapter 7 is built. Chapter 6 documents the management of these
+resources, including their cost.
 
-\textbf{A2, level of interaction.} The central technical interactions of
-the project are the conflicts among accuracy, latency, and memory: an
-addition that improves one routinely degrades another. These conflicts
-could not be resolved analytically; they were resolved by the controlled
-ablation methodology of Chapter 3, under which every candidate change was
-measured on all metrics jointly and adopted only when the trade-off was
-favorable, as the studies of Chapter 8 record.
+\textbf{A2, level of interaction.} The project's central technical
+interactions are the conflicts among accuracy, latency, and memory:
+improving one routinely degrades another. These conflicts could not be
+resolved analytically. They were resolved instead through the
+controlled ablation methodology of Chapter 3, under which every
+candidate change was measured on all metrics jointly and adopted only
+when the trade-off was favorable. Chapter 8 records these studies.
 
 \textbf{A3, innovation.} The activity was creative rather than routine.
 The architecture of Chapter 3 is a novel composition of building blocks
-adapted from distinct families of the literature, and it includes the
+adapted from distinct families of the literature. It also includes the
 fail-soft fusion of the geometry encoding volume, a mechanism designed
-in this work so that the added evidence sharpens the estimate when it is
-reliable and degrades gracefully rather than catastrophically when it is
-not.
+in this work so that the added evidence sharpens the estimate when it
+is reliable and degrades gracefully, rather than catastrophically, when
+it is not.
 
 \textbf{A4, consequences to society and the environment.} The activity
 has identifiable consequences beyond the laboratory: on-device privacy,
 robot and drone safety, eye-safe passive sensing, accessibility of
 low-cost depth, energy saved by avoiding cloud round trips, and a
-transparent training footprint. These are examined in Chapter 4.
+transparent training footprint. Chapter 4 examines these consequences.
 
 \textbf{A5, familiarity.} The activity extends beyond textbook material
-and prior experience. Its subject matter, compact recurrent stereo
+and prior experience. Its subject matter (compact recurrent stereo
 architectures, cross-domain generalization, and edge-inference
-optimization, exists only in the recent research literature reviewed in
-Chapter 2, and engaging with it required reading, evaluating, and
+optimization) exists only in the recent research literature reviewed
+in Chapter 2. Engaging with it required reading, evaluating, and
 adapting published research rather than applying established practice.
 
 \FloatBarrier
@@ -133,11 +134,11 @@ This chapter demonstrated that the thesis addresses a complex
 engineering problem and that the work carried out constitutes complex
 engineering activities in the Washington Accord sense. The problem
 satisfies the mandatory attribute P1 through the knowledge profile K3,
-K4, K5, and K8, and Table \ref{tab:cep_attributes} grounds the remaining
+K4, K5, and K8. Table \ref{tab:cep_attributes} grounds the remaining
 P attributes in concrete parts of the thesis: the conflicting
 requirements of the edge envelope, the ablation-driven depth of
 analysis, and the interdependence of the architectural blocks. The
-activities exhibit the five A attributes through the diversity of
+activities exhibit the five A attributes through the range of
 resources used, the measured resolution of conflicting requirements, the
 novel block composition with fail-soft fusion, the societal and
 environmental consequences of Chapter 4, and the beyond-textbook

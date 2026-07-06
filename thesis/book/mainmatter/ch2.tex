@@ -568,10 +568,12 @@ this choice against two alternatives.
 The three-dimensional cost volume is the dominant cost in most stereo
 networks, and several families compress it. Cascade methods
 \cite{gu2020cascade} build a coarse volume over the full disparity range
-and then progressively narrow the range at finer scales; on PSMNet the
-two-stage cascade cut memory substantially while also improving the
-end-point error from 0.887 to 0.721 pixels, so narrowing the range
-turned out to be cheaper and more accurate at the same time. BGNet
+and then progressively narrow the range at finer scales; on the cascade
+paper's reproduced PSMNet baseline the two-stage cascade cut memory
+substantially while also improving the end-point error from 0.887 to
+0.721 pixels (a reproduced baseline, distinct from the 1.09 pixels PSMNet
+reports in Table \ref{tab:method_comparison}), so narrowing the range
+turned out to be cheaper and more accurate at once. BGNet
 \cite{xu2021bgnet} learns a bilateral grid that upsamples a
 one-eighth-resolution cost volume in an edge-preserving way, with a
 parameter-free slicing step, at 25 milliseconds per frame. DeepPruner
@@ -716,7 +718,8 @@ structure, and it breaks down in textureless, reflective, repetitive, and
 large-disparity regions. The scale of the failure is substantial: GA-Net
 trained on synthetic data and evaluated zero-shot reaches 11.7 percent
 outliers on KITTI 2015 and 32.2 percent on Middlebury, and PSMNet reaches
-16.3 percent on KITTI, several times their fine-tuned rates. Two families
+16.3 percent on KITTI, several times their fine-tuned rates
+\cite{zhang2020dsmnet}. Two families
 of remedy exist. Architecture-level methods make the features themselves
 domain-invariant. DSMNet \cite{zhang2020dsmnet} adds a domain
 normalization that removes image-level and pixel-level statistic shifts
@@ -775,7 +778,7 @@ together.
 
 \begin{table}[!htbp]
 \centering
-\caption{\textbf{Stereo benchmarks and training datasets.} Pair counts are the standard training/test splits; SceneFlow counts follow the canonical finalpass split used in this thesis.}
+\caption{\textbf{Stereo benchmarks and training datasets.} Pair counts are the standard training/test splits; SceneFlow counts follow the canonical finalpass split used in this thesis. For Middlebury 2014 the train column is the 23 perfect-rectification scenes with public ground truth, on which Chapter 8 evaluates zero-shot, and the test column is the 10 scenes with withheld ground truth.}
 \label{tab:datasets}
 \small
 \begin{tabular}{lllllc}
@@ -785,7 +788,7 @@ Dataset & Domain & Train/Test & Resolution & Ground truth & Ref.\\
 SceneFlow & synthetic & 35{,}454 / 4{,}370 & $960{\times}540$ & dense, rendered & \cite{mayer2016sceneflow}\\
 KITTI 2012 & driving & 194 / 195 & $1242{\times}375$ & sparse LiDAR & \cite{geiger2012kitti}\\
 KITTI 2015 & driving & 200 / 200 & $1242{\times}375$ & sparse LiDAR + CAD & \cite{menze2015kitti}\\
-Middlebury 2014 & indoor & 15 / 15 & up to ${\sim}3000{\times}2000$ & structured light & \cite{scharstein2014middlebury}\\
+Middlebury 2014 & indoor & 23 / 10 & up to ${\sim}3000{\times}2000$ & structured light & \cite{scharstein2014middlebury}\\
 ETH3D & mixed & 27 / 20 & ${\sim}940{\times}490$ & laser scan & \cite{schops2017eth3d}\\
 \bottomrule
 \end{tabular}

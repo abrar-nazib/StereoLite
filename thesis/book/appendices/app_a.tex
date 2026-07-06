@@ -34,7 +34,7 @@ Trainable parameters & 2.9631~M\\
 \end{table}
 
 \section{Per-Scene Zero-Shot Results}
-\begin{table}[!htbp]
+\begin{table}[H]
 \centering
 \caption{\textbf{Per-scene zero-shot Middlebury 2014 results.} 23 perfect-set scenes, $384\times 640$ inference protocol of Chapter 8.}
 \label{tab:mb14_perscene_full}
@@ -83,11 +83,15 @@ class of device.
 
 \section{Reproduction Pointers}
 \begin{sloppypar}
-Every reported number can be reproduced from the repository. The production
-model is trained by the driver \texttt{train\_full\_sceneflow\_a100.py},
-the SceneFlow test number by \texttt{eval\_full\_testset.py}, the zero-shot
-Middlebury 2014 result by \texttt{eval\_gev4\_middlebury2014.py}, and the
-rectification-robustness sweep of the second objective by
+The reported synthetic-benchmark numbers can be reproduced from the
+project repository at \url{https://github.com/abrar-nazib/StereoLite}.
+The production model is trained by the driver
+\texttt{train\_full\_sceneflow\_a100.py}, the SceneFlow test number by
+\texttt{eval\_full\_testset.py}, the zero-shot Middlebury 2014 result by
+\texttt{eval\_gev4\_middlebury2014.py}, and the rectification-robustness
+sweep of the second objective by
 \texttt{eval\_rectification\_robustness.py}. Each driver records its
 configuration and metrics to a metadata file alongside the checkpoint.
+The 997-pair real-rig agreement study uses an in-house capture set that
+will be released with a later, expanded version of that dataset.
 \end{sloppypar}

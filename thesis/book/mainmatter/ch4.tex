@@ -18,8 +18,8 @@ discussion is the compact stereo matching network designed in Chapter 3,
 implemented and deployed in Chapter 7, and evaluated in Chapter 8: a
 passive depth sensor built from two commodity image sensors and an
 embedded accelerator, whose entire depth computation runs on the device.
-Each property of that design, on-device processing, passive sensing, and
-a small computational footprint, translates into a concrete societal or
+Each property of that design (on-device processing, passive sensing, and
+a small computational footprint) translates into a concrete societal or
 environmental consequence. Section 4.2 examines the societal, health,
 safety, legal, and cultural dimensions; Section 4.3 examines the
 environmental and sustainability dimensions; Section 4.4 summarizes.
@@ -53,13 +53,12 @@ On-device inference also removes the network round trip from the control
 loop, so the depth estimate a robot acts on does not depend on the
 availability or latency of a wireless link; a platform whose obstacle
 avoidance survives a lost connection is categorically safer than one
-whose perception stalls with the network. Health enters through the
-choice of sensing modality. A passive stereo rig emits no laser and no
-structured infrared light; it only observes. There is therefore no
-emitted radiation to consider for the eyes of bystanders, which is a
-relevant distinction from active depth sensors whose emitters must be
-engineered and certified for eye safety, particularly around children
-and in crowded indoor spaces.
+whose perception stalls with the network. The choice of sensing modality
+also carries health implications. A passive stereo rig emits no laser and
+no structured infrared light; it only observes. Bystanders are therefore
+not exposed to any emitted radiation, a relevant distinction from active
+depth sensors, whose emitters must be engineered and certified for eye
+safety, particularly around children and in crowded indoor spaces.
 
 Finally, the work has an accessibility dimension. A compact, low-cost,
 passive depth sensor lowers the barrier to robotics and assistive
@@ -67,10 +66,10 @@ technology in settings where specialized depth hardware is unaffordable.
 Depth perception built from two commodity image sensors and an embedded
 accelerator puts spatial sensing within reach of student projects,
 small workshops, assistive devices, and products aimed at price-sensitive
-markets, communities that a sensor costing several times as much simply
-excludes. Broadening who can build and afford spatially aware machines
-is a societal outcome in its own right, and it is a direct consequence of
-the design constraints this thesis set out to satisfy.
+markets, communities that a sensor costing several times as much would
+simply exclude. This broadening of who can build and afford spatially
+aware machines is itself a societal outcome, and it follows directly
+from the design constraints this thesis set out to satisfy.
 
 \FloatBarrier
 \section{Impact of the Thesis on the Environment and Sustainability}
@@ -78,39 +77,38 @@ The environmental case for on-device stereo begins with energy. The
 deployed network operates within a power envelope of a few watts to a few
 tens of watts, and computing the depth locally consumes far less energy
 per frame than transmitting the video stream to a datacenter and back.
-A cloud-processed alternative pays, for every single frame, the energy of
-radio transmission, of the network infrastructure along the path, and of
-the datacenter inference itself, and it pays this cost for the entire
-operating life of the device. On-device inference eliminates that
-recurring per-frame transport cost entirely, so the energy advantage
-compounds over the deployed lifetime of every unit.
+A cloud-processed alternative pays the energy of radio transmission, of
+the network infrastructure along the path, and of the datacenter
+inference itself, for every frame, over the entire operating life of the
+device. On-device inference removes that recurring per-frame transport
+cost, so the energy advantage grows over the deployed lifetime of every
+unit.
 
-The choice of passive stereo over active sensing has a material
-dimension as well. A stereo rig uses two commodity image sensors rather
-than a specialized time-of-flight or LiDAR unit, and it emits no laser or
+The choice of passive stereo over active sensing also matters for
+materials. A stereo rig uses two commodity image sensors rather than a
+specialized time-of-flight or LiDAR unit, and it emits no laser or
 structured light. It therefore carries no emitter hardware at all: no
 laser diode, no pattern projector, and none of the associated drive
-electronics. Commodity image sensors are manufactured at enormous scale
-for the phone and webcam markets, so a depth sensor assembled from them
-inherits the low material cost and mature supply chain of that scale,
-rather than demanding the specialized components of an active unit. Fewer
-and more common parts also mean the sensor is easier to source, repair,
-and replace over its service life, which is the unglamorous but real
-substance of sustainable hardware.
+electronics. Commodity image sensors are manufactured at large scale for
+the phone and webcam markets, so a depth sensor assembled from them draws
+on the low material cost and established supply chain of that scale,
+rather than requiring the specialized components of an active unit. Fewer
+and more common parts also make the sensor easier to source, repair, and
+replace over its service life, which are practical measures of hardware
+sustainability.
 
 Sustainability also applies to the development of the model itself, and
-this thesis reports its training footprint transparently. The production
-model was trained in roughly one day on a single cloud GPU, and the
-ablation and evaluation runs each cost a fraction of a dollar of cloud
-time. This footprint is deliberately modest by the standards of modern
-deep learning, where the largest stereo systems are built on
-foundation-scale pretraining whose compute is orders of magnitude
-larger. The methodology that made this possible, the small controlled
-ablation harness of Chapter 3 that filtered design candidates cheaply
-before the single full training run of Chapter 7, is itself a
-sustainability practice: compute was spent once, on a design that had
-already earned it. The full financial record of this footprint appears
-in Chapter 6.
+this thesis reports its training footprint. The production model was
+trained in roughly one day on a single cloud GPU, and the ablation and
+evaluation runs each cost a fraction of a dollar of cloud time. This
+footprint is deliberately modest by the standards of modern deep
+learning, where the largest stereo systems are built on foundation-scale
+pretraining whose compute is orders of magnitude larger. The methodology
+that made this possible, the small controlled ablation harness of
+Chapter 3 that filtered design candidates cheaply before the single full
+training run of Chapter 7, is itself a sustainability practice: compute
+was spent once, on a design already validated by that cheaper process.
+The full financial record of this footprint appears in Chapter 6.
 
 \FloatBarrier
 \section{Summary}
@@ -125,6 +123,5 @@ avoids the recurring energy cost of a cloud round trip, the passive rig
 needs no specialized emitter hardware beyond two commodity image
 sensors, and the model's training footprint, roughly one day on a single
 cloud GPU with ablations costing a fraction of a dollar each, is small
-and reported honestly. These impacts are not add-ons but direct
-consequences of the edge-deployment constraints that shaped the design
-of Chapter 3.
+and is reported in Chapter 6. These impacts follow directly from the
+edge-deployment constraints that shaped the design of Chapter 3.

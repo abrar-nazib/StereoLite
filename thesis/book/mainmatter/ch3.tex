@@ -58,13 +58,16 @@ of accuracy:
     compact enough for on-device memory and storage; parameter count is
     also the first-order proxy for a deployed model's download and
     update footprint.
-  \item \textbf{Real time on a 4 to 6 TOPS accelerator.} The intended
-    device class delivers roughly four to six tera-operations per
-    second, so the network must complete a forward pass within a live
-    camera stream's frame budget on such a device.
-  \item \textbf{Under 200 megabytes of inference working set.} Peak
-    activation memory must stay small enough to coexist with the rest
-    of a robot's software stack on a shared-memory edge board.
+  \item \textbf{Real time on the target edge accelerator.} The
+    deployment target, an NVIDIA Jetson Orin Nano, delivers 20 to 40
+    tera-operations per second of eight-bit throughput
+    \cite{nvidia_orin_nano}, and the network must complete a forward pass
+    within a live camera stream's frame budget on it.
+  \item \textbf{Under 200 megabytes of inference working set at the
+    deployment precision.} Peak activation memory in the eight-bit
+    deployment path must stay small enough to coexist with the rest of a
+    robot's software stack on a shared-memory edge board; a
+    higher-precision development GPU may use more.
   \item \textbf{INT8-exportable operators.} Every operator on the
     inference path must quantize cleanly to eight-bit integer
     arithmetic, since the accelerators in this class reach their rated
