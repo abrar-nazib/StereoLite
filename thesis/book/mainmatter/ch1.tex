@@ -11,37 +11,37 @@
 \chapter{Introduction}
 
 \section{Overview}
-Depth perception is a prerequisite for a machine that must act in
-three-dimensional space: a mobile robot avoids obstacles, a drone holds
-its position, and an augmented-reality headset anchors virtual content
-only if it knows how far away each surface lies. Binocular stereo
-recovers that depth passively from two inexpensive image sensors, but
-the dense correspondence it requires is computationally demanding, and
-the deep networks that now solve it most accurately are far too large
-and too slow for the embedded accelerators these platforms carry. This
-thesis designs, trains, and deploys a compact stereo matching network
-that closes that gap: it delivers dense disparity, and through it metric
+A machine that must act in three-dimensional space first needs to know
+how far away things are. A mobile robot needs it to avoid obstacles, a
+drone needs it to hold position, and an augmented-reality headset needs
+it to anchor virtual content to real surfaces. Binocular stereo recovers
+this depth passively from two inexpensive image sensors, but the dense
+correspondence it requires is computationally demanding, and the deep
+networks that now solve it most accurately are far too large and too slow
+for the embedded accelerators these platforms carry. This thesis designs,
+trains, and deploys a compact stereo matching network that narrows this
+gap. The network produces dense disparity, and from it metric
 three-dimensional reconstruction, within the parameter, latency, and
-memory budget of edge hardware. This chapter states the background and
+memory budget of edge hardware. This chapter presents the background and
 motivation, the objectives, the research methodology, and the plan and
 organization of the work.
 
 \FloatBarrier
 \section{Background and Motivation}
-Depth is not an optional cue but the quantity on which the safety and
-usefulness of spatially acting systems depend. The sensing options
-differ sharply in cost and character. Scanning LiDAR measures time of
-flight along emitted laser beams and delivers accurate but sparse points
-at a price and power draw that exclude small platforms.
+Depth is not an optional cue. It is the quantity on which the safety and
+usefulness of spatially acting systems depend, and the sensing options
+that supply it differ sharply in cost and character. Scanning LiDAR
+measures time of flight along emitted laser beams and returns accurate but
+sparse points, at a price and power draw that exclude small platforms.
 Structured-light and time-of-flight cameras emit infrared patterns or
 pulses and recover dense depth indoors, but their emitters limit range,
 fail in sunlight, and interfere with one another when several devices
 share a space. Among the passive ways to recover depth, binocular stereo
-is attractive for embedded systems because it emits nothing, draws little
-power, works indoors and outdoors alike, and uses two inexpensive image
-sensors rather than a laser scanner. Its cost is computational: the
-correspondence between the two views must be solved for every pixel, and
-that computation is precisely what this thesis makes affordable.
+suits embedded systems because it emits nothing, draws little power, works
+indoors and outdoors alike, and uses two inexpensive image sensors rather
+than a laser scanner. Its cost is computational. The correspondence
+between the two views must be solved for every pixel, and that computation
+is what this thesis sets out to make affordable.
 
 Binocular stereo recovers depth from the horizontal shift of a scene
 point between two horizontally separated views. That shift, the
@@ -85,19 +85,18 @@ Deep networks have transformed the accuracy of stereo matching. The most
 accurate systems now pair a foundation-scale monocular prior with an
 iterative refinement core; FoundationStereo, for example, reports 0.34
 pixel end-point error on the SceneFlow benchmark with a backbone of
-roughly 340 million parameters \cite{wen2025foundationstereo}. However,
-this accuracy is bought with a computational cost that embedded hardware
-cannot pay. The edge accelerators found on mobile robots and drones
-deliver a few tera-operations per second, carry a few gigabytes of memory,
-and operate within a power envelope of a few watts to a few tens of watts.
-A network with hundreds of millions of parameters and hundreds of
-milliseconds of latency does not fit that budget. The problem this thesis
-addresses is therefore not accuracy alone but the joint objective of
-accuracy, latency, and memory: a stereo network that is accurate enough to
-be useful, small enough to fit in on-device memory, and fast enough to run
-in real time on an edge accelerator. Figure \ref{fig:edge_gap} places the
-published literature on this trade-off and marks the region this thesis
-targets.
+roughly 340 million parameters \cite{wen2025foundationstereo}. That
+accuracy comes at a computational cost that embedded hardware cannot pay.
+The edge accelerators found on mobile robots and drones deliver a few
+tera-operations per second, carry a few gigabytes of memory, and operate
+within a power envelope of a few watts to a few tens of watts. A network
+with hundreds of millions of parameters and hundreds of milliseconds of
+latency does not fit that budget. The problem this thesis addresses is
+therefore not accuracy alone but the joint objective of accuracy, latency,
+and memory: a stereo network that is accurate enough to be useful, small
+enough to fit in on-device memory, and fast enough to run in real time on
+an edge accelerator. Figure \ref{fig:edge_gap} places the published
+literature on this trade-off and marks the region this thesis targets.
 
 \begin{figure}[!htbp]
 \centering
@@ -117,31 +116,31 @@ resource-limited platforms.
 in terms of rectification.
 \end{enumerate}
 
-The scope of this thesis is passive rectified binocular stereo, trained by
-supervision on synthetic data with dense ground truth. The design targets
-a compact network of a few million parameters, evaluated both in domain
-and zero-shot on an unseen real domain, with its inference optimized for
-the edge latency envelope and qualified on real camera pairs. The
-recovered disparity is carried through to metric three-dimensional
+This thesis addresses passive rectified binocular stereo, trained under
+supervision on synthetic data with dense ground truth. The network is
+compact, on the order of a few million parameters, and is evaluated both
+in domain and zero-shot on an unseen real domain. Its inference is
+optimized for the edge latency envelope and checked on real camera pairs.
+The recovered disparity is then used for metric three-dimensional
 reconstruction: real scenes captured by the project's stereo rig are
-back-projected into colored point clouds through the calibrated
-geometry, which is the reconstruction the thesis title refers to. Active
-sensing, self-supervised training, monocular depth estimation, and the
-production of a deployment software development kit are outside the scope.
-The evidence for the second objective, tolerance to imperfect
-rectification, is twofold and reported in Chapter 8: a controlled
-perturbation study on synthetic data with known ground truth, and a
-real-data demonstration on a low-cost stereo rig whose factory
-rectification is imperfect, on which the model retains low error.
+back-projected into colored point clouds through the calibrated geometry,
+and this is the reconstruction named in the thesis title. Active sensing,
+self-supervised training, monocular depth estimation, and the production
+of a deployment software development kit fall outside the scope. Evidence
+for the second objective, tolerance to imperfect rectification, is
+twofold and is reported in Chapter 8. The first part is a controlled
+perturbation study on synthetic data with known ground truth. The second
+is a real-data demonstration on a low-cost stereo rig whose factory
+rectification is imperfect, where the model still keeps error low.
 
-A natural question is why this thesis designs a new compact network rather
-than compressing an existing large one. Two reasons motivate the choice.
-First, the accuracy of the foundation-scale systems rests substantially on
-their monocular priors and their scale, neither of which survives
-aggressive compression, so compressing them tends to discard the very
-component that makes them accurate. Second, the tile-hypothesis and
-recurrent-refinement families were designed for efficiency from the
-outset and offer a cleaner starting point for an edge budget.
+One might ask why this thesis designs a new compact network instead of
+compressing an existing large one. There are two reasons. The accuracy of
+foundation-scale systems rests largely on their monocular priors and
+their sheer scale, and neither survives aggressive compression, so
+compressing such systems tends to remove the very component that makes
+them accurate. In addition, the tile-hypothesis and recurrent-refinement
+families were built for efficiency from the start and give a cleaner
+starting point for an edge budget.
 
 \FloatBarrier
 \section{Research Methodology}
