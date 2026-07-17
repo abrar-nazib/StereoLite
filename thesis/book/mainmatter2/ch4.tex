@@ -1,0 +1,423 @@
+% =====================================================================
+% CHAPTER 4: System Development and Implementation (new 9-section
+% department template, thesis-or-project-template_1745300785.pdf).
+% Assembled per thesis/RESTRUCTURE_PLAN_V2.md from old
+% mainmatter/ch7.tex sections 7.3 (Selection of Parameters, Apparatus
+% and Components), 7.4 (Optimization and Configuration Selection), and
+% 7.7 (Principle of Operation), with fresh 4.1 Introduction and
+% Summary prose. See the % SOURCES / DROPPED / MOVED-AWAY block at the
+% end of this file for the full accounting.
+% =====================================================================
+\chapter{System Development and Implementation}
+\label{ch:implementation}
+
+\section{Introduction}
+Chapter \ref{ch:design} fixed the architecture of StereoLite and the
+evidence behind every design choice, from the truncated-backbone
+encoder through the fail-soft geometry gate. This chapter covers how
+that architecture became a trained, optimized, and deployable system.
+We describe the software stack and codebase that trains and evaluates
+the network, the concrete parameter values the design settled on, the
+optimization pass that brought the inference graph inside the edge
+latency budget, the compute and sensing hardware the project used, and
+the principle of operation that turns a rectified image pair into a
+disparity map and, optionally, a metric point cloud.
+
+The chapter is organized around what was built rather than what was
+measured. Software Development covers the training and evaluation
+codebase and the cloud infrastructure behind it. Network Implementation
+gives the exact hyperparameters chosen for the production model.
+Optimization and Configuration Selection describes the six changes that
+cut inference latency and the further changes required for eight-bit
+deployment. Training Objective and Protocol fixes what the network
+minimizes during training and the crop, augmentation, and optimizer
+protocol applied on top of the training corpus. Hardware and Embedded
+Deployment lists the compute and sensing apparatus, including the
+Jetson Orin Nano deployment target and the physical stereo rig.
+Principle of Operation walks through the
+forward pass end to end. Chapter \ref{ch:experimental} then describes
+the experimental setup and measurement protocols built on top of this
+implementation, and Chapter \ref{ch:results} reports the resulting
+numbers; this chapter is concerned only with how the system was built.
+
+\FloatBarrier
+\section{Software Development}
+\label{sec:software_development}
+The network is implemented in PyTorch 2.11 with CUDA 12.8 on Python
+3.10. We organized the codebase around scripted drivers rather than
+notebooks: a separate script trains the production model, separate
+harnesses run the encoder, refinement, and loss ablations under a
+matched protocol, and separate drivers run the SceneFlow held-out
+evaluation and the zero-shot Middlebury 2014 cross-domain evaluation.
+Each driver writes its full configuration and its metrics to a metadata
+file next to its outputs, so a reported number can be traced back to
+the exact run that produced it.
+
+Two cloud platforms carry the compute load. Full-data training and the
+production run described in Section \ref{sec:network_implementation}
+ran on Modal-orchestrated cloud A100 jobs, while ablations and
+cross-domain evaluations ran on cloud T4 instances, which are cheap
+enough to run after every design change without straining the project
+budget. An earlier development pass on the edge-tier chassis used a
+self-contained Kaggle notebook with data-parallel training across two
+T4 GPUs; the production run reported in this thesis moved to the
+single-A100 Modal path once the architecture and loss were fixed, since
+a single larger GPU trains the full SceneFlow corpus faster than two
+smaller ones split across processes. Keeping training, ablation, and
+evaluation as separate scripted drivers, each logging its own metadata,
+is what let every number in Chapter \ref{ch:results} trace back to a
+specific run rather than to a notebook cell that may since have
+changed.
+
+\FloatBarrier
+\section{Network Implementation}
+\label{sec:network_implementation}
+The design chapter argued for each architectural family; this section
+records the exact values the production model uses. The backbone is a
+YOLO26s encoder truncated after its first seven blocks. The recurrent
+hidden state carries 32 channels, and the refinement head that reads it
+carries 48. The tile initialization module builds its correlation
+volume from eight groups over 24 disparity hypotheses at one sixteenth
+resolution, and the per-iteration local correlation looks up a
+half-range of two pixels around the current disparity estimate. The
+refinement schedule runs two iterations at one sixteenth resolution,
+three at one eighth, and three at one quarter, and the geometry
+encoding volume is narrowed to a band of plus or minus 16 disparities
+around the tile estimate rather than spanning the full disparity range.
+Table \ref{tab:arch_config} of Appendix~\ref{app:specs} gives the complete
+configuration record of the trained checkpoint, verbatim, alongside
+these headline values.
+
+Table \ref{tab:train_config} lists the training-side configuration that
+Chapter \ref{ch:design} selected and justified: the optimizer, schedule,
+batch size, input protocol, augmentation set, training data, validation
+protocol, and training hardware. Every value in the table is the result
+of a controlled ablation reported in Chapter \ref{ch:results}, and the
+design-evidence audit of Chapter \ref{ch:design} traces each choice to
+its justification. Section \ref{sec:training_objective} below fixes the
+training objective and the protocol narrative behind this table in
+full.
+
+\begin{table}[H]
+\centering
+\caption{Training configuration of the production run (run 20260704).}
+\label{tab:train_config}
+\small
+\begin{tabular}{ll}
+\toprule
+Element & Value\\
+\midrule
+Optimizer & AdamW, weight decay $10^{-5}$\\
+Schedule & OneCycle, 60{,}000 steps, peak LR $8\times 10^{-4}$\\
+Batch size / precision & 32 / bfloat16 mixed\\
+Input protocol & random native $384\times 640$ co-located crops\\
+Augmentation & asymmetric color jitter, right-only erase, random scale\\
+Training data & full SceneFlow finalpass, 35{,}454 pairs\\
+Validation & fixed 400-pair FlyingThings3D subset, every 1k steps\\
+Hardware & one NVIDIA A100 80 GB (cloud)\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\FloatBarrier
+\section{Optimization and Configuration Selection}
+\label{sec:optimization}
+Reaching the latency target required optimizing the network's
+inference graph, not just training it. We applied six changes: we
+rewrote the cost-volume construction loops to use padded zero-copy
+views instead of allocating and zeroing a feature map for every
+disparity bin; we reduced the grid-sample calls from 48 to eight by
+batching the lookups and caching the sampling grids; we hoisted the
+static channels of the recurrent input, which are re-convolved every
+iteration, to run once per scale, following the precomputed-context
+trick of RAFT-Stereo \cite{lipson2021raftstereo}; we fused the gate
+convolutions and the four output heads, which share inputs; we removed
+dead inference-path code; and we narrowed the geometry volume to a band
+around the tile disparity. We proved each change equivalent before
+adopting it, either bitwise or through a matched A/B comparison, and
+together they cut the full-precision latency by a factor of 1.74.
+
+Figure \ref{fig:export_pipeline} lays the deployment path out: the four
+graph optimizations act on the full-precision model before export,
+while the three operator swaps prepare the graph for eight-bit
+calibration.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{fig_4_5_export_preview}
+\caption{Export pipeline from trained checkpoint to INT8 TensorRT engine.}
+\label{fig:export_pipeline}
+\end{figure}
+
+The same pass also had to clear three operators that block eight-bit
+deployment: the unfold operation in convex upsampling, group
+normalization on some accelerator toolchains, and three-dimensional
+convolution on neural processing units. We swapped each for a
+quantization-friendly equivalent, then exported and calibrated the
+resulting graph to an eight-bit TensorRT engine for the Jetson Orin
+Nano, whose measured on-device latency Chapter \ref{ch:results}
+reports. Table \ref{tab:efficiency_findings} summarizes the six changes
+and their equivalence status.
+
+\begin{table}[!htbp]
+\centering
+\caption{Inference optimizations and equivalence status measured at $384\times 640$ on RTX 3050.}
+\label{tab:efficiency_findings}
+\small
+\begin{tabular}{p{5.6cm}p{4.2cm}l}
+\toprule
+Optimization & Saving & Equivalence\\
+\midrule
+Zero-copy padded views in cost-volume loops & 5 to 15\% latency & bitwise\\
+Batched correlation lookups, cached grids & 3 to 8\% latency & identical math\\
+Static GRU input channels hoisted per scale & 8 to 10\% of MACs & exact\\
+Fused gate convolutions and output heads & 1 to 3\% latency & bitwise\\
+Dead inference-path code removed & memory + launches & exact\\
+Narrow GEV band ($\pm 16$ around tile $d$) & 25 to 30\% of MACs & matched A/B (Ch.~\ref{ch:results})\\
+\midrule
+Combined & fp32 61.4 ms vs 106.7 ms base ($1.74\times$) & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\FloatBarrier
+\section{Training Objective and Protocol}
+\label{sec:training_objective}
+The optimizations above act on a network that already has to be trained
+correctly in the first place. This section fixes what the network
+minimizes during training and the data protocol under which that
+objective is applied, the two pieces of the design methodology that sit
+upstream of the parameter values already listed in Table
+\ref{tab:train_config}.
+
+\subsection{Training Objective}
+The network trains under the multi-scale objective of \eqref{eq:loss}. A
+pixel counts as valid when its ground-truth disparity is finite and lies
+between 0 and 320 pixels. Each lower-scale prediction is resized to full
+resolution and multiplied by its scale factor before comparison. The
+objective weights an L1 term at every scale, heaviest at full
+resolution, adds a matching L1 term on the geometry-volume output, and
+augments the full-resolution prediction with a Sobel
+gradient-consistency term, a threshold hinge stack, a KITTI-style
+D1-relative hinge \cite{menze2015kitti}, an edge-aware smoothness term, and a gated
+slant-supervision term that trains the plane slopes only where they are
+trustworthy. The slant term pairs with plane rendering: it makes the
+slopes accurate enough for the rendering step to sharpen boundaries.
+
+We chose this composition by ablation rather than guesswork. The loss
+study of Chapter \ref{ch:results} tested nine formulations: plain L1
+under-serves the outlier metrics, hinge terms on a single threshold
+overfit that threshold, and the threshold stack combined with the D1
+hinge was the only formulation to win both the end-point error and the
+outlier rates. The production objective descends from that winner,
+keeping the gradient term for its sub-pixel benefit and holding the
+smoothness term to a small weight so it regularizes without blurring.
+
+\begin{equation}
+\begin{aligned}
+\mathcal{L} \;=\;& 1.00\,\mathcal{L}_{1}(d_{\mathrm{full}})
+ + 0.50\,\mathcal{L}_{1}(d_{1/2})
+ + 0.30\,\mathcal{L}_{1}(d_{1/4})
+ + 0.20\,\mathcal{L}_{1}(d_{1/8})
+ + 0.10\,\mathcal{L}_{1}(d_{1/16})\\
+&+ 0.15\,\mathcal{L}_{1}(d_{\mathrm{gev}})
+ + 0.50\,\mathcal{L}_{\mathrm{grad}}
+ + 0.20\,\mathcal{L}_{\mathrm{thr}}
+ + 0.20\,\mathcal{L}_{\mathrm{D1}}
+ + 0.02\,\mathcal{L}_{\mathrm{smooth}}
+ + 0.30\,\mathcal{L}_{\mathrm{slant}}
+\end{aligned}
+\label{eq:loss}
+\end{equation}
+where $\mathcal{L}_1$ is the masked mean absolute disparity error,
+$\mathcal{L}_{\mathrm{grad}}$ a Sobel gradient-consistency term,
+$\mathcal{L}_{\mathrm{thr}}$ a hinge over the error thresholds
+$\{0.5, 1, 2, 3\}$ pixels, $\mathcal{L}_{\mathrm{D1}}$ the D1-relative
+hinge, $\mathcal{L}_{\mathrm{smooth}}$ an edge-aware smoothness term, and
+$\mathcal{L}_{\mathrm{slant}}$ the gated slant supervision.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{fig_3_8_supervision_preview}
+\caption{Six disparity scales supervised with L1, gradient consistency, and threshold terms.}
+\label{fig:supervision}
+\end{figure}
+
+\FloatBarrier
+\subsection{Datasets and Training Protocol}
+Chapter \ref{ch:experimental} describes the SceneFlow finalpass corpus
+itself, its split, and its role as the training and in-domain test set;
+here we fix the protocol applied on top of that corpus. Training samples
+random 384 by 640 windows, co-located in both views, from the native 960
+by 540 frames, which preserves native disparity magnitudes rather than
+shrinking them. Chapter \ref{ch:results} shows this native-crop protocol
+substantially outperforms the legacy protocol of downscaling the whole
+frame before cropping. Three augmentations from the OpenStereo recipe
+apply during training: asymmetric color jitter, right-image-only random
+erasing, and random scaling. Optimization uses AdamW with a OneCycle
+schedule over 60,000 steps at a peak learning rate of $8 \times 10^{-4}$,
+a batch of 32, and bfloat16 mixed precision, on a single A100 GPU. Input
+is normalized to the unit interval at the model boundary. Validation
+uses a fixed 400-pair subset of the test set at the native 960 by 540
+axis, evaluated every thousand steps, with a resized-axis measurement
+logged alongside for comparison against work that reports at the resized
+scale. Table \ref{tab:train_config} lists this configuration in full.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{fig_3_10_input_protocol}
+\caption{Native-crop sampling (left) vs downscale-then-crop (right) training protocols.}
+\label{fig:input_protocol}
+\end{figure}
+
+\FloatBarrier
+\section{Hardware and Embedded Deployment}
+\label{sec:hw_deployment}
+The apparatus divides into compute and sensing. On the compute side,
+training runs on a single cloud A100 GPU with 80 gigabytes of memory.
+Ablations and evaluations run on a cloud T4, chosen for its low cost,
+which keeps a controlled study practical after every design change. The
+local latency benchmark runs on an RTX 3050 laptop GPU with roughly 4
+gigabytes of memory, representing the low end of the deployment memory
+budget. The intended deployment target is the Jetson Orin Nano class of
+edge accelerator (Figure \ref{fig:jetson}), on which we measured the
+optimized eight-bit model directly; Chapter \ref{ch:results} reports the
+on-device result.
+
+On the sensing side, real-camera pairs come from a calibrated low-cost
+binocular rig that streams a 2560 by 720 side-by-side image, split into
+a rectified 1280 by 720 pair per frame. This rig supplies the real-data
+qualification of the trained model: the zero-shot qualitative pairs, the
+real-camera agreement protocol of Section \ref{sec:testing_protocols},
+and the three-dimensional reconstructions of Chapter
+\ref{ch:results}. Housing both the training-side compute and the
+sensing-side rig in the same section keeps the apparatus that produced
+every downstream number in one place, ahead of the experimental
+protocols that Chapter \ref{ch:experimental} builds on top of it.
+
+\FloatBarrier
+\section{Principle of Operation}
+\label{sec:principle_of_operation}
+In deployment the system runs as a fixed feed-forward pipeline. A
+rectified left and right pair enters at the inference resolution of 384
+by 640 pixels, normalized to the unit interval, and passes through the
+blocks fixed in Chapter \ref{ch:design}. The shared encoder processes
+both views in a single batched pass and emits matching features at one
+quarter, one eighth, and one sixteenth resolution, while a separate
+context encoder reads the left image alone and produces the context
+maps that feed the recurrent state.
+
+Matching begins at the coarsest scale. The tile initialization module
+builds the group-wise correlation volume of \eqref{eq:gwc} at one
+sixteenth resolution, regularizes it with a small three-dimensional
+network, and reads off the initial disparity and confidence through the
+soft-argmax of \eqref{eq:softargmax_init}; the plane slopes start at
+zero, and the hidden state starts from the coarsest context map. The
+recurrent refinement then runs its fixed schedule: two iterations at
+one sixteenth, three at one eighth, and three at one quarter resolution.
+At each iteration the right features are warped by the current
+disparity, a local correlation is evaluated over five offsets, and the
+convolutional gated recurrent unit of \eqref{eq:convgru} updates the
+hidden state; gated residuals adjust the disparity, the plane slopes,
+and the confidence. Between scales, the plane-aware propagation of
+\eqref{eq:plane_prop} carries the tile state to the finer grid along its
+local slanted-surface hypothesis rather than by plain interpolation.
+
+At one quarter resolution, the narrow-band geometry encoding volume
+produces its independent proposal per \eqref{eq:gev_expect}, and the
+fail-soft gate of \eqref{eq:failsoft} blends that proposal into the
+recurrent estimate only where the learned weight favors it. This
+corrects regions the tile state resolved poorly, without disturbing the
+ones it resolved well. The refined quarter-resolution state is rendered
+from its tile planes with an edge gate and upsampled to full resolution
+by two learned convex-combination stages, each output subpixel a
+softmax-weighted mixture of its three-by-three coarse neighborhood. The
+result is a dense full-resolution disparity map.
+
+Disparity becomes depth through the calibrated relations of
+\eqref{eq:backprojection}: depth follows $Z = fB/d$, and each valid
+pixel optionally back-projects to a metric three-dimensional point in
+the camera frame, colored by its left-image pixel. On the project's
+rig, the calibrated focal length and baseline scale to the inference
+resolution by the width ratio, so the point cloud is metric without
+further tuning. This single forward pass, from image pair to disparity
+map and optional colored point cloud, is the operation measured
+throughout Chapter \ref{ch:results}.
+
+\FloatBarrier
+\section{Summary}
+This chapter traced the path from the architecture of Chapter
+\ref{ch:design} to a trained, deployable system. The codebase separates
+training, ablation, and evaluation into scripted drivers that each log
+their own configuration and metrics, running on Modal-orchestrated cloud
+A100 and T4 GPUs. The production model fixes a truncated YOLO26s
+backbone, a 32-channel recurrent state, an eight-group correlation
+volume, and a two, three, three iteration schedule, all recorded
+verbatim in Appendix~\ref{app:specs}. A six-change, equivalence-proven optimization
+pass cut inference latency by a factor of 1.74 and cleared the
+operators that block eight-bit deployment, producing a calibrated
+TensorRT engine for the Jetson Orin Nano. Training itself runs under an
+eleven-term multi-scale objective built around a threshold-stack and
+D1-relative hinge, applied to random native-resolution crops of the
+SceneFlow corpus with a three-part augmentation recipe and a
+sixty-thousand-step OneCycle schedule. The compute and sensing
+apparatus spans a cloud A100 for training, a cloud T4 for ablations, an
+RTX 3050 for local latency benchmarking, the Jetson Orin Nano deployment
+target, and a calibrated low-cost stereo rig for real-camera
+qualification. The principle of operation section walked through the
+resulting forward pass, from a rectified image pair to a
+full-resolution disparity map and an optional metric point cloud.
+Chapter \ref{ch:experimental} now describes the experimental setup and
+measurement protocols built on top of this implementation.
+
+% SOURCES: mainmatter/ch7.tex sections 7.2 (Training Objective and
+% Datasets and Training Protocol subsections -> new section "Training
+% Objective and Protocol", added 2026-07-17 patch: eq:loss, fig:supervision,
+% fig:input_protocol carried intact, numbers frozen), 7.3 (Selection of
+% Parameters, Apparatus and Components -> split across Network
+% Implementation and Hardware and Embedded Deployment), 7.4 (Optimization
+% and Configuration Selection, verbatim numbers and table), and 7.7
+% (Principle of Operation, unchanged aside from chapter cross-references).
+% New prose: Introduction, Software Development (expanded from the compute
+% half of the old 7.3 apparatus paragraph plus documented Modal/Kaggle
+% infrastructure facts, no new numbers), the connective prose in Training
+% Objective and Protocol, and Summary. Labels carried unchanged:
+% tab:train_config, tab:efficiency_findings, eq:loss, fig:supervision,
+% fig:input_protocol.
+%
+% PATCH NOTE (2026-07-17): during the parallel restructure, ch3 and ch4
+% each assumed the other owned old 7.2's training-objective block, so it
+% was orphaned and \ref{eq:loss} dangled book-wide. This patch resolves
+% that by giving ch4 ownership, matching ch3's own MOVED-AWAY comment
+% ("old ch7 7.2 subsection Training Objective -> implementation chapter
+% (ch4)") and ch5's forward reference ("Chapter~\ref{ch:implementation}
+% describes the crop, augmentation, and optimization protocol"). Checked
+% ch3.tex and ch5.tex for duplication first: neither defines eq:loss,
+% fig:supervision, or fig:input_protocol, and neither restates the crop/
+% augmentation/optimizer prose in full (ch5 only names the corpus and
+% explicitly defers the protocol here; ch3 only cross-references the
+% ablation results tables by role). The new section therefore introduces
+% no duplicate prose; it references Chapter 5 for the corpus facts
+% (pair counts, resolution) instead of restating them, and reuses the
+% already-present Table \ref{tab:train_config} rather than redefining it.
+%
+% Equation labels referenced but NOT owned here (assumed to live in
+% Chapter 3 per the ownership map, since they originate in old
+% mainmatter/ch3.tex "Design of StereoLite"): eq:gwc,
+% eq:softargmax_init, eq:convgru, eq:plane_prop, eq:gev_expect,
+% eq:failsoft, eq:backprojection. Figure/label referenced but NOT owned
+% here (belongs to Chapter 5 per old section 7.6): fig:jetson,
+% sec:testing_protocols. Cross-chapter labels assumed by convention
+% (confirm at integration): ch:design (Chapter 3), ch:experimental
+% (Chapter 5), ch:results (Chapter 6).
+% DROPPED: nothing substantive. The old 7.3 sentence pointing forward
+% to "the real-camera agreement protocol of Section
+% \ref{sec:testing_protocols}" and "the three-dimensional
+% reconstructions of Chapter 8" is kept as a forward pointer in Section
+% \ref{sec:hw_deployment}, renumbered to the new chapter labels.
+% MOVED-AWAY: old 7.5 "Review and Feedback" belongs to Chapter 3 (design
+% assessment). Old 7.6 "Simulation and Experimental Setup" (fig:setup,
+% fig:jetson) and 7.8 "Testing and Measurement" (sec:testing_protocols)
+% belong to Chapter 5. Old 7.1/7.9 framing sentences were dissolved; any
+% implementation-flavored fragments were folded into the new Introduction
+% and Summary rather than kept as standalone sections.

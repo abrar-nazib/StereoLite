@@ -155,38 +155,59 @@ def fig_2_2_timeline():
 
 
 def fig_2_5_taxonomy():
-    d = D("taxonomy", 1420, 470)
-    root = d.box(560, 20, 300, 52,
+    # Compact 2-column x 4-row tree with a center trunk: canvas is only
+    # 730 px wide, so at \textwidth the fonts print ~11 pt (the old
+    # 7-wide single row printed ~5 pt). Root top-center; the trunk drops
+    # down the center gap (x=365) and branches left/right into each
+    # family box's inner edge. Zero edge/box crossings by construction.
+    d = D("taxonomy", 730, 620)
+    root = d.box(225, 15, 280, 70,
                  "<b>Compression techniques for</b><br>"
-                 "<b>deep stereo matching</b>", fill=GREY_F, fs=12)
+                 "<b>deep stereo matching</b>", fill=GREY_F, fs=17)
+
+    def fam(x, y, title, ex, fill, stroke):
+        return d.box(
+            x, y, 300, 100,
+            f"<b>{title}</b><br>"
+            f"<font style='font-size:15px'>{ex}</font>",
+            fill=fill, stroke=stroke, fs=18)
+
     fams = [
-        ("Backbone\nsubstitution", "MobileStereoNet ·\nGhost/YOLO encoders",
+        ("Backbone substitution", "MobileStereoNet ·<br>Ghost/YOLO encoders",
          BLUE_F, BLUE_S),
-        ("Cost-volume\ncompression", "cascade · BGNet grid ·\nDeepPruner · tiles (HITNet)",
+        ("Cost-volume compression", "cascade · BGNet grid ·<br>DeepPruner · HITNet tiles",
          ORAN_F, ORAN_S),
-        ("Iterative-loop\ncompression", "LightStereo · DTP ·\niteration pruning",
+        ("Iterative-loop compression", "LightStereo · DTP ·<br>iteration pruning",
          GREEN_F, GREEN_S),
-        ("Knowledge\ndistillation", "LiteAnyStereo ·\nDistill-then-Prune",
+        ("Knowledge distillation", "LiteAnyStereo ·<br>Distill-then-Prune",
          LAV_F, LAV_S),
-        ("Architectural\ncompression", "CoEx GCE ·\nCGI-Stereo", RED_F, RED_S),
-        ("Adaptive\ncompute", "AnyNet anytime ·\nMADNet online", YEL_F, YEL_S),
-        ("Neural architecture\nsearch", "LEAStereo ·\nEASNet", GREY_F, GREY_S),
+        ("Architectural compression", "CoEx GCE ·<br>CGI-Stereo",
+         RED_F, RED_S),
+        ("Adaptive compute", "AnyNet anytime ·<br>MADNet online",
+         YEL_F, YEL_S),
+        ("Neural architecture search", "LEAStereo ·<br>EASNet",
+         GREY_F, GREY_S),
     ]
-    n = len(fams)
-    w, gap = 172, 26
-    total = n * w + (n - 1) * gap
-    x = (1420 - total) / 2
-    for title, ex, fill, stroke in fams:
-        t = title.replace("\n", "<br>")
-        e = ex.replace("\n", "<br>")
-        fb = d.box(x, 150, w, 56, f"<b>{t}</b>", fill=fill, stroke=stroke,
-                   fs=10.5)
-        eb = d.box(x + 10, 240, w - 20, 56,
-                   f"<font style='font-size:9px'>{e}</font>", fill="#ffffff",
-                   stroke="#bbbbbb", fs=9)
-        d.edge(root, fb, exit_=(0.5, 1), entry=(0.5, 0))
-        d.edge(fb, eb, exit_=(0.5, 1), entry=(0.5, 0), width=1.0)
-        x += w + gap
+    rows_y = (140, 260, 380, 500)
+    mid = 365
+    for i, (t, e, f, s) in enumerate(fams):
+        col, row = i % 2, i // 2
+        if i == 6:  # 7th box: bottom row, centered under the trunk
+            b = fam(mid - 160, rows_y[3], t, e, f, s)
+            d.edge(root, b, exit_=(0.5, 1), entry=(0.5, 0))
+            continue
+        # branches leave the trunk at staggered heights (left at 35%,
+        # right at 65% of box height) so the two opposing arrow stubs
+        # never fuse into what reads as one double-headed arrow
+        y = rows_y[row]
+        if col == 0:
+            b = fam(20, y, t, e, f, s)
+            d.edge(root, b, exit_=(0.5, 1), entry=(1, 0.35),
+                   points=((mid, y + 35),))
+        else:
+            b = fam(410, y, t, e, f, s)
+            d.edge(root, b, exit_=(0.5, 1), entry=(0, 0.65),
+                   points=((mid, y + 65),))
     URLS["fig_2_5_taxonomy"] = d.save(OUT / "fig_2_5_taxonomy.drawio")
 
 
@@ -233,80 +254,92 @@ def fig_3_2_encoders():
 
 
 def fig_3_3_tile_init():
-    d = D("tileinit", 1200, 360)
-    fl = d.box(30, 60, 130, 44, "f<sub>L16</sub> (256 ch)", fill=BLUE_F,
-               stroke=BLUE_S, fs=10.5)
-    fr = d.box(30, 150, 130, 44, "f<sub>R16</sub> (256 ch)", fill=BLUE_F,
-               stroke=BLUE_S, fs=10.5)
-    cube = d.cube(240, 75, 110, 85,
+    # Serpentine two-row layout (was a 1200 px single row that printed
+    # ~5 pt). Row 1 left-to-right: features -> correlation volume ->
+    # 3-D CNN; row 2 right-to-left: softmax -> d0/c0 -> tile state.
+    # Canvas 730 px wide, fonts print ~12 pt.
+    d = D("tileinit", 730, 540)
+    fl = d.box(30, 55, 170, 52, "f<sub>L16</sub> (256 ch)", fill=BLUE_F,
+               stroke=BLUE_S, fs=14)
+    fr = d.box(30, 145, 170, 52, "f<sub>R16</sub> (256 ch)", fill=BLUE_F,
+               stroke=BLUE_S, fs=14)
+    cube = d.cube(290, 60, 140, 105,
                   "<b>Correlation volume</b><br>8 groups × 24 disparities")
     d.edge(fl, cube, exit_=(1, 0.5), entry=(0, 0.3))
     d.edge(fr, cube, exit_=(1, 0.5), entry=(0, 0.7))
-    bars = d.bars(430, 118, [72, 56, 42], RED_F, RED_S)
-    d.text(390, 172, 150, 34, "<b>3-D CNN</b><br>8-16-16-1", fs=10)
+    bars = d.bars(530, 112, [86, 66, 50], RED_F, RED_S, w=16, gap=10)
+    d.text(470, 176, 180, 36, "<b>3-D CNN</b> 8-16-16-1", fs=13)
     d.edge(cube, bars[0], exit_=(1, 0.5), entry=(0, 0.5))
-    sm = d.box(570, 96, 120, 44, "softmax<br>p(d)", fill=YEL_F,
-               stroke=YEL_S, fs=10.5)
-    d.edge(bars[2], sm, exit_=(1, 0.5), entry=(0, 0.5))
-    da = d.box(760, 50, 190, 40, "d<sub>0</sub> = Σ p(d)·d  (soft-argmax)",
-               fill=GREY_F, fs=10)
-    ca = d.box(760, 145, 190, 40, "c<sub>0</sub> = max p(d)", fill=GREY_F,
-               fs=10)
-    d.edge(sm, da, exit_=(1, 0.3), entry=(0, 0.5))
-    d.edge(sm, ca, exit_=(1, 0.7), entry=(0, 0.5))
-    pill = d.box(1010, 88, 170, 64,
+    # carriage return: 3-D CNN down to the softmax box on row 2
+    sm = d.box(520, 300, 150, 56, "softmax<br>p(d)", fill=YEL_F,
+               stroke=YEL_S, fs=14)
+    d.edge(bars[2], sm, exit_=(0.5, 1), entry=(0.5, 0),
+           points=((595, 250),))
+    da = d.box(250, 285, 210, 52,
+               "d<sub>0</sub> = Σ p(d)·d<br>(soft-argmax)", fill=GREY_F,
+               fs=13)
+    ca = d.box(250, 365, 210, 52, "c<sub>0</sub> = max p(d)", fill=GREY_F,
+               fs=13)
+    d.edge(sm, da, exit_=(0, 0.3), entry=(1, 0.5))
+    d.edge(sm, ca, exit_=(0, 0.7), entry=(1, 0.5))
+    pill = d.box(30, 300, 180, 84,
                  "<b>Tile state</b><br>T = (d<sub>0</sub>, 0, 0, "
-                 "ctx16, c<sub>0</sub>)", fill=GREY_F, fs=10.5)
-    d.edge(da, pill, exit_=(1, 0.5), entry=(0, 0.3))
-    d.edge(ca, pill, exit_=(1, 0.5), entry=(0, 0.7))
-    d.text(240, 250, 400, 30,
+                 "ctx16, c<sub>0</sub>)", fill=GREY_F, fs=14)
+    d.edge(da, pill, exit_=(0, 0.5), entry=(1, 0.3))
+    d.edge(ca, pill, exit_=(0, 0.5), entry=(1, 0.7))
+    d.text(30, 460, 660, 30,
            "24 hypotheses at 1/16 scale cover roughly 0 to 368"
-           " full-resolution pixels", fs=9.5, align="left")
+           " full-resolution pixels", fs=13, align="left")
     URLS["fig_3_3_tile_init"] = d.save(OUT / "fig_3_3_tile_init.drawio")
 
 
 def fig_3_4_refinement():
-    d = D("refine", 1330, 430)
-    st = d.box(20, 150, 120, 66, "<b>state</b><br>(d, s<sub>x</sub>, "
-               "s<sub>y</sub>, h, c)", fill=GREY_F, fs=10)
-    warp = d.box(200, 60, 140, 46, "warp f<sub>R</sub> by d", fill=BLUE_F,
-                 stroke=BLUE_S, fs=10.5)
-    corr = d.box(200, 150, 140, 52, "local correlation<br>±2 (5 offsets)",
-                 fill=ORAN_F, stroke=ORAN_S, fs=10)
-    cat = d.box(410, 96, 170, 92,
+    # Serpentine two-row layout (was a 1330 px single row that printed
+    # ~5 pt). Row 1: state -> warp/correlation -> assemble x; row 2
+    # (right-to-left): ConvGRU -> head/gates -> updated state; dashed
+    # recurrence returns along the left edge. Canvas 760 px wide.
+    d = D("refine", 760, 620)
+    st = d.box(30, 120, 160, 80, "<b>state</b><br>(d, s<sub>x</sub>, "
+               "s<sub>y</sub>, h, c)", fill=GREY_F, fs=14)
+    warp = d.box(280, 55, 180, 52, "warp f<sub>R</sub> by d", fill=BLUE_F,
+                 stroke=BLUE_S, fs=14)
+    corr = d.box(280, 155, 180, 56, "local correlation<br>±2 (5 offsets)",
+                 fill=ORAN_F, stroke=ORAN_S, fs=13)
+    cat = d.box(540, 95, 190, 110,
                 "<b>assemble x</b><br>[f<sub>L</sub>, warp(f<sub>R</sub>), "
-                "d, s<sub>x</sub>, s<sub>y</sub>, c,<br>corr, ctx]",
-                fill=GREY_F, fs=9.5)
-    gru = d.box(650, 96, 160, 92,
+                "d, s<sub>x</sub>, s<sub>y</sub>,<br>c, corr, ctx]",
+                fill=GREY_F, fs=13)
+    gru = d.box(510, 330, 220, 120,
                 "<b>ConvGRU</b><br>z, r = σ(Conv[h,x])<br>"
                 "q = tanh(Conv[r·h, x])<br>h' = (1−z)h + zq",
-                fill=GREEN_F, stroke=GREEN_S, fs=8.5)
-    head = d.box(880, 60, 150, 50, "<b>update head</b><br>2 layers · 48 ch",
-                 fill=GREEN_F, stroke=GREEN_S, fs=10)
-    gate = d.box(880, 150, 150, 56, "<b>4 sigmoid gates</b><br>"
+                fill=GREEN_F, stroke=GREEN_S, fs=13)
+    head = d.box(270, 310, 180, 56, "<b>update head</b><br>2 layers · 48 ch",
+                 fill=GREEN_F, stroke=GREEN_S, fs=13)
+    gate = d.box(270, 400, 180, 60, "<b>4 sigmoid gates</b><br>"
                  "Δd, Δs<sub>x</sub>, Δs<sub>y</sub>, Δc", fill=GREY_F,
-                 fs=10)
-    newst = d.box(1110, 128, 150, 70,
+                 fs=13)
+    newst = d.box(30, 340, 180, 90,
                   "<b>updated state</b><br>d' = softplus(d + g·Δd)",
-                  fill=GREY_F, fs=9.5)
-    d.edge(st, warp, points=[(170, 183), (170, 83)], exit_=(1, 0.5),
-           entry=(0, 0.5))
-    d.edge(st, corr, exit_=(1, 0.5), entry=(0, 0.5))
+                  fill=GREY_F, fs=13)
+    d.edge(st, warp, exit_=(1, 0.3), entry=(0, 0.5),
+           points=((235, 144), (235, 81)))
+    d.edge(st, corr, exit_=(1, 0.7), entry=(0, 0.5))
     d.edge(warp, cat, exit_=(1, 0.5), entry=(0, 0.25))
     d.edge(corr, cat, exit_=(1, 0.5), entry=(0, 0.75))
-    d.edge(cat, gru, exit_=(1, 0.5), entry=(0, 0.5))
-    d.edge(gru, head, exit_=(1, 0.3), entry=(0, 0.5))
-    d.edge(gru, gate, exit_=(1, 0.7), entry=(0, 0.5))
-    d.edge(head, newst, exit_=(1, 0.5), entry=(0, 0.3))
-    d.edge(gate, newst, exit_=(1, 0.5), entry=(0, 0.7))
-    ctx = d.box(650, 290, 160, 40, "context (scale-matched)", fill=LAV_F,
-                stroke=LAV_S, fs=9.5)
+    # carriage return: assemble x down into the ConvGRU
+    d.edge(cat, gru, exit_=(0.5, 1), entry=(0.5, 0), points=((635, 260),))
+    d.edge(gru, head, exit_=(0, 0.3), entry=(1, 0.5))
+    d.edge(gru, gate, exit_=(0, 0.7), entry=(1, 0.5))
+    d.edge(head, newst, exit_=(0, 0.5), entry=(1, 0.3))
+    d.edge(gate, newst, exit_=(0, 0.5), entry=(1, 0.7))
+    ctx = d.box(530, 510, 180, 44, "context (scale-matched)", fill=LAV_F,
+                stroke=LAV_S, fs=13)
     d.edge(ctx, gru, dashed=True, color=LAV_S, exit_=(0.5, 0),
            entry=(0.5, 1))
-    # recurrence
-    d.edge(newst, st, points=[(1185, 380), (80, 380)], dashed=True,
+    # recurrence: updated state back up to state along the left edge
+    d.edge(newst, st, points=[(15, 385), (15, 160)], dashed=True,
            value="repeat ×2 (1/16) · ×3 (1/8) · ×3 (1/4)",
-           exit_=(0.5, 1), entry=(0.5, 1))
+           exit_=(0, 0.5), entry=(0, 0.5))
     URLS["fig_3_4_refinement"] = d.save(OUT / "fig_3_4_refinement.drawio")
 
 

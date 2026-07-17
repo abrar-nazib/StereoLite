@@ -1,0 +1,969 @@
+% =====================================================================
+% CHAPTER 2 (9-chapter template, RESTRUCTURE_PLAN_V2): Literature Review
+%   2.1 Introduction (rewritten roadmap for the new 4-section shape)
+%   2.2 Existing Research        <- old ch2 2.2 Literature Review
+%                                   + old ch2 2.3 Requirements of
+%                                   Edge-Deployable Stereo Matching
+%                                   + old ch2 2.4 Classification of
+%                                   Efficient Stereo Methods, all folded
+%                                   into flat \subsection entries (no
+%                                   sub-subsections)
+%   2.3 Comparative Analysis     <- old ch2 2.5 Cross-Domain
+%                                   Generalization and Benchmarks
+%                                   + the comparison table/figure lifted
+%                                   out of old ch2 2.6, reframed as a
+%                                   direct family-vs-family comparison
+%   2.4 Summary                  <- old ch2 2.7, updated to the new
+%                                   shape, handing off to Chapter 3 via
+%                                   \ref{ch:design}
+% Old ch2 2.6 "Detailed Review of the Adopted Methodology" (the four
+% adopted-mechanism narrative) is EXCLUDED here; it is owned by the ch3
+% agent. All \label names carried over from the old chapter are kept
+% verbatim; equations are byte-identical; every hard-coded "Chapter N"
+% has been replaced with a \ref to the corresponding new chapter label.
+% =====================================================================
+\chapter{Literature Review}
+\label{ch:litreview}
+\label{ch:lit}
+
+\section{Introduction}
+This chapter surveys the literature that shapes the design of this
+thesis. Section~\ref{sec:existing_research} traces deep stereo matching
+chronologically, from the classical four-step pipeline and the first
+learned matching costs through three-dimensional cost-volume networks,
+iterative refinement, and the foundation-model systems that currently
+hold the accuracy ceiling. Because this thesis targets deployment on an
+edge accelerator rather than accuracy alone, that section then states
+the hardware requirements edge deployment imposes and classifies the
+efficient and edge-deployable literature by the technique family each
+uses to meet them. Section~\ref{sec:comparative_analysis} compares these
+families directly: it reviews cross-domain generalization and the
+benchmarks used to measure it, then sets published parameter counts,
+accuracy, and latency figures for the surveyed methods side by side,
+alongside our own model. Section~\ref{sec:ch2_summary} closes the
+chapter and hands off to Chapter~\ref{ch:design}, which designs a
+network informed by this survey.
+
+\FloatBarrier
+\section{Existing Research}
+\label{sec:existing_research}
+
+\subsection{Stereo Matching Fundamentals}
+Stereo matching is the problem of finding, for each pixel in one image of
+a stereo pair, the pixel in the other image that captures the same scene
+point \cite{scharstein2002taxonomy}. This subsection sets out the concepts
+that the rest of the thesis relies on: the epipolar geometry that reduces
+the search to one dimension, rectification, the disparity that encodes
+depth, the matching costs that measure image agreement, the cost volume
+that organizes those costs, the local and global families that solve for
+disparity, and the refinement that cleans the result. These ideas were
+formalized in the classical era \cite{scharstein2002taxonomy} and survive,
+in learned form, in the deep networks reviewed later in this chapter
+\cite{poggi2021synergies, laga2020survey}.
+
+\paragraph{Epipolar geometry.}
+The search for a match is constrained by geometry rather than left open
+over the whole image. Given the relative pose of the two cameras, a point
+seen at position $p$ in the left image must lie, in the right image, on a
+single straight line called the epipolar line, and every epipolar line
+passes through a fixed point called the epipole, the image of the other
+camera's center. Figure \ref{fig:epipolar} illustrates this epipolar
+constraint: it reduces the two-dimensional problem of searching the
+entire right image to a one-dimensional problem of searching along a
+known line.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.70\textwidth]{fig_2_epipolar}
+\caption{Epipolar geometry constraining stereo correspondence search to one dimension (Fei-Fei Li, CS231A).}
+\label{fig:epipolar}
+\end{figure}
+
+\paragraph{Rectification.}
+The epipolar lines of a general camera pair are slanted and vary from
+row to row, which makes them difficult to search directly. Rectification
+addresses this by reprojecting both images onto a common image plane parallel
+to the line joining the two camera centers, as Figure
+\ref{fig:rectify_geom} shows. After this warp every epipolar line
+coincides with an image row, so corresponding points share the same
+vertical coordinate and the match for a left pixel $(x, y)$ is found by
+sliding horizontally:
+\begin{equation}
+x' = x - d, \qquad y' = y
+\label{eq:correspondence}
+\end{equation}
+where $(x', y')$ is the matching pixel in the right image and $d \ge 0$ is
+the disparity. We assume rectified input throughout, so the
+correspondence search always reduces to a horizontal scan, and the
+accuracy of the rectification itself becomes a source of error we examine
+directly in Chapter~\ref{ch:results}.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.52\textwidth]{fig_2_rectification}
+\caption{Stereo rectification reprojecting tilted image planes onto a common plane (Fei-Fei Li, CS231A).}
+\label{fig:rectify_geom}
+\end{figure}
+
+\paragraph{Disparity and depth.}
+The horizontal shift $d$ between a point and its match is the disparity,
+and it fixes the depth of the scene point through the calibrated pinhole
+relation
+\begin{equation}
+Z = \frac{f\,B}{d}
+\label{eq:depth_from_disparity}
+\end{equation}
+where $Z$ is the depth of a scene point, $f$ the camera focal length in
+pixels, $B$ the baseline separating the two cameras, and $d$ the
+disparity, the horizontal shift of the point between the two rectified
+views (Figure \ref{fig:stereo_geometry}). Because the relation is inverse,
+disparity resolution matters most for distant surfaces: a fixed sub-pixel
+error in disparity corresponds to an increasingly large depth interval as
+the scene recedes, and this is why the field reports accuracy in fractions
+of a pixel.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.66\textwidth]{fig_1_1_stereo_geometry_preview}
+\caption{Two-view stereo geometry relating disparity to depth.}
+\label{fig:stereo_geometry}
+\end{figure}
+
+\paragraph{The matching cost.}
+To decide which candidate along the scanline is the true match, a stereo
+method needs a numerical measure of how well two image locations agree,
+called the matching cost. The classical costs trade robustness against
+simplicity \cite{hirschmuller2007evalcosts}. The squared and absolute
+intensity differences are cheap but assume the two cameras record the same
+brightness, so they fail under gain and exposure differences. Normalized
+cross-correlation over a window removes a constant gain and bias and is
+therefore more stable. The census transform \cite{zabih1994census} is the
+most robust of the classical costs: it replaces each pixel by a binary
+string that records only whether each neighbor is brighter or darker than
+the center, and it compares two such strings by their Hamming distance,
+\begin{equation}
+C_{\text{cen}}(p, d) = \mathrm{Ham}\!\big(\mathcal{T}(I_L, p),\ \mathcal{T}(I_R, p - d)\big),
+\qquad
+\mathcal{T}(I, p) = \bigotimes_{q \in N_p} \big[\, I(q) \ge I(p)\,\big]
+\label{eq:census}
+\end{equation}
+where $\mathcal{T}$ is the census string built by concatenating (the
+operator $\bigotimes$) the comparison bit $[\,I(q) \ge I(p)\,]$ over the
+neighborhood $N_p$, $\mathrm{Ham}$ counts the positions at which two
+strings differ, and $[\cdot]$ is the indicator function. Because it keeps
+only the ordering of intensities and discards their magnitudes, the census
+cost is insensitive to illumination changes between the two views, as
+Figure \ref{fig:census} illustrates. This step is exactly what the first
+deep methods replaced with a learned network: MC-CNN
+\cite{zbontar2016mccnn} swapped the hand-crafted cost for a convolutional
+similarity score while leaving the rest of the classical pipeline in
+place, and the feature encoders of every modern network build on this
+same idea.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.82\textwidth]{fig_2_census}
+\caption{The census transform for illumination-robust matching cost computation.}
+\label{fig:census}
+\end{figure}
+
+\paragraph{The disparity space image and cost volume.}
+Evaluating the matching cost for every pixel and every candidate disparity
+produces a three-dimensional structure $C(x, y, d)$ called the disparity
+space image, or cost volume: for each pixel it records how well the two
+views agree at each possible shift, as visualized in Figure
+\ref{fig:costvolume}. Reading the volume along the disparity axis at one
+pixel gives a cost profile whose minimum is the winning disparity; slicing
+it at a fixed disparity shows which regions of the scene sit at that depth.
+This structure is the direct precursor of the learned cost volumes used
+throughout this thesis: modern networks build the same volume from learned
+features instead of raw intensities, but the object being reasoned over is
+still $C(x, y, d)$.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.80\textwidth]{fig_2_costvolume}
+\caption{The disparity space image, or cost volume, for stereo matching.}
+\label{fig:costvolume}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{fig_2_1_classical_preview}
+\caption[The four-step classical stereo matching pipeline.]{The four-step classical stereo matching pipeline \cite{scharstein2002taxonomy}.}
+\label{fig:classical_pipeline}
+\end{figure}
+
+\paragraph{The four-step pipeline.}
+Scharstein and Szeliski \cite{scharstein2002taxonomy} showed that every
+stereo algorithm, classical or deep, decomposes into the same four steps,
+shown in Figure \ref{fig:classical_pipeline}: matching cost computation,
+which fills the cost volume; cost aggregation, which smooths it by pooling
+evidence from neighboring pixels; disparity optimization, which selects a
+disparity at each pixel; and disparity refinement, which post-processes the
+result. The rest of the chapter follows this decomposition, because deep
+learning progressively replaced each of the four steps with a learned
+module while keeping the overall structure intact.
+
+\paragraph{Local and global methods.}
+Classical algorithms split into two families by where they place their
+effort. Local methods concentrate on aggregation: they average the
+matching cost over a support window and then pick, at each pixel
+independently, the disparity of lowest cost. This is fast and simple, but
+it enforces smoothness only implicitly through the window, so it blurs
+depth edges (the window straddles two depths at a boundary) and fails in
+textureless regions where the window contains no distinctive signal.
+Global methods instead concentrate on optimization: they define an energy
+over the whole disparity map that adds a data term, rewarding low matching
+cost, to a smoothness term, penalizing disparity jumps between neighbors,
+and they search for the disparity map of least energy. This yields sharp,
+consistent results because the smoothness prior is explicit and can be made
+discontinuity-preserving, but the joint optimization is far more expensive
+than per-pixel selection. The trade-off between the two families,
+aggregation speed against optimization quality, reappears in the
+efficient deep methods surveyed later in this chapter.
+
+\paragraph{Disparity optimization and semi-global matching.}
+Semi-global matching \cite{hirschmuller2008sgm} became the standard
+classical algorithm by approximating the expensive two-dimensional global
+optimization as a sum of independent one-dimensional dynamic-programming
+problems solved along several path directions, which recovers most of the
+quality of a full global method at a fraction of the cost. It minimizes an energy that
+combines a per-pixel matching cost with two smoothness penalties over
+neighboring pixels,
+\begin{equation}
+E(D) = \sum_{p} C(p, D_p)
+  + \sum_{p} \sum_{q \in N_p} \Big[
+      P_1\, \mathbb{1}\!\left[\,|D_p - D_q| = 1\,\right]
+    + P_2\, \mathbb{1}\!\left[\,|D_p - D_q| > 1\,\right] \Big]
+\label{eq:sgm_energy}
+\end{equation}
+where $D$ is the disparity map, $C(p, D_p)$ the matching cost of assigning
+disparity $D_p$ to pixel $p$, $N_p$ the neighbors of $p$, $P_1$ a small
+penalty for one-pixel disparity changes that preserves slanted surfaces,
+$P_2$ a larger penalty for jumps beyond one pixel that permits true
+discontinuities, and $\mathbb{1}[\cdot]$ the indicator function. Semi-global
+matching links directly to deep stereo: the first learned method kept it
+as an optimization backend, and later networks replaced its fixed
+aggregation with learnable layers.
+
+\paragraph{Disparity refinement.}
+The disparity selected from a discrete cost volume is an integer, and it
+still carries errors in occluded and textureless regions, so a final
+refinement step improves both its precision and its reliability. Sub-pixel
+precision is recovered by fitting a parabola \cite{scharstein2002taxonomy}
+to the three cost values around the winning disparity $d$ and taking the
+location of its minimum,
+\begin{equation}
+d_{\text{sub}} = d - \frac{C(d + 1) - C(d - 1)}{2\,\big[\,C(d + 1) - 2\,C(d) + C(d - 1)\,\big]}
+\label{eq:subpixel}
+\end{equation}
+where $C(d)$ is the aggregated cost at the winning disparity and
+$C(d \pm 1)$ its two neighbors, which yields a fractional disparity without
+enlarging the search range. A left-right consistency check computes the
+disparity from both images and flags as occluded any pixel whose two
+estimates disagree by more than a pixel, and the flagged pixels are then
+filled from nearby reliable values and cleaned by median filtering. Each of
+these operations reappears in learned form in the modern networks reviewed
+below, where refinement is carried out by trained convolutional or
+recurrent modules rather than fixed rules.
+
+\FloatBarrier
+\subsection{The Deep Learning Transition}
+Deep learning entered stereo matching first through the matching-cost
+step. MC-CNN \cite{zbontar2016mccnn} replaced only the cost computation
+with a Siamese convolutional network that scores the similarity of two
+patches, and fed those scores into an otherwise classical pipeline of
+cross-based aggregation, semi-global optimization, and refinement. It
+established a trick that later networks kept: compute each image's
+features once and reuse them across all disparities. The method itself
+was not end-to-end. DispNetC \cite{mayer2016sceneflow} removed the
+classical stages entirely and regressed disparity directly with an
+encoder-decoder network. Its central component was a correlation layer,
+which forms a compact cost volume by correlating the two feature maps
+along the scanline, as in \eqref{eq:correlation}; it ran roughly a
+thousand times faster than MC-CNN at comparable accuracy. The same work
+introduced the SceneFlow synthetic dataset, which remains the standard
+pretraining set for stereo networks. GC-Net \cite{kendall2017gcnet}
+completed the transition to a fully learned cost-volume network. It
+builds a four-dimensional cost volume by concatenating the left and right
+feature vectors at each disparity, regularizes it with a
+three-dimensional convolutional encoder-decoder, and regresses a
+continuous disparity with the differentiable soft-argmin of
+\eqref{eq:softargmin}, an operator still used across cost-volume networks
+today.
+
+The correlation layer forms a scalar matching cost by taking the inner
+product of the two feature maps at each disparity along the scanline,
+\begin{equation}
+c(x, y, d) = \big\langle\, f_L(x, y),\; f_R(x - d,\, y) \,\big\rangle
+           = \sum_{k} f_L^{(k)}(x, y)\, f_R^{(k)}(x - d, y)
+\label{eq:correlation}
+\end{equation}
+where $c(x, y, d)$ is the matching cost for reference pixel $(x, y)$ at
+disparity $d$, $f_L$ and $f_R$ the shared feature maps, and the inner
+product runs over the feature channels $k$; the search covers
+$d \in [0, D_{\max}]$.
+
+The soft-argmin turns the regularized cost volume into a continuous
+disparity by taking a softmax-weighted expectation,
+\begin{equation}
+\hat{d}(x, y) = \sum_{d=0}^{D-1} d \cdot
+  \operatorname{softmax}_d\!\big(-c_d(x, y)\big)
+\label{eq:softargmin}
+\end{equation}
+where $\hat{d}(x, y)$ is the regressed sub-pixel disparity and $c_d(x, y)$
+the aggregated cost at disparity $d$; the negative sign turns low cost
+into high probability. The operator assumes a single-peaked cost
+distribution and returns an intermediate value where that assumption
+fails, such as at a depth discontinuity.
+
+\FloatBarrier
+\subsection{The 3D Cost-Volume Era}
+The years that followed refined the three-dimensional cost-volume
+paradigm. PSMNet \cite{chang2018psmnet}, shown in Figure
+\ref{fig:psmnet}, added spatial pyramid pooling to inject global context
+at the feature level, along with three stacked hourglass modules under
+intermediate supervision, and became the de-facto baseline for the era.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{fig_2_4a_psmnet}
+\caption[PSMNet architecture, representing the three-dimensional cost-volume paradigm.]{PSMNet architecture, representing the three-dimensional cost-volume paradigm \cite{chang2018psmnet}.}
+\label{fig:psmnet}
+\end{figure}
+
+GwcNet \cite{guo2019gwcnet} introduced the group-wise correlation
+volume, which splits the features into channel groups and computes an
+inner-product correlation per group, as in \eqref{eq:gwc_lit}. This form
+sits between the information-poor full correlation and the expensive
+concatenation, and it degrades far more gracefully than concatenation
+under a reduced aggregation budget, which is why nearly every later
+efficient method adopts it, including the tile initialization we use.
+GA-Net \cite{zhang2019ganet} addressed the cost of
+three-dimensional convolution directly: it replaced the convolution with
+a differentiable semi-global aggregation layer that approximates
+recursive aggregation along a few directions and a local guided
+aggregation layer for thin structures, and showed that a network with
+only two such layers can outperform GC-Net with nineteen
+three-dimensional convolutions. Later work pushed efficiency further:
+AANet \cite{xu2020aanet} removed
+three-dimensional convolution entirely in favor of deformable intra-scale
+and cross-scale aggregation, ACVNet \cite{xu2022acvnet} used an
+attention map derived from correlation to filter a concatenation volume,
+and CFNet \cite{shen2021cfnet} shifted the objective toward cross-domain
+generalization through a fused multi-scale volume and an
+uncertainty-driven cascade that adaptively narrows the disparity search.
+
+The group-wise correlation splits the $N_c$ feature channels into $N_g$
+groups and computes a normalized inner-product correlation within each
+group,
+\begin{equation}
+C_{\mathrm{gwc}}(g, d, x, y) = \frac{N_g}{N_c}\,
+  \big\langle\, f_L^{(g)}(x, y),\; f_R^{(g)}(x - d,\, y) \,\big\rangle
+\label{eq:gwc_lit}
+\end{equation}
+where $g$ indexes the group, $d$ the disparity, and $f_L^{(g)}$,
+$f_R^{(g)}$ the channel slice of each feature map belonging to group $g$;
+the resulting volume carries one channel per group. We use this operator
+at a single coarse scale in our tile initialization, as \eqref{eq:gwc}
+makes explicit in Chapter~\ref{ch:design}.
+
+\FloatBarrier
+\subsection{Iterative Refinement}
+RAFT-Stereo \cite{lipson2021raftstereo}, shown in Figure
+\ref{fig:raftstereo}, introduced a different paradigm: it adapted the
+iterative refinement of RAFT optical flow to stereo. It builds an all-pairs
+one-dimensional correlation volume, uses a separate context encoder to
+seed a multi-level convolutional gated recurrent unit, and refines the
+disparity through many lightweight update iterations, each of which looks
+up correlation values around the current estimate. It restores full
+resolution with a learned convex upsampling that predicts a weighted
+combination of a coarse neighborhood.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{fig_2_4b_raftstereo}
+\caption[RAFT-Stereo architecture, representing the iterative refinement paradigm.]{RAFT-Stereo architecture, representing the iterative refinement paradigm \cite{lipson2021raftstereo}.}
+\label{fig:raftstereo}
+\end{figure}
+
+Three of these mechanisms, the group-wise cost lookup, the recurrent
+update, and convex upsampling, reappear in modified form in the model we
+design in Chapter~\ref{ch:design}. IGEV-Stereo
+\cite{xu2023igev} improved the paradigm by building a geometry encoding
+volume, a lightweight three-dimensional-regularized cost volume that both
+provides a warm-start disparity through soft-argmin and is looked up each
+iteration alongside the all-pairs correlation, as in \eqref{eq:gev_lit};
+with this warm start it matches RAFT-Stereo's thirty-two iterations in
+three. The geometry encoding volume is the direct ancestor of the geometry
+branch we use. The warm start matters because an iterative method spends its early
+iterations recovering what a good initialization provides for free; with
+it, IGEV-Stereo at a single iteration already outperforms RAFT-Stereo by
+a wide margin, and the auxiliary loss on the initial estimate forces the
+geometry volume to be a genuine disparity predictor rather than a mere
+feature bank. Two later works refined the recurrent core in directions
+relevant to this thesis. CREStereo \cite{li2022crestereo} introduced a
+cascaded recurrent refinement whose adaptive group correlation layer
+searches a small two-dimensional window rather than assuming a perfectly
+horizontal epipolar line, and its ablation showed local correlation
+outperforming the all-pairs form outright; both findings matter here,
+the first because a two-dimensional local search is precisely what
+confers tolerance to imperfect rectification, the second because it
+justifies replacing the all-pairs volume with a small local lookup in a
+compact model. Selective-Stereo \cite{wang2024selective} added a
+selective recurrent unit that runs two gate branches with different
+kernel sizes and fuses them per pixel through a contextual attention
+map, reaching the quality of many more iterations in a few; when we tried
+the same unit in our ablation campaign it did not transfer to the
+compact tile setting, a result Chapter~\ref{ch:results} reports.
+
+The recurrent update is a convolutional gated recurrent unit
+\cite{lipson2021raftstereo} that updates a hidden state from a
+per-iteration input,
+\begin{equation}
+\begin{aligned}
+z_n &= \sigma(\mathrm{Conv}([h_{n-1}, x_n])), \qquad
+r_n = \sigma(\mathrm{Conv}([h_{n-1}, x_n])),\\
+\tilde{h}_n &= \tanh(\mathrm{Conv}([r_n \odot h_{n-1}, x_n])), \qquad
+h_n = (1 - z_n)\odot h_{n-1} + z_n \odot \tilde{h}_n
+\end{aligned}
+\label{eq:convgru_lit}
+\end{equation}
+where $x_n$ assembles the correlation lookup, the encoded disparity, and
+the context, $h_{n-1}$ is the previous hidden state, $z_n$ and $r_n$ the
+update and reset gates, $\tilde{h}_n$ the candidate state, $\sigma$ the
+sigmoid, and $\odot$ the element-wise product; a small head then predicts
+the disparity residual from $h_n$.
+
+The geometry encoding volume regularizes a group-wise correlation volume
+and combines it with the all-pairs correlation into a lookup structure,
+\begin{equation}
+C_G = R\big(C_{\mathrm{gwc}}(f_{L}, f_{R})\big), \qquad
+d_0 = \sum_{d=0}^{D-1} d \cdot \operatorname{softmax}_d\!\big(C_G(d)\big)
+\label{eq:gev_lit}
+\end{equation}
+where $C_{\mathrm{gwc}}$ is the group-wise correlation of the
+quarter-resolution features, $R$ a lightweight three-dimensional network,
+$C_G$ the regularized geometry volume, and $d_0$ the warm-start disparity;
+each iteration then looks up values from both $C_G$ and the all-pairs
+correlation.
+
+A parallel line replaced the cost volume itself with attention. STTR
+\cite{li2021sttr} treats matching as dense sequence-to-sequence
+correspondence along the epipolar lines, alternating self-attention
+within each image and cross-attention between the views, with an
+optimal-transport assignment that handles occlusion explicitly and
+removes the fixed maximum-disparity assumption altogether. The
+transformer family improved occlusion reasoning and freed the disparity
+range, but its dense attention has remained costly at the resolutions
+and budgets that edge deployment demands, which is why we draw on the
+recurrent family instead.
+
+\FloatBarrier
+\subsection{Foundation-Model Era}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{fig_2_foundation_arch}
+\caption[FoundationStereo architecture, representing the foundation-model-era paradigm.]{FoundationStereo architecture, representing the foundation-model-era paradigm \cite{wen2025foundationstereo}.}
+\label{fig:foundation_arch}
+\end{figure}
+
+The most recent and most accurate systems follow a similar approach: they
+graft a frozen monocular vision foundation model onto an iterative stereo
+core and train on very large data. FoundationStereo
+\cite{wen2025foundationstereo} fuses a frozen DepthAnythingV2 transformer
+with a light convolutional encoder through a side-tuning adapter, adds an
+attentive hybrid cost filter, and trains on a million synthetic pairs,
+reaching 0.34 pixel end-point error on SceneFlow; its architecture is
+shown in Figure \ref{fig:foundation_arch}. DEFOM-Stereo
+\cite{jiang2025defom} adds a monocular depth foundation model to a
+RAFT-Stereo core and splits each iteration into a scale update that
+corrects the monocular prior and a standard refinement. MonSter
+\cite{cheng2025monster} couples an IGEV stereo branch with a monocular
+branch through bidirectional refinement, and Stereo-Anywhere
+\cite{bartolomei2025stereoanywhere} uses a monocular prior to truncate the
+stereo cost volume and suppress the false matches that mirrors and glass
+produce. The prior enters each method differently. DEFOM-Stereo splits
+each recurrent iteration into a scale update, which corrects the
+monocular prior's per-pixel scale through a dedicated lookup over
+candidate scale factors, and a standard residual update; its ablation
+shows the monocular initialization alone hurts and only becomes useful
+with the scale correction. MonSter runs the two branches symmetrically,
+each guiding the other after a global scale and shift alignment, and its
+ablation shows four iterations with the prior matching what the plain
+stereo core needs thirty-two iterations to reach. The accuracy gain
+therefore comes from two sources: the prior's knowledge of monocular
+structure and the iterations it saves. These systems set the accuracy
+ceiling, but they do so with hundreds of millions of parameters and
+hundreds of milliseconds of latency, a cost that motivates the edge
+problem we address rather than solving it. Figure
+\ref{fig:timeline} traces this progression across the six paradigm eras
+and marks where the present work sits.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{fig_2_2_timeline_preview}
+\caption{Evolution of deep stereo matching, 2016 to 2026.}
+\label{fig:timeline}
+\end{figure}
+
+\FloatBarrier
+\subsection{Requirements of Edge-Deployable Stereo Matching}
+\label{sec:edge_requirements}
+Deployment on an edge accelerator cannot be solved by choosing the most
+accurate published network: models at the accuracy ceiling carry
+hundreds of millions of parameters and hundreds of milliseconds of
+latency, and mid-size iterative networks run their update loop tens of
+times per frame on desktop graphics hardware. Edge accelerators on
+mobile robots and drones, exemplified by the Jetson Orin Nano class of
+device, impose four requirements that bound every design choice we make
+in this thesis.
+
+First, the network must be compact enough for on-device memory:
+accelerators share memory with the robot's other software, so the
+parameter budget must stay within a few million parameters, the region
+occupied by the efficient family surveyed next. Second, the
+network must run in real time on a device of roughly four to six
+tera-operations per second; a perception stage that cannot keep up
+with the camera forces the robot to act on stale depth, so latency is
+a hard requirement that rules out many-iteration update loops and
+dense attention. Third, the network must keep a small inference
+working set. Peak activation memory, dominated by the cost volume in
+most stereo networks, must fit alongside the model weights and the
+application; this is why cost-volume compression forms its own
+technique family below. Fourth, the network must use operators that
+quantize cleanly to eight-bit integers, since accelerators reach rated
+throughput only under integer quantization; operators that resist
+quantization, such as trilinear interpolation in three-dimensional
+volumes, forfeit that throughput regardless of parameter count.
+Chapter~\ref{ch:design} restates these as formal problem and design
+statements that frame the classification below.
+
+\FloatBarrier
+\subsection{Classification of Efficient Stereo Methods}
+\label{sec:classification}
+The efficient and edge-deployable methods are the closest relatives of the
+model proposed in this thesis, and they are best understood by the
+technique family each uses to reduce cost. Figure \ref{fig:taxonomy}
+organizes these families, and the subsections below treat each in turn.
+
+Figure \ref{fig:reqmap} makes the connection explicit: each deployment
+requirement is answered primarily by one or two of the technique
+families, and a family that answers no requirement of the target
+platform can be skipped without loss.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.95\textwidth]{fig_2_7_reqmap_preview}
+\caption{Edge-deployment requirements mapped to compression technique families.}
+\label{fig:reqmap}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{fig_2_5_taxonomy_preview}
+\caption{Taxonomy of compression techniques for deep stereo matching.}
+\label{fig:taxonomy}
+\end{figure}
+
+\subsection{Backbone Substitution}
+The simplest way to reduce cost is to replace the heavy feature encoder
+with a mobile backbone. MobileStereoNet
+\cite{shamsafar2022mobilestereonet} extended MobileNet's separable
+blocks into the three-dimensional cost-volume regularization itself and
+reported two design points: a two-dimensional variant at 1.14 pixel
+end-point error with 2.23 million parameters, and a three-dimensional
+variant at 0.80 pixels with 1.77 million, an order of magnitude smaller
+than the contemporaneous volumetric baselines at comparable accuracy.
+The lesson generalizes beyond MobileNet: any well-pretrained compact
+backbone can serve, and a detection backbone carries an added advantage,
+since its features are already trained to localize objects across
+scales. We follow this route and use a truncated detection backbone as
+our shared encoder, a choice Chapter~\ref{ch:results} validates against
+two alternatives.
+
+\subsection{Cost-Volume Compression}
+The three-dimensional cost volume is the dominant cost in most stereo
+networks, and several families compress it. Cascade methods
+\cite{gu2020cascade} build a coarse volume over the full disparity range
+and then progressively narrow the range at finer scales; on the cascade
+paper's reproduced PSMNet baseline the two-stage cascade cut memory
+substantially while also improving the end-point error from 0.887 to
+0.721 pixels (a reproduced baseline, distinct from the 1.09 pixels PSMNet
+reports in Table \ref{tab:method_comparison}), so narrowing the range
+turned out to be cheaper and more accurate at once. BGNet
+\cite{xu2021bgnet} learns a bilateral grid that upsamples a
+one-eighth-resolution cost volume in an edge-preserving way, with a
+parameter-free slicing step, at 25 milliseconds per frame. DeepPruner
+\cite{duggal2019deeppruner} predicts a per-pixel disparity range with a
+differentiable PatchMatch and a confidence-range predictor, so the
+expensive aggregation runs only on a pruned set of hypotheses; its fast
+variant reaches 0.97 pixel end-point error at 61 milliseconds. HITNet
+\cite{tankovich2021hitnet}, shown in Figure \ref{fig:hitnet}, removes the
+three-dimensional cost volume altogether: it represents the scene as a
+grid of small tiles, each carrying a slanted-plane hypothesis with a
+disparity, two slopes, and a descriptor, and refines these hypotheses
+through two-dimensional propagation and warping across scales, reaching
+0.43 pixel end-point error at 0.97 million parameters and 54
+milliseconds. The slanted plane lets a tile represent sub-pixel structure
+that a fronto-parallel hypothesis cannot, and this is what lets the
+network stay accurate without a dense volume. This tile-hypothesis
+representation, including its plane slopes, is the paradigm from which we
+build our model.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{fig_2_4c_hitnet}
+\caption[HITNet architecture, representing the tile-hypothesis paradigm.]{HITNet architecture, representing the tile-hypothesis paradigm \cite{tankovich2021hitnet}.}
+\label{fig:hitnet}
+\end{figure}
+
+\subsection{Iterative-Loop Compression}
+The update loop is where iterative methods spend most of their cost, and
+the efficient variants target it directly. LightStereo
+\cite{guo2025lightstereo} replaces three-dimensional aggregation with a
+two-dimensional network of inverted-residual blocks that expand the
+disparity channels, reaching 0.73 pixel end-point error at 3.44 million
+parameters and 17 milliseconds; its authors observe that feature
+extraction, not aggregation, dominates the remaining runtime.
+Distill-then-Prune \cite{pan2024dtp} designs a backbone that is compatible
+with deployment toolchains by construction: it avoids three-dimensional
+convolution and trilinear interpolation, and reaches 1.56 pixel end-point
+error at 0.26 million parameters with 16 milliseconds of latency on an
+embedded board.
+
+\subsection{Knowledge Distillation}
+A distinct family reduces the accuracy cost of a small network by training
+it against a large teacher. LiteAnyStereo \cite{jing2025liteanystereo},
+whose network is shown in Figure \ref{fig:liteany}, pairs a 7.6 million
+parameter non-iterative network with a three-stage training pipeline:
+supervised training on synthetic data, self-distillation under input
+perturbation, and distillation from a frozen FoundationStereo teacher on
+unlabeled real pairs. The result is strong zero-shot accuracy that the
+same network cannot reach by supervised training alone.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{fig_2_4d_liteanystereo}
+\caption[LiteAnyStereo architecture, representing the distillation-trained efficient paradigm.]{LiteAnyStereo architecture, representing the distillation-trained efficient paradigm \cite{jing2025liteanystereo}.}
+\label{fig:liteany}
+\end{figure}
+
+Distill-then-Prune \cite{pan2024dtp} shows that distilling before pruning,
+and using the teacher output alone rather than the teacher combined with
+ground truth, gives the best student. Written generically, rather than
+in any one paper's notation, the distillation term of such pipelines is
+a masked regression between the student and teacher disparity,
+\begin{equation}
+\mathcal{L}_{\mathrm{KD}} = \frac{1}{|\Omega|}
+  \sum_{i \in \Omega} m_i \cdot
+  \operatorname{smooth}_{L_1}\!\big(\hat{d}_S(i) - \hat{d}_T(i)\big)
+\label{eq:kd_loss}
+\end{equation}
+where $\hat{d}_S$ and $\hat{d}_T$ are the student and teacher disparities,
+$\Omega$ the image domain, and $m_i$ an optional teacher-confidence mask.
+This three-stage pipeline, illustrated in Figure \ref{fig:kd_stages}, has
+not yet been applied to our model, although it may offer
+the largest accuracy gain among the surveyed mechanisms, and we revisit
+it as future work in Chapter~\ref{ch:conclusion}.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{fig_2_7_kd_stages}
+\caption[The three-stage knowledge-distillation pipeline of LiteAnyStereo.]{The three-stage knowledge-distillation pipeline of LiteAnyStereo \cite{jing2025liteanystereo}.}
+\label{fig:kd_stages}
+\end{figure}
+
+\subsection{Architectural Compression and Adaptive Compute}
+CoEx \cite{bangunharcana2021coex} re-enriches a cheap,
+information-poor correlation volume from the image side: its guided
+cost-volume excitation derives per-channel attention weights from the
+left features with cheap convolutions and applies them at every
+aggregation scale, recovering the accuracy of a far costlier
+concatenation volume at 2.72 million parameters and 27 milliseconds. It
+also swaps the full soft-argmin for a regression over the top disparity
+candidates, avoiding the between-modes averaging of
+\eqref{eq:softargmin}. CGI-Stereo \cite{xu2023cgistereo} fuses context
+into geometry at every decoder scale with bidirectional gradient flow,
+beating far larger networks zero-shot at a fraction of their cost. The
+same trade, cheap image-derived guidance for volumetric capacity,
+recurs in our guided excitation and mask-based upsampling.
+LightStereo \cite{guo2025lightstereo} adds a complementary finding:
+expanding the disparity channels in its inverted-residual aggregation
+blocks helps, but expanding the spatial kernels does not, so the useful
+capacity lies along the disparity axis.
+
+Adaptive-compute methods change the cost at run time. AnyNet
+\cite{wang2019anynet} produces a usable disparity from a first coarse
+stage and refines it through residual cost volumes with a narrow search
+range, letting an embedded board trade 29 milliseconds of coarse depth
+against 97 milliseconds of refined depth as the budget allows. MADNet
+\cite{tonioni2019madnet} instead adapts online to a new environment,
+updating one module per frame under a photometric self-supervised loss
+via a bandit strategy for module choice, and recovers most of the
+accuracy a zero-shot deployment loses while sustaining 25 frames per
+second. AnyNet's narrow-range search and both methods' coarse-to-fine
+budgeting anticipate the local lookup and iteration schedule we use.
+Neural architecture search reaches the same pipeline in LEAStereo
+\cite{cheng2020leastereo}, which jointly searches the feature and
+matching networks within the stereo pipeline and reaches 0.78 pixel
+end-point error at 1.81 million parameters, showing a well-allocated
+small budget can rival hand designs an order of magnitude larger.
+
+Three lessons from the efficient family shape the design in
+Chapter~\ref{ch:design}. First, the cost volume is where the budget goes:
+every successful compact method shrinks, prunes, or replaces it with a
+sparser hypothesis structure, and the tile representation we adopt is the
+most aggressive. Second, image-derived guidance is cheap and effective:
+excitation, bilateral-grid, and mask-based upsampling all steer a small
+volume or coarse prediction from the image, a pattern we follow with our
+convex upsampling and context stream. Third, the training recipe is
+not an afterthought: the distillation results show the same small
+architecture can land at very different accuracy purely from how it is
+trained, so we treat and ablate our training protocol with the same
+rigor as the architecture. These families are largely
+complementary; our model combines several, pairing a substituted
+backbone with a compressed cost volume and a compressed recurrent loop.
+
+\FloatBarrier
+\section{Comparative Analysis}
+\label{sec:comparative_analysis}
+
+\subsection{Cross-Domain Generalization}
+A network trained on synthetic data often fails on real domains: it
+learns shortcut features tied to the synthetic statistics, such as
+consistent local color distributions, instead of domain-invariant
+structure, and it breaks down in textureless, reflective, repetitive, and
+large-disparity regions. The scale of the failure is substantial: GA-Net
+trained on synthetic data and evaluated zero-shot reaches 11.7 percent
+outliers on KITTI 2015 and 32.2 percent on Middlebury, and PSMNet reaches
+16.3 percent on KITTI, several times their fine-tuned rates
+\cite{zhang2020dsmnet}. Two families
+of remedy exist. Architecture-level methods make the features themselves
+domain-invariant. DSMNet \cite{zhang2020dsmnet} adds a domain
+normalization that removes image-level and pixel-level statistic shifts
+together with a structure-preserving graph filter, and improves the
+zero-shot KITTI rate from 11.7 to 6.5 percent and the Middlebury rate
+from 32.2 to 21.8 percent. HVT \cite{chang2023hvt} applies hierarchical
+visual transformations at global, local, and pixel level during training
+only, at zero inference cost, and pushes the zero-shot KITTI rate further
+to 4.9 percent on the same backbone. Training-recipe methods change the
+data and the supervision instead: StereoAnything
+\cite{guo2024stereoanything} mixes labeled stereo with tens of millions
+of monocular-to-stereo pseudo-pairs and shows that dataset diversity
+matters more than dataset size, and LiteAnyStereo
+\cite{jing2025liteanystereo} reaches strong zero-shot accuracy with a
+non-iterative network trained by three-stage distillation. The relative
+importance of iteration and training pipeline for generalization is not
+settled in the literature: some efficient methods argue that iteration is
+necessary for cross-domain accuracy, while LiteAnyStereo reaches
+competitive zero-shot numbers without any iteration, and the cleanest
+controlled evidence attributes its accuracy to the training pipeline
+rather than to any recurrent module. Chapter~\ref{ch:results} returns to
+this question and shows that the training pipeline closes most of the
+cross-domain gap for our non-iterative tile network.
+
+\FloatBarrier
+\subsection{Benchmarks and Datasets}
+Table \ref{tab:datasets} summarizes the benchmarks used in this thesis.
+SceneFlow is a large synthetic dataset of 35,454 training pairs across
+three subsets with dense rendered ground truth, and it is the standard
+pretraining set; only its FlyingThings3D subset provides an official
+test split, which is used here for in-domain evaluation. Its value lies
+in the density and exactness of its labels, which real sensors cannot
+provide, at the price of a domain gap discussed in the preceding
+subsection. KITTI 2012 and 2015 provide real driving scenes with sparse
+LiDAR ground truth, and their D1-all outlier rate has become the
+field's standard metric for driving. ETH3D covers mixed indoor and
+outdoor scenes at gray-scale with laser-scanned ground truth. Middlebury
+2014 provides high-resolution indoor scenes with dense structured-light
+ground truth, and it is the hardest of the four in two respects: its
+images reach several megapixels, so most methods evaluate at half or
+quarter resolution, and its disparities extend to several hundred pixels,
+far beyond the search range most networks are built for. These two
+properties make it the standard zero-shot stress test, and it is the
+cross-domain benchmark we use. Its evaluation protocol splits the
+scenes into a training set with public ground truth and a test set whose
+ground truth is withheld on a server. The zero-shot convention we follow,
+matching the reference methods we compare against, evaluates on the
+ground-truth-public scenes without any training or fine-tuning on
+Middlebury. The metrics also carry conventions worth
+noting: end-point error rewards sub-pixel accuracy on smooth surfaces and
+can look healthy while boundaries are poor, whereas the bad-$t$ and
+D1-all rates count outlier pixels and expose exactly the boundary and
+textureless failures that end-point error averages away. For this
+reason, we report both families of metric together throughout
+Chapter~\ref{ch:results}.
+
+\begin{table}[!htbp]
+\centering
+\caption{Stereo benchmark datasets with train/test splits, resolutions, and ground-truth types.}
+\label{tab:datasets}
+\small
+\begin{tabular}{lllllc}
+\toprule
+Dataset & Domain & Train/Test & Resolution & Ground truth & Ref.\\
+\midrule
+SceneFlow & synthetic & 35{,}454 / 4{,}370 & $960{\times}540$ & dense, rendered & \cite{mayer2016sceneflow}\\
+KITTI 2012 & driving & 194 / 195 & $1242{\times}375$ & sparse LiDAR & \cite{geiger2012kitti}\\
+KITTI 2015 & driving & 200 / 200 & $1242{\times}375$ & sparse LiDAR + CAD & \cite{menze2015kitti}\\
+Middlebury 2014 & indoor & 23 / 10 & up to ${\sim}3000{\times}2000$ & structured light & \cite{scharstein2014middlebury}\\
+ETH3D & mixed & 27 / 20 & ${\sim}940{\times}490$ & laser scan & \cite{schops2017eth3d}\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\FloatBarrier
+\subsection{Accuracy, Parameters, and Latency Across Method Families}
+Table \ref{tab:method_comparison} and Figure \ref{fig:pareto} place
+every method surveyed in this chapter, plus our own model, on a common
+footing of parameters, SceneFlow end-point error, KITTI 2015 D1-all, and
+reported latency. Read together with the taxonomy of
+Section~\ref{sec:classification}, they turn the family-by-family survey
+above into a direct comparison. Foundation-scale and iterative systems
+hold the accuracy frontier, at hundreds of millions and tens of millions
+of parameters respectively, while the efficient family occupies the
+low-parameter region at some cost in accuracy: FoundationStereo reaches
+0.34 pixel end-point error at roughly 340 million parameters and 470
+milliseconds, whereas HITNet reaches 0.43 pixels, a difference of only
+0.09 pixels, at 0.97 million parameters and 54 milliseconds, under a
+hundredth of the latency. Parameter count alone does not order the
+methods either: PSMNet, at 5.2 million parameters, trails HITNet's 0.97
+million on both accuracy and latency, which shows that the architecture
+a budget buys matters as much as the size of the budget. CoEx and
+LightStereo-S sit in the same low-parameter, low-latency region as
+HITNet, at 2.72 and 3.44 million parameters and 27 and 17 milliseconds,
+and land within 0.3 pixels of it, so several distinct efficient
+architectures reach comparable operating points from different
+technique families. Our own model, StereoLite, sits at 2.96 million
+parameters and 49.8 milliseconds with 0.78 pixel end-point error,
+inside the same efficient cluster but with room to close against HITNet
+on accuracy.
+
+The accuracy-parameter-latency comparison alone is not sufficient,
+however, because it says nothing about cross-domain behavior. The review
+in Section~\ref{sec:existing_research} showed that two networks of
+similar synthetic-data accuracy can differ by an order of magnitude in
+zero-shot outlier rate depending on their training pipeline rather than
+their parameter count, so a fair comparison across families has to weigh
+generalization alongside the raw numbers in Table
+\ref{tab:method_comparison}. This is the gap the following chapters
+close for our own model: Chapter~\ref{ch:design} sizes the architecture
+against the frontier established here, and Chapter~\ref{ch:results}
+reports where it lands on both axes.
+
+\begin{table}[!htbp]
+\centering
+\caption{Parameters, SceneFlow error, KITTI D1-all, and latency for representative methods (values verified against cited papers).}
+\label{tab:method_comparison}
+\small
+\begin{tabular}{lccccc}
+\toprule
+Method & Year & Params (M) & SF EPE (px) & KITTI D1 (\%) & Latency (ms)\\
+\midrule
+PSMNet \cite{chang2018psmnet} & 2018 & 5.2 & 1.09 & 2.32 & 410\\
+HITNet (L) \cite{tankovich2021hitnet} & 2021 & 0.97 & 0.43 & 1.98 & 54\\
+BGNet \cite{xu2021bgnet} & 2021 & ${\sim}2.9$ & 1.17 & 2.51 & 25\\
+CoEx \cite{bangunharcana2021coex} & 2021 & 2.72 & 0.69 & 2.13 & 27\\
+RAFT-Stereo \cite{lipson2021raftstereo} & 2021 & 11.23 & 0.61 & 1.82 & 380\\
+IGEV-Stereo \cite{xu2023igev} & 2023 & 12.60 & 0.47 & 1.59 & 180\\
+LightStereo-S \cite{guo2025lightstereo} & 2025 & 3.44 & 0.73 & 2.30 & 17\\
+DEFOM-Stereo \cite{jiang2025defom} & 2025 & 47.3 & 0.42 & 1.55 & 316\\
+FoundationStereo \cite{wen2025foundationstereo} & 2025 & ${\sim}340$ & 0.34 & 1.46 & ${\sim}470$\\
+\midrule
+StereoLite (ours) & 2026 & 2.96 & 0.78 & n/a & 49.8\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[!htbp]
+\centering
+\begin{subfigure}{\textwidth}
+\centering
+\includegraphics[width=0.94\textwidth]{fig_2_6a_param_pareto}
+\caption{Accuracy against trainable parameters.}
+\end{subfigure}\\[6pt]
+\begin{subfigure}{\textwidth}
+\centering
+\includegraphics[width=0.94\textwidth]{fig_2_6b_latency_pareto}
+\caption{KITTI 2015 D1-all against reported latency.}
+\end{subfigure}
+\caption{Accuracy against parameters and latency for the surveyed methods.}
+\label{fig:pareto}
+\end{figure}
+
+\FloatBarrier
+\section{Summary}
+\label{sec:ch2_summary}
+This chapter surveyed the literature that bears on an edge-deployable
+stereo network and then compared that literature directly rather than as
+a list of isolated methods.
+Section~\ref{sec:existing_research} traced deep stereo matching from the
+classical four-step pipeline through learned matching costs,
+three-dimensional cost-volume networks, iterative refinement, and the
+foundation-model systems that now hold the accuracy ceiling at a
+computational cost most edge devices cannot meet. It then stated four
+requirements for edge deployment (compact parameters, real-time
+latency on roughly four to six tera-operations per second, a small
+inference working set, and integer-friendly operators) and used them to
+classify the efficient literature into backbone substitution,
+cost-volume compression, iterative-loop compression, knowledge
+distillation, and architectural and adaptive-compute techniques.
+Section~\ref{sec:comparative_analysis} compared these families directly:
+the review of cross-domain generalization showed that both
+architecture-level and training-recipe remedies narrow the
+synthetic-to-real gap, and that the relative contribution of iteration
+versus training pipeline to zero-shot accuracy remains unsettled in the
+literature; the benchmark review fixed the dual-metric, zero-shot
+evaluation convention the rest of this thesis follows; and the combined
+parameter-accuracy-latency comparison placed our own model on the same
+footing as every method it is compared against. Chapter~\ref{ch:design}
+draws on this survey to design a network for the edge envelope stated in
+Section~\ref{sec:edge_requirements}, selecting and adapting the specific
+mechanisms it inherits from the families reviewed here.
+
+% SOURCES: thesis/book/mainmatter/ch2.tex sections 2.1 (Introduction),
+%   2.2 (Literature Review, all 5 subsections: Stereo Matching
+%   Fundamentals, The Deep Learning Transition, The 3D Cost-Volume Era,
+%   Iterative Refinement, Foundation-Model Era), 2.3 (Requirements of
+%   Edge-Deployable Stereo Matching), 2.4 (Classification of Efficient
+%   Stereo Methods, all 5 subsections: Backbone Substitution,
+%   Cost-Volume Compression, Iterative-Loop Compression, Knowledge
+%   Distillation, Architectural Compression and Adaptive Compute), 2.5
+%   (Cross-Domain Generalization and Benchmarks, both subsections), and
+%   the comparison Table \ref{tab:method_comparison} + Figure
+%   \ref{fig:pareto} + their framing paragraph lifted out of old 2.6.
+%   All \label names, equations, figures, and tables carried over
+%   verbatim (byte-identical numbers/citations). Old top-level sections
+%   2.3 and 2.4 were flattened into \subsection entries directly under
+%   the new 2.2 "Existing Research" (no sub-subsections, per the
+%   x.y.z.w ban), and old 2.5's two subsections became \subsection
+%   entries under the new 2.3 "Comparative Analysis" alongside a new
+%   third subsection ("Accuracy, Parameters, and Latency Across Method
+%   Families") that reframes the comparison table/figure with fresh,
+%   non-mechanism-specific comparative prose.
+% DROPPED: nothing substantive; every paragraph, figure, table, and
+%   equation from old 2.1-2.5 was carried over. Prose was lightly
+%   rewritten in "we" voice where it referred to our own design choices,
+%   and every hard-coded "Chapter N" was replaced with a \ref to the new
+%   chapter label (\ref{ch:design} for the new Ch3, \ref{ch:results} for
+%   the new Ch6 "Results and Discussion", \ref{ch:conclusion} for the
+%   new Ch9). These three labels are assumed names for the sibling
+%   chapter agents' \label{} declarations; if a sibling agent chose a
+%   different label string, the QA pass (B4) will surface it as an
+%   undefined reference and it should be reconciled at integration.
+% MOVED-AWAY: old ch2 Section 2.6 "Detailed Review of the Adopted
+%   Methodology" is owned by the ch3 agent (Engineering Design and
+%   Methodology) per RESTRUCTURE_PLAN_V2. Specifically excluded from
+%   this file: the four paragraphs describing the group-wise
+%   correlation cost, ConvGRU + convex upsampling, the geometry encoding
+%   volume, and the slanted tile-plane representation as "adopted
+%   mechanisms" of the thesis's own network, and the closing paragraph
+%   naming the specific combination as an unaddressed gap in the
+%   surveyed literature. Only the comparison Table \ref{tab:method_comparison},
+%   Figure \ref{fig:pareto}, and their general (non-mechanism-specific)
+%   framing paragraph were retained here, per the explicit instruction
+%   that "capability-matrix / comparison-table material" belongs in the
+%   new 2.3.

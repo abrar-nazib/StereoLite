@@ -1,0 +1,84 @@
+% =====================================================================
+% APPENDIX C: Addressing Complex Engineering Activities
+% (RESTRUCTURE_PLAN_V2, appx-kp owner)
+% Ported from old mainmatter/ch5.tex Section 5.3 (Addressing Complex
+% Engineering Activities), with old Section 5.4's closing sentences on
+% the A attributes folded into this appendix's closing paragraph.
+% Chapter cross-references updated from old hard-coded numbers to the
+% new 9-chapter labels; the two mentions of the old socio-economic
+% chapter are phrased descriptively since that chapter's label had not
+% been assigned yet.
+% =====================================================================
+\chapter{Addressing Complex Engineering Activities}
+\label{app:cea}
+
+The Washington Accord also characterizes complex engineering
+activities by five A attributes, distinct from the P attributes of a
+complex problem discussed in Appendix~\ref{app:cep}. An activity is
+complex when carrying it out demands diverse resources, conflicting
+requirements, innovation, and the other characteristics set out below.
+The work we carried out in this thesis exhibits each of the five.
+
+\textbf{A1, range of resources.} We used several distinct kinds of
+resources: rented cloud GPUs for training and ablation, multiple
+public stereo datasets for training and cross-domain evaluation, a
+physical calibrated stereo camera rig for real-data experiments, an
+embedded accelerator as the deployment target, and the open-source
+deep-learning tooling on which the implementation of
+Chapter~\ref{ch:implementation} is built. The management of these
+resources, including their cost, is documented in this thesis's
+management and finance account.
+
+\textbf{A2, level of interaction.} The project's central technical
+interactions are the conflicts among accuracy, latency, and memory:
+improving one routinely degrades another. We could not resolve these
+conflicts analytically. We resolved them instead through the
+controlled ablation methodology of Chapter~\ref{ch:design}, under
+which every candidate change was measured on all metrics jointly and
+adopted only when the trade-off was favorable. Chapter~\ref{ch:results}
+records these studies.
+
+\textbf{A3, innovation.} The activity was creative rather than
+routine. The architecture of Chapter~\ref{ch:design} is a novel
+composition of building blocks adapted from distinct families of the
+literature. It also includes the fail-soft fusion of the geometry
+encoding volume, a mechanism we designed in this work so that the
+added evidence sharpens the estimate when it is reliable and degrades
+gracefully, rather than catastrophically, when it is not.
+
+\textbf{A4, consequences to society and the environment.} The activity
+has identifiable consequences beyond the laboratory: on-device
+privacy, robot and drone safety, eye-safe passive sensing,
+accessibility of low-cost depth, energy saved by avoiding cloud round
+trips, and a transparent training footprint. This thesis's
+socio-economic impact analysis examines these consequences.
+
+\textbf{A5, familiarity.} The activity extends beyond textbook
+material and prior experience. Its subject matter, compact recurrent
+stereo architectures, cross-domain generalization, and edge-inference
+optimization, exists only in the recent research literature we
+reviewed in Chapter~\ref{ch:lit}. Engaging with it required reading,
+evaluating, and adapting published research rather than applying
+established practice.
+
+This appendix has shown that the work carried out in this thesis
+constitutes complex engineering activities in the Washington Accord
+sense. The five A attributes are exhibited through the range of
+resources we used, the measured resolution of conflicting
+requirements, the novel block composition with fail-soft fusion, the
+societal and environmental consequences examined in the
+socio-economic impact analysis, and the beyond-textbook research
+grounding of Chapter~\ref{ch:lit}. Together with Appendix~\ref{app:cep},
+this completes the case that the thesis addresses both a complex
+engineering problem and complex engineering activities.
+
+% SOURCES: old mainmatter/ch5.tex Section 5.3 (Addressing Complex
+% Engineering Activities, all five A-attribute paragraphs carried over
+% with judgment) and part of Section 5.4 (Summary, the A-attribute
+% closing sentences folded into this appendix's closing paragraph).
+% DROPPED: the "Section 5.2 does X, Section 5.3 does Y" roadmap
+% sentence from old Section 5.1 was dropped as redundant once the
+% material was split across three separate appendix files.
+% MOVED-AWAY: the CEP material (old Section 5.2) is in app_b.tex, and
+% the knowledge-profile argument is in app_a.tex, both owned by this
+% same agent (appx-kp).

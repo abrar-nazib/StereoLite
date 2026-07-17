@@ -1,0 +1,64 @@
+% ============ Appendix I: PO and KPA Attainment Tracker ==================
+% Source: thesis/book/appendices/app_d.tex, renumbered for the new
+% nine-chapter structure (see thesis/RESTRUCTURE_PLAN_V2.md ownership
+% map). Renumber map applied:
+%   old Ch.1 (intro)            -> ch:intro
+%   old Ch.2 (lit review)       -> ch:lit
+%   old Ch.3 (design)           -> ch:design
+%   old Ch.4 (socio-economic)   -> ch:socio (now Ch.7)
+%   old Ch.6 (management)       -> ch:management (now Ch.8)
+%   old Ch.7 (implementation)   -> split into ch:implementation (Ch.4)
+%                                   and ch:experimental (Ch.5)
+%   old Ch.8 (results)          -> ch:results (now Ch.6)
+%   old Ch.9 (conclusion)       -> ch:conclusion (now Ch.9; label not
+%                                   yet defined at write time, follows
+%                                   the book's established naming
+%                                   convention, verify at B4 QA)
+%   old App.A (technical specs) -> app:specs (now App.H)
+%   old App.B (ethics/teamwork/communication) -> split into
+%                                   app:plagiarism, app:aireport,
+%                                   app:ethics_clearance (App.D/E/G)
+%                                   and ch:management Individual and
+%                                   Team Work Contribution section
+%                                   (now Ch.8, formerly in App.B)
+\chapter{PO and KPA Attainment Tracker}
+\label{app:po_tracker}
+
+\section{Program Outcome Mapping}
+Table~\ref{tab:po_tracker} maps each program outcome to the section of
+this thesis that demonstrates it, with a one-line statement of the
+evidence.
+
+\begin{table}[!htbp]
+\centering
+\caption{Program outcome attainment mapped to thesis sections.}
+\label{tab:po_tracker}
+\small
+\begin{tabular}{clp{7.2cm}}
+\toprule
+PO & Location & Evidence\\
+\midrule
+PO1 & Ch.~\ref{ch:intro} & Engineering knowledge of stereo geometry, sensing trade-offs, and the depth-from-disparity relation.\\
+PO2 & Ch.~\ref{ch:intro}, \ref{ch:lit}, \ref{ch:design} & Problem analysis: the accuracy-latency-memory constraint, the literature gap, and the formal design requirements.\\
+PO3 & Ch.~\ref{ch:design} & Design and development of the StereoLite architecture block by block.\\
+PO4 & Ch.~\ref{ch:experimental}, \ref{ch:results} & Investigation through controlled ablation studies and in-domain, cross-domain, and robustness evaluation.\\
+PO5 & Ch.~\ref{ch:implementation}, App.~\ref{app:specs} & Modern tool usage: PyTorch, cloud GPU training, mixed precision, and profiling.\\
+PO6 & Ch.~\ref{ch:socio} & Engineer and society: on-device privacy and accessibility of a low-cost depth sensor.\\
+PO7 & Ch.~\ref{ch:socio} & Environment and sustainability: passive sensing, low power, and a transparent training footprint.\\
+PO8 & App.~\ref{app:plagiarism}, \ref{app:aireport}, \ref{app:ethics_clearance} & Ethics: AI-usage disclosure, conflict-of-interest statement, and similarity report.\\
+PO9 & Ch.~\ref{ch:management} (Individual and Team Work Contribution) & Individual and teamwork: the CRediT contribution statement of the two authors.\\
+PO10 & Ch.~\ref{ch:management}, whole thesis & Communication: the written report, figures, and the supervisor-consultation record.\\
+PO11 & Ch.~\ref{ch:management} & Project management and finance: the timeline and the itemized expense record.\\
+PO12 & Ch.~\ref{ch:conclusion} & Life-long learning: the future-work directions grounded in the field's trajectory.\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% SOURCES: appendices/app_d.tex (whole file, renumbered).
+% DROPPED: nothing.
+% MOVED-AWAY: PO9 evidence (CRediT authorship table) and PO10 evidence
+%   (communication/supervision-meeting record) both physically moved
+%   into ch:management (Ch.8, Sections 8.5 and 8.2) per the ownership
+%   map; this tracker only points there, it does not restate that
+%   content. The full CRediT table and communication narrative are
+%   owned by the ch8 agent.

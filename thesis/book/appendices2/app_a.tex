@@ -1,0 +1,80 @@
+% =====================================================================
+% APPENDIX A: Addressing Knowledge Profile (KPs) in the Thesis
+% (RESTRUCTURE_PLAN_V2, appx-kp owner)
+% Extracted and expanded from the K3/K4/K5/K8 knowledge-profile
+% argument that opened old mainmatter/ch5.tex's Section 5.2 (Addressing
+% Complex Engineering Problems). No new numbers; the old hard-coded
+% chapter numbers are replaced with \ref to the new 9-chapter labels
+% (ch:lit, ch:design, ch:implementation, ch:experimental, ch:results).
+% =====================================================================
+\chapter{Addressing Knowledge Profile (KPs) in the Thesis}
+\label{app:kp}
+
+The Washington Accord's knowledge-profile scheme, adopted by the BAETE
+program-outcome system, describes the kind of knowledge an engineering
+graduate must draw on to solve a genuinely complex problem. A problem
+only qualifies as complex when it cannot be resolved by natural
+science or mathematics alone and instead demands in-depth engineering
+knowledge of a specific, named kind. This appendix identifies which
+knowledge profiles we drew on in this thesis and points to the chapter
+where each one is exercised. Appendix~\ref{app:cep} then uses this
+mapping to ground the mandatory depth-of-knowledge attribute of the
+thesis's Complex Engineering Problem.
+
+Designing the stereo-matching network at the center of this thesis
+drew on four such profiles. It required in-depth engineering knowledge
+of the stereo pipeline, specialist knowledge of the deep-stereo
+literature and its building blocks, the design of a novel architecture
+under hard resource constraints, and grounding in a large body of
+research literature to select and combine the right mechanisms. In
+Washington Accord terms these four demands correspond to profiles K3,
+K4, K5, and K8. Table~\ref{tab:kp_profile} lists each one together
+with the chapter where we exercised it.
+
+\begin{table}[!htbp]
+\centering
+\caption{Knowledge-profile attainment mapped to thesis chapters.}
+\label{tab:kp_profile}
+\small
+\begin{tabular}{lp{4.0cm}p{7.4cm}}
+\toprule
+Profile & Definition & Where exercised in this thesis\\
+\midrule
+K3 & Engineering fundamentals & The stereo-vision pipeline and cost-volume mechanisms surveyed in Chapter~\ref{ch:lit} and formalized in the network design of Chapter~\ref{ch:design}.\\
+K4 & Specialist knowledge & The selection and adaptation of tile-hypothesis, recurrent, and geometry-volume building blocks from the deep-stereo literature, carried out in Chapter~\ref{ch:design}.\\
+K5 & Engineering design & The design of the StereoLite architecture in Chapter~\ref{ch:design} and its inference-optimization pass under hard resource constraints in Chapter~\ref{ch:implementation}.\\
+K8 & Research-literature grounding & The literature review of Chapter~\ref{ch:lit}, which grounds every design choice in published evidence rather than in intuition alone.\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+K3 and K8 sit mostly upstream of the design, in the fundamentals and
+the literature that make a principled design possible in the first
+place. K4 and K5 sit inside the design itself, in the specific blocks
+we chose and the way we put them together under a fixed parameter and
+latency budget. K5 alone also reaches downstream of the design: an
+engineering design is only as good as its validation, so the same K5
+demand carries into the test protocol of Chapter~\ref{ch:experimental}
+and the measured outcomes of Chapter~\ref{ch:results}, where the
+choices made under K4 and K5 are checked against held-out data rather
+than assumed to hold.
+
+None of these four profiles could be dropped without the thesis
+becoming a routine engineering exercise. Without K3 or K8 the
+architecture would have no principled basis; without K4 or K5 the
+literature review would have no original design to apply it to.
+Appendix~\ref{app:cep} treats this combination as the evidence for the
+mandatory depth-of-knowledge attribute of the thesis's Complex
+Engineering Problem.
+
+% SOURCES: old mainmatter/ch5.tex Section 5.2 opening paragraph (the
+% K3/K4/K5/K8 knowledge-profile argument), reorganized into a
+% standalone table with expanded per-profile prose. The two framing
+% sentences on what makes a problem complex are adapted from old
+% Section 5.1.
+% DROPPED: nothing; the K-profile argument is fully represented here.
+% The "in-depth engineering knowledge" framing sentence is stated once
+% in this file and referenced, not repeated, from app_b.tex.
+% MOVED-AWAY: the P1-P7 CEP table and its framing prose live in
+% app_b.tex; the A1-A5 CEA prose lives in app_c.tex. Both are owned by
+% this same agent (appx-kp).

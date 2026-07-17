@@ -1,0 +1,287 @@
+% =====================================================================
+% CHAPTER 8: Thesis Management and Finance (new department template,
+% RESTRUCTURE_PLAN_V2.md)
+% Assembled from:
+%   - old mainmatter/ch6.tex (Introduction, Management of the Thesis,
+%     Time Frame table + prose, Overall Budget table + prose,
+%     Component/Software Budget prose)
+%   - old mainmatter/ch1.tex 1.5 Project Planning + 1.5.1 Work Plan
+%     (Gantt figure fig:gantt, moved here per the ownership map, never
+%     duplicated in the new Chapter 1)
+%   - old appendices/app_c.tex "Authorship Contribution Statement"
+%     (CRediT content, recast as a table, tab:credit) and "Communication"
+%     (folded into 8.2 as supervision cadence)
+%   - new: 8.4 Resource Planning, written from facts already established
+%     in old ch6, old app_a "Software and Hardware Environment", and the
+%     cross-references already fixed by ch3/ch4/ch5/ch7 in mainmatter2/.
+%     No number in this file is invented; every figure traces to one of
+%     the sources above.
+% POs demonstrated: PO9 (individual and teamwork), PO11 (project
+% management and finance).
+% =====================================================================
+\chapter{Thesis Management and Finance}
+\label{ch:management}
+
+\section{Introduction}
+This chapter records how we managed the thesis: the schedule we followed,
+the resources we drew on, what we spent, and how we split the work
+between the two of us. Paper collection and the initial literature
+review began during the fourth-year odd semester (the seventh semester),
+ahead of the scheduled project work; the main project then ran from
+December 2025 to July 2026. Model training and the experimental studies
+of Chapter~\ref{ch:experimental} used rented cloud GPUs, and we also
+bought a stereo camera and a Jetson Orin Nano board for real-data
+capture and on-device deployment testing. Section~\ref{sec:8-2}
+describes how we managed the work across seven overlapping phases and
+how we coordinated with our supervisor; Section~\ref{sec:8-3} reports
+the overall project expenditure; Section~\ref{sec:8-4} sets out how we
+planned compute, data, software, and our own time; and
+Section~\ref{sec:8-5} states each author's individual contribution.
+
+\FloatBarrier
+\section{Management of the Thesis}
+\label{sec:8-2}
+We divided the work into phases with defined outputs and let some phases
+overlap deliberately so that activities could run in parallel. The
+literature review guided our choice of candidate architectures, and the
+setup and preliminary training that followed established the
+experimental pipeline. We kept capturing real-camera data while
+refining the architecture through the ablation campaign of
+Chapter~\ref{ch:design}, then carried the selected design through the
+benchmarking, three-dimensional reconstruction, and final evaluation of
+Chapter~\ref{ch:results} before consolidating the results in this book.
+This overlap let data preparation, experimentation, and writing proceed
+together, since design decisions still depended on experimental
+evidence that only became available as the ablation campaign
+progressed.
+
+We met with our supervisor regularly throughout the project to review
+progress, discuss design decisions, and plan the next steps. Milestone
+reviews lined up with the end of the literature study, the architecture
+design, the ablation campaign, and the production training run, and the
+supervisor's feedback at each of those points shaped the direction of
+the work that followed. We also prepared the final manuscript and the
+defense presentation in consultation with the supervisor.
+
+\subsection{Time Frame / Gantt Chart}
+\label{sec:8-2-1}
+The main project schedule ran from December 2025 to July 2026. Paper
+collection and the literature review had already begun in the
+fourth-year odd semester, before the scheduled model-development work
+started, and that early reading supplied the basis for model selection
+at the start of the schedule. Table~\ref{tab:timeframe} lists the
+periods and principal outputs of the seven project phases, and
+Figure~\ref{fig:gantt} shows the corresponding Gantt chart of their
+overlap.
+
+\begin{table}[!htbp]
+\centering
+\caption{Seven project phases from December 2025 to July 2026.}
+\label{tab:timeframe}
+\small
+\begin{tabular}{p{4.2cm}p{3.0cm}p{6.3cm}}
+\toprule
+Phase & Period & Output\\
+\midrule
+1. Model selection and setup & Dec. 2025 to Jan. 2026 & Selected baseline models and a working experimental environment\\
+2. Pre-training and fine-tuning & Dec. 2025 to Mar. 2026 & Initial checkpoints and a stable training procedure\\
+3. Real-data capture & Jan. to Mar. 2026 & Calibrated and rectified stereo image pairs\\
+4. Ablation studies & Feb. to Apr. 2026 & Evidence for the final architectural and training choices\\
+5. Benchmarking and 3D reconstruction & Mar. to May 2026 & Accuracy, efficiency, and reconstruction results\\
+6. Result analysis and evaluation & Apr. to Jun. 2026 & Consolidated in-domain, zero-shot, robustness, and deployment findings\\
+7. Thesis writing and documentation & May to Jul. 2026 & Final thesis book and supporting documentation\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{fig_b_1_gantt_fixed}
+\caption{Seven project phases from December 2025 to July 2026.}
+\label{fig:gantt}
+\label{fig:gantt6}
+\end{figure}
+
+\FloatBarrier
+\section{Overall Budget}
+\label{sec:8-3}
+Table~\ref{tab:expenses} lists the approximate project expenditure.
+Cloud computation made up about one third of the total: the A100
+training workload cost approximately USD 100, and the other GPU
+instances used for ablation and evaluation cost approximately USD 40.
+The stereo camera and Jetson Orin Nano together cost about BDT 35,000,
+which is approximately USD 280 at the conversion rate used in this
+record.
+
+\begin{table}[!htbp]
+\centering
+\caption{Project expenditure in USD and BDT across hardware and cloud computing.}
+\label{tab:expenses}
+\small
+\begin{tabular}{p{8.4cm}rr}
+\toprule
+Item & Cost (USD) & Cost (BDT)\\
+\midrule
+Cloud A100 usage for training & 100 & 12,500\\
+Other cloud GPUs for ablation and evaluation & 40 & 5,000\\
+Stereo camera and Jetson Orin Nano & 280 & 35,000\\
+Software licences & 0 & 0\\
+\midrule
+Total & 420 & 52,500\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Component and Software Budget}
+The budget in Table~\ref{tab:expenses} splits into hardware, cloud
+computing, and software.
+
+Hardware covered the stereo camera and the Jetson Orin Nano, used for
+real-data acquisition and on-device testing, at a combined cost of
+about BDT 35,000 (USD 280). Both count as development hardware for
+validating the pipeline, not as the deployed system itself.
+
+Cloud computing cost about USD 140 in total: roughly USD 100 on A100
+instances for the main training run, and about USD 40 on other GPU
+instances for ablation studies, intermediate checks, and final
+evaluation. These are usage totals accumulated over the whole
+development period, not the rate for a single day, and they will not
+match a provider's current hourly tariff, since prices vary by
+accelerator, region, and storage allocation.
+
+The software stack, described in Chapter~\ref{ch:implementation}, uses
+open-source tools and cost nothing in licence fees. We limited cloud
+use to development; inference runs locally on the Jetson device, so
+deployment adds no recurring per-frame cloud charge, only ordinary
+hardware upkeep and power.
+
+\FloatBarrier
+\section{Resource Planning}
+\label{sec:8-4}
+Beyond the money recorded in Section~\ref{sec:8-3}, the thesis depended
+on planning compute, data, software, and our own time so that each
+phase of Table~\ref{tab:timeframe} had what it needed when it needed
+it.
+
+Compute split across three tiers by purpose. Local development and the
+latency benchmark ran on a single RTX 3050 laptop GPU with roughly 4
+gigabytes of memory, which gave us an always-available environment for
+writing and debugging the training and evaluation code before
+committing anything to a paid run. The production training run of
+Chapter~\ref{ch:implementation} used a single rented cloud A100 with 80
+gigabytes of memory, sized so the network and its training batch fit
+comfortably for the one full run recorded in Table~\ref{tab:expenses}.
+Ablation studies, intermediate checks, and evaluation instead ran on
+cheaper rented cloud T4 instances, which cost about a tenth of the A100
+workload (Table~\ref{tab:expenses}) and let us test many architectural
+variants in Chapter~\ref{ch:design} without paying A100 rates for runs
+that did not need the full card. We committed a design to the A100 tier
+only after the T4 ablations had already validated it, so the expensive
+compute trained a design we had confirmed cheaply, rather than
+searching for that design at A100 prices. The Jetson Orin Nano board,
+bought alongside the stereo camera in Table~\ref{tab:expenses}, served
+a different role again: it is the deployment target itself, and
+Chapter~\ref{ch:results} reports the on-device latency measured
+directly on it rather than projected from a desktop GPU.
+
+Data planning followed the same tiering. Chapter~\ref{ch:experimental}
+describes the SceneFlow synthetic corpus and the Middlebury 2014
+benchmark that trained and evaluated the network, alongside the
+real-camera pairs captured with the calibrated binocular rig also
+described there. The synthetic and benchmark data came from public
+releases, so the data-collection cost we carried directly was the
+camera hardware itself, already counted in Table~\ref{tab:expenses},
+together with the time spent calibrating and rectifying our own
+captures.
+
+Software cost nothing beyond the hardware above. We built the training
+and evaluation code on PyTorch 2.11 with CUDA 12.8 on Python 3.10
+(Chapter~\ref{ch:implementation}), and wrote this book in LaTeX; both
+toolchains are open source, which kept the software-licence row of
+Table~\ref{tab:expenses} at zero throughout the project.
+
+Finally, we planned our own time against the phase table of
+Section~\ref{sec:8-2-1}. Pre-training, fine-tuning, and real-data
+capture ran together over the first quarter of the schedule; ablation
+studies and benchmarking followed as checkpoints matured; and we
+reserved the final two months mostly for writing, so that documenting
+the thesis did not compete with active experimentation for our
+attention. Section~\ref{sec:8-5} records how this time was split
+between the two of us.
+
+\FloatBarrier
+\section{Individual and Team Work Contribution}
+\label{sec:8-5}
+The thesis was carried out by a two-person team, Md. Raihanul Haque
+Rahi (Roll 2008011) and Nazib Abrar (Roll 2008026), under the
+supervision of Md Zunaid Hossen (Lecturer, Department of Mechatronics
+Engineering), who guided the work as described in
+Section~\ref{sec:8-2} but is not a co-author of this thesis. Rahi
+led the architecture and training side of the work: proposing the
+tile-based design, writing the model and training code, and running
+the investigation and validation that the ablation campaign of
+Chapter~\ref{ch:design} depended on. Abrar led the evaluation and
+tooling side: building the evaluation pipeline, curating the real-camera
+and benchmark data described in Chapter~\ref{ch:experimental}, and
+running the validation studies that fed Chapter~\ref{ch:results}.
+
+Both authors worked across most categories rather than staying inside a
+single role, which is typical of a two-person thesis team where every
+phase in Table~\ref{tab:timeframe} needs both people at once. Table
+\ref{tab:credit} records each author's primary responsibilities
+against the CRediT (Contributor Roles Taxonomy) categories.
+
+\begin{table}[!htbp]
+\centering
+\caption{Primary CRediT responsibilities of each author.}
+\label{tab:credit}
+\small
+\begin{tabular}{p{4.0cm}p{9.5cm}}
+\toprule
+Author & Primary CRediT responsibilities\\
+\midrule
+Md. Raihanul Haque Rahi (Roll 2008011) & Conceptualization, Methodology, Software (architecture and training code), Investigation, Validation, Writing (original draft), Visualization\\
+Nazib Abrar (Roll 2008026) & Conceptualization, Methodology, Software (evaluation and tooling), Data curation, Investigation, Validation, Writing (review and editing), Visualization\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Both authors reviewed and approved the final manuscript.
+
+\FloatBarrier
+\section{Summary}
+\label{sec:8-6}
+This chapter recorded how we managed and financed the thesis. The main
+schedule ran from December 2025 to July 2026, following the literature
+review conducted in the preceding semester, and consisted of seven
+overlapping phases from model setup to final documentation, punctuated
+by milestone reviews with our supervisor. Total expenditure was about
+USD 420 (BDT 52,500): USD 140 for cloud GPU usage and USD 280 for the
+stereo camera and Jetson Orin Nano. We planned compute across three
+tiers (an RTX 3050 laptop GPU for local development, cloud T4 instances
+for ablations, and a single cloud A100 for production training), used
+open-source software throughout at no licence cost, and split the work
+so that architecture and training fell primarily to Rahi and evaluation
+and tooling fell primarily to Abrar, with both authors reviewing every
+stage of the manuscript. Because inference runs locally on the Jetson
+device, deployment itself adds no recurring cloud charge beyond this
+recorded development cost.
+
+% SOURCES: mainmatter/ch6.tex (all sections: 6.1 Introduction, 6.2
+%   Management of the Thesis + 6.2.1 Time Frame with tab:timeframe,
+%   6.3 Overall Budget with tab:expenses, 6.4 Component/Software Budget,
+%   6.5 Summary); mainmatter/ch1.tex 1.5 Project Planning + 1.5.1 Work
+%   Plan (Gantt figure fig:gantt / fig_b_1_gantt_fixed, both old labels
+%   fig:gantt and fig:gantt6 preserved on the single consolidated
+%   figure); appendices/app_c.tex "Authorship Contribution Statement"
+%   (recast as tab:credit) and "Communication" (folded into 8.2).
+%   Resource Planning (8.4) numbers sourced from appendices/app_a.tex
+%   "Software and Hardware Environment" (RTX 3050 ~4 GB, cloud A100 80
+%   GB, cloud T4, Jetson Orin Nano, PyTorch 2.11/CUDA 12.8/Python 3.10)
+%   plus the cost ratios already in tab:expenses; no new numeric claim
+%   introduced.
+% DROPPED: none. All content from the four source files above is
+%   represented, either verbatim (tables, figure) or humanized (prose).
+% MOVED-AWAY: none owned by another chapter; dataset details, rig
+%   specifications, and the Jetson Orin Nano hardware description stay
+%   with ch:experimental (owner ch5) and are only cross-referenced here.

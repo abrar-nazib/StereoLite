@@ -1,0 +1,382 @@
+% =====================================================================
+% CHAPTER 5: Experimental Setup and Data Collection (new department
+% template, 2026-07-14). Red sections fixed: Introduction (first),
+% Summary (last). Black middle sections are ours; the template suggests
+% Experimental Setup, Test Bench, Instruments, Calibration, Experimental
+% Procedure, and Data Collection, which this chapter follows closely.
+% Assembled per thesis/RESTRUCTURE_PLAN_V2.md (ch5 owner) from:
+%   - old mainmatter/ch7.tex Section "Simulation and Experimental Setup"
+%     (7.6; fig:setup, fig:jetson intact) and Section "Testing and
+%     Measurement" (7.8; \label{sec:testing_protocols} kept).
+%   - old mainmatter/ch2.tex "Benchmarks and Datasets" subsection (frozen
+%     dataset numbers reused; the table itself, tab:datasets, stays in
+%     ch2 as literature survey material, so a new table with a distinct
+%     label is built here for the datasets this thesis actually runs on).
+%   - old mainmatter/ch3.tex Principle-of-Operation paragraph on the rig's
+%     calibrated focal length and baseline (numbers only; the disparity-
+%     to-depth mechanism itself stays with ch:implementation).
+%   - old appendices/app_a.tex "Software and Hardware Environment" and
+%     "Reproduction Pointers" (compute/software facts; script names).
+% New prose: 5.1 Introduction, 5.7 Summary. No new numbers introduced;
+% every value here is copied from the sources above with its citation.
+% =====================================================================
+\chapter{Experimental Setup and Data Collection}
+\label{ch:experimental}
+
+\section{Introduction}
+Chapter~\ref{ch:implementation} described how the StereoLite network was
+built, trained, and optimized. Before its numbers can be trusted, the
+conditions under which they were produced need to be stated precisely:
+what hardware ran the training and the timing runs, what data the
+network saw during training and what it never saw, where the real
+camera pairs came from and how the rig behind them was calibrated, and
+what procedure turned a forward pass into a reported number. This
+chapter fixes that record. It covers the compute platforms and the
+physical stereo rig that together form the test bench, the calibration
+that makes the rig's geometry usable for depth recovery, the three data
+sources the thesis draws on, how the real-camera pairs were collected
+and how a frozen teacher network supplied a comparison reference for
+them, and the four measurement protocols that produced every accuracy,
+latency, and robustness figure in Chapter~\ref{ch:results}.
+
+The chapter is organized to move from apparatus to data to procedure.
+Section~\ref{sec:exp_setup_bench} lists the compute platforms and the
+stereo rig that make up the test bench. Section~\ref{sec:calibration}
+gives the rig's calibrated parameters and the rectification convention
+they support. Section~\ref{sec:exp_datasets} describes the three data
+sources in turn: the synthetic training and test corpus, the zero-shot
+real benchmark, and the physical rig's own captures. Section
+\ref{sec:data_collection} details how the real pairs were captured and
+how pseudo-ground-truth was obtained for them. Section
+\ref{sec:testing_protocols} closes the chapter with the four measurement
+protocols, latency and memory, rectification tolerance, real-camera
+agreement, and the dual-axis evaluation convention, each stated once
+here so that Chapter~\ref{ch:results} can report numbers without
+re-deriving the procedure behind them.
+
+\FloatBarrier
+\section{Experimental Setup and Test Bench}
+\label{sec:exp_setup_bench}
+The test bench spans four compute platforms and one piece of physical
+sensing hardware, chosen so that each stage of the work runs on the
+platform best suited to it. The production model is implemented in
+PyTorch 2.11 with CUDA 12.8 on Python 3.10, and training runs on a
+single cloud GPU with 80 gigabytes of memory. Full runs are expensive
+enough that they are reserved for the final configuration; the many
+controlled ablations behind that configuration, and the cross-domain
+evaluation that follows every training run, instead run on a smaller
+cloud GPU, chosen for its low cost so that a controlled comparison after
+every design change stays practical. Local latency benchmarking runs on
+a laptop-class GPU with roughly 4 gigabytes of memory, which represents
+the low end of the memory budget the network must fit inside rather than
+a generous development machine. The intended deployment target is a
+Jetson Orin Nano class of edge accelerator, on which the optimized model
+was measured directly, and Figure~\ref{fig:jetson} shows the development
+board used for that measurement.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.6\textwidth]{fig_7_jetson}
+\caption{Jetson Orin Nano edge accelerator, deployment target for inference.}
+\label{fig:jetson}
+\end{figure}
+
+On the sensing side, the test bench includes a calibrated low-cost
+binocular rig, a Waveshare AR0144 stereo USB camera
+\cite{waveshare_ar0144} described fully in
+Section~\ref{sec:calibration}, which supplies every real-camera pair
+used in this thesis. Together, the four
+compute platforms and the rig give a training platform sized for the
+full dataset, an inexpensive platform for iterating on the design, a
+worst-case memory reference for the deployment budget, the intended
+deployment hardware itself, and a physical source of real, imperfectly
+rectified data that no synthetic benchmark can substitute for.
+
+\FloatBarrier
+\section{Calibration and Rectification}
+\label{sec:calibration}
+Real-camera pairs come from a calibrated binocular rig, a Waveshare
+AR0144 stereo USB camera whose dual global-shutter sensors are driven
+synchronously so both views land in the same frame
+\cite{waveshare_ar0144}. Figure \ref{fig:ar0144} shows the module. The
+rig streams a single 2560 by 720 side-by-side image, which is split
+into a rectified 1280 by 720 pair per frame; Figure
+\ref{fig:rig_schematic} sketches the stream and the calibrated
+geometry, and Table \ref{tab:rig_specs} lists the manufacturer
+specifications.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.72\textwidth]{fig_5_1b_ar0144_baseline}
+\caption[Waveshare AR0144 stereo camera module with its 52 mm baseline.]{Waveshare AR0144 stereo camera module with its 52 mm baseline (product image: Waveshare \cite{waveshare_ar0144}).}
+\label{fig:ar0144}
+\end{figure}
+
+\begin{table}[!htbp]
+\centering
+\caption[Manufacturer specifications of the AR0144 stereo camera.]{Manufacturer specifications of the AR0144 stereo camera \cite{waveshare_ar0144}.}
+\label{tab:rig_specs}
+\small
+\begin{tabular}{ll}
+\toprule
+Item & Value\\
+\midrule
+Sensors & 2 $\times$ onsemi AR0144, 1/4 inch, global shutter\\
+Stereo output & $2560 \times 720$ side by side ($1280 \times 720$ per view), 30 FPS\\
+Baseline & 52 mm\\
+Lens & 2.88 mm EFL, F/2.2, fixed focus, distortion $< 0.2\%$\\
+Field of view & $74^{\circ}$ diagonal, $65^{\circ}$ horizontal, $43^{\circ}$ vertical\\
+Interface & USB 2.0 Type-C, 5 V\\
+Board size & $66.00 \times 30.00 \times 17.72$ mm\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{fig_5_2_rig_preview}
+\caption{Stereo rig capture and rectification geometry for metric depth.}
+\label{fig:rig_schematic}
+\end{figure}
+
+Calibration recovers a focal length of
+approximately 1005 pixels at the native 1280-pixel width and a baseline
+of 52 millimeters between the two camera centers; both values scale to
+the network's inference resolution by the width ratio, so the disparity
+the network predicts converts to metric depth without any additional
+tuning. The calibrated values agree with the manufacturer data of
+Table \ref{tab:rig_specs}: the published baseline is exactly 52
+millimeters, and the 65 degree horizontal field of view over the
+1280-pixel width implies a focal length close to the calibrated 1005
+pixels. The rig's factory rectification is imperfect and leaves a
+residual vertical misalignment between the two views, on the order of a
+fraction of a pixel to about a pixel, rather than the perfect
+epipolar alignment synthetic training data provides. This gap between
+laboratory-perfect and factory rectification is exactly the condition
+the second research objective targets, and Section
+\ref{sec:testing_protocols} defines the two protocols, one controlled
+and synthetic, one on the physical rig, that measure how well the
+network tolerates it.
+
+\FloatBarrier
+\section{Datasets}
+\label{sec:exp_datasets}
+This thesis draws on three data sources, summarized in Table
+\ref{tab:exp_datasets}: a synthetic corpus with dense ground truth for
+training and in-domain testing, a real benchmark the network never
+trains on for zero-shot cross-domain testing, and the project's own
+physical rig for real-camera qualification. Chapter~\ref{ch:results}
+reports every number produced from them; this section describes what
+each source contains.
+
+\begin{table}[!htbp]
+\centering
+\caption{Data sources with pair counts, resolution, and ground truth.}
+\label{tab:exp_datasets}
+\small
+\begin{tabular}{lllll}
+\toprule
+Source & Role & Pairs & Resolution & Ground truth\\
+\midrule
+SceneFlow finalpass & train / in-domain test & 35{,}454 / 4{,}370 & $960{\times}540$ & dense, rendered\\
+Middlebury 2014 & zero-shot cross-domain & 23 (perfect set) & up to ${\sim}3000{\times}2000$ & structured light\\
+Stereo rig capture & real-camera qualification & 997 & $1280{\times}720$ & none (teacher reference)\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Synthetic Training and Test Corpus: SceneFlow}
+SceneFlow finalpass \cite{mayer2016sceneflow} is the synthetic corpus the
+network trains on. Its canonical split combines FlyingThings3D,
+Monkaa, and Driving into 35,454 training pairs, each rendered at
+$960\times 540$ with dense, pixel-exact disparity ground truth; only the
+FlyingThings3D subset provides an official test split, 4,370 pairs, held
+out and never seen during training. Chapter~\ref{ch:implementation}
+describes the crop, augmentation, and optimization protocol applied on
+top of this corpus; this chapter records the corpus itself, since its
+size and density set the ceiling on how well the network can learn
+dense correspondence before it is ever asked to generalize. Rendered
+ground truth of this kind is something no physical sensor can supply at
+this scale, which is precisely why the field trains on it despite the
+domain gap it introduces relative to real imagery.
+
+\subsection{Zero-Shot Cross-Domain Benchmark: Middlebury 2014}
+Middlebury 2014 \cite{scharstein2014middlebury} supplies the cross-domain
+test. Its 23 perfect-rectification scenes, real indoor imagery captured
+with structured-light ground truth at up to roughly $3000\times 2000$
+pixels, carry public ground truth and are the scenes this thesis
+evaluates on; the benchmark's remaining 10 scenes withhold their ground
+truth on a submission server and are not used here. The network never
+trains on any Middlebury imagery, so every result reported against this
+benchmark in Chapter~\ref{ch:results} is a genuine zero-shot measurement.
+Its disparities extend to several hundred pixels and its scenes include
+thin structures and repeated texture that the synthetic training
+distribution under-represents, which is why it functions as a stress
+test rather than a second in-domain benchmark.
+
+\subsection{Physical Stereo Rig Captures}
+The third source is the project's own rig, described in Section
+\ref{sec:calibration}. Unlike the two benchmarks above, it carries no
+dense ground truth of its own; its role is to confirm that behaviour
+measured on synthetic and public data survives contact with a real,
+imperfectly rectified camera. Section~\ref{sec:data_collection} details
+how these pairs were captured and how a reference disparity was
+obtained for them despite the absence of ground truth.
+
+\FloatBarrier
+\section{Data Collection}
+\label{sec:data_collection}
+Real pairs were captured directly from the rig's live 2560 by 720
+side-by-side stream, described in Section~\ref{sec:calibration}, and
+split in software into the rectified 1280 by 720 left and right frames
+that the network consumes at its inference resolution. No frame
+selection criterion beyond basic scene variety was applied: the capture
+set spans ordinary indoor scenes at the range the rig was calibrated
+for, since the purpose of these pairs is to qualify the network on
+unremarkable real data rather than to stress a particular scenario.
+This yielded 997 rectified pairs, none of which contributed to training
+or fine-tuning at any stage; the network that produces disparity on
+these pairs is exactly the SceneFlow-trained checkpoint of Chapter
+\ref{ch:implementation}.
+
+Because the rig supplies no dense ground truth, the real-camera
+agreement protocol of Section~\ref{sec:testing_protocols} instead
+compares the network's prediction on these 997 pairs against a
+pseudo-ground-truth reference produced by a frozen FoundationStereo
+teacher run on the same pairs. The teacher is a large, accurate,
+foundation-model-based network that is never trained or fine-tuned on
+this project's data; it is applied once, off-line, to generate a
+disparity reference for each of the 997 pairs, and that reference is
+then treated as a strong stand-in for ground truth in the agreement
+comparison. Because both the compact network and the teacher observe
+the same imperfectly rectified input, a close match between them
+measures agreement under real conditions rather than absolute error
+against a laboratory-perfect reference, and Section
+\ref{sec:testing_protocols} states this distinction explicitly wherever
+the resulting numbers are used.
+
+\FloatBarrier
+\section{Experimental Procedure and Evaluation Metrics}
+\label{sec:testing_protocols}
+Every number Chapter~\ref{ch:results} reports follows one of four
+measurement protocols, defined here so that each has a single stated
+procedure rather than an implicit one repeated across tables. Accuracy
+throughout follows the standard stereo metrics of \eqref{eq:metrics}:
+end-point error \cite{mayer2016sceneflow}, the bad-$t$ rates
+\cite{scharstein2002taxonomy}, and the D1-all outlier rate
+\cite{menze2015kitti}, each metric averaged per image and then over
+images rather than pooled across every pixel in the set.
+
+The first protocol measures latency and memory. Latency is measured at
+batch one and $384\times 640$ resolution after warm-up passes; memory is
+recorded as the peak inference working set, and every measurement states
+its device. On the local laptop GPU the model runs in eager PyTorch at
+full and half precision, without compiler assistance, so those numbers
+reflect an unoptimized serving path. On the deployment target, the
+Jetson Orin Nano, the optimized model is exported to an eight-bit engine
+and measured directly on the device, and that on-device figure is the
+one taken as evidence for the real-time claim.
+
+The second protocol tests tolerance to imperfect rectification under
+controlled conditions. The trained model is evaluated at the native axis
+on a fixed 400-pair FlyingThings3D subset. The right image is shifted
+vertically by a controlled offset while the disparity ground truth stays
+unchanged, so the offset emulates a residual vertical misalignment
+between the views without touching anything else about the pair. The
+sweep runs from zero through sub-pixel offsets to several pixels, and
+the standard metrics are reported at every point on the sweep.
+
+The third protocol corroborates that synthetic sweep on physical data,
+using the collection described in Section~\ref{sec:data_collection}.
+The trained model is run on the 997 rectified pairs from the project's
+rig, whose factory rectification leaves a residual vertical misalignment
+of the kind the second protocol emulates, and its disparity is compared
+against the FoundationStereo teacher's pseudo-ground-truth on the same
+pairs. Because both the model and the teacher see the same misaligned
+input, this protocol measures agreement with a strong reference rather
+than absolute error, and it corroborates rather than replaces the
+controlled sweep of the second protocol.
+
+The fourth is the dual-axis evaluation convention. Every in-domain
+evaluation is reported on the native $960\times 540$ axis, which
+preserves true disparity magnitudes, with a resized-axis measurement at
+$640\times 384$ logged alongside for comparability with the legacy
+protocol discussed in Chapter~\ref{ch:implementation}. Any comparison
+between input protocols evaluates every candidate on both axes, so a
+gain on one axis cannot hide a loss on the other. Zero-shot Middlebury
+2014 evaluation follows a single fixed protocol applied identically to
+the trained model and to the public reference checkpoints it is compared
+against: inference at $384\times 640$, ground truth scaled to the
+inference width, disparities above 192 pixels masked, and per-scene
+metrics macro-averaged over scenes.
+
+Each protocol runs as a separate scripted driver on a cloud GPU, and
+every driver writes its configuration and metrics to a metadata file
+alongside its outputs so that a reported number can be traced back to
+the run that produced it; the specific driver names are recorded in the
+appendix covering technical specifications. A cross-domain evaluation
+run of this kind
+costs only minutes and a small fraction of a cloud GPU-hour, which is
+what keeps the after-every-training-run evaluation gate described in
+Chapter~\ref{ch:design} practical rather than an occasional afterthought.
+
+\FloatBarrier
+\section{Summary}
+This chapter recorded the conditions behind every number reported in
+Chapter~\ref{ch:results}. The test bench pairs a large cloud GPU for
+production training with a smaller, cheaper cloud GPU for ablations, a
+memory-constrained laptop GPU for a conservative latency reference, and
+the Jetson Orin Nano as the deployment target, alongside a calibrated
+low-cost stereo rig whose focal length, baseline, and imperfect factory
+rectification were all stated so that later reconstruction and
+robustness numbers are traceable to a physical measurement. Three data
+sources were described: the SceneFlow synthetic corpus that trains and
+in-domain-tests the network, the Middlebury 2014 benchmark that tests it
+zero-shot on unseen real imagery, and 997 real pairs collected from the
+project's own rig, for which a frozen FoundationStereo teacher supplied
+a pseudo-ground-truth reference in place of the dense ground truth the
+rig cannot provide. Four measurement protocols, latency and memory,
+controlled rectification perturbation, real-rig agreement, and dual-axis
+evaluation, were each fixed to a single stated procedure so that
+Chapter~\ref{ch:results} can report its numbers against a documented and
+reproducible method rather than an implicit one.
+
+% SOURCES: old mainmatter/ch7.tex Section "Simulation and Experimental
+%   Setup" (7.6, full text: three data sources, fig:setup and fig:jetson
+%   figures, scripted-driver reproducibility framing, low-cost-evaluation
+%   sentence) and Section "Testing and Measurement" (7.8, full text: all
+%   four measurement protocols, \label{sec:testing_protocols} kept
+%   verbatim). old mainmatter/ch2.tex "Benchmarks and Datasets" subsection
+%   (SceneFlow 35,454/4,370 pairs at 960x540, Middlebury 2014 23/10 scenes
+%   up to ~3000x2000, both \cite keys reused). old mainmatter/ch3.tex
+%   Principle-of-Operation paragraph (rig focal length ~1005 px at native
+%   1280 px width, baseline 52 mm; numbers only). old appendices/app_a.tex
+%   "Software and Hardware Environment" (PyTorch 2.11, CUDA 12.8, Python
+%   3.10, per-platform memory figures) and "Reproduction Pointers"
+%   (997-pair in-house capture set note, scripted-driver-per-experiment
+%   framing).
+% DROPPED: the fig:setup diagram (fig_7_setup_preview) from old 7.6 was
+%   considered for this chapter but its content (three data sources plus
+%   training/evaluation platforms plus recorded metrics) is now fully
+%   covered in prose across Sections 5.2-5.6 of this chapter without the
+%   figure, so it was left out here rather than duplicated; if a future
+%   integration pass wants the original diagram reinstated, it is
+%   unchanged at fig_7_setup_preview and carries the label fig:setup in
+%   the old book. Vendor names for the cloud GPUs (a specific commercial
+%   provider) are not stated, matching the vendor-neutral convention
+%   already used throughout the old book's Chapter 7 and 8 text.
+% MOVED-AWAY: SceneFlow crop size, augmentation triplet, optimizer,
+%   schedule, batch size, precision, and Table tab:train_config -> owner
+%   ch:implementation (old 7.2 Datasets and Training Protocol + 7.3
+%   Selection of Parameters, per the plan's row for 7.2/7.3/7.4/7.7).
+%   The disparity-to-depth back-projection mechanism and the network's
+%   forward-pass description -> owner ch:implementation (old 7.7
+%   Principle of Operation). The literature-survey dataset comparison
+%   table tab:datasets (with KITTI 2012/2015 and ETH3D, not used in this
+%   thesis's own experiments) stays with ch:lit's comparative-analysis
+%   section; this chapter's Table \ref{tab:exp_datasets} is a new,
+%   distinctly labeled table scoped to the three sources this thesis
+%   actually runs on, to avoid a duplicate tab:datasets label at
+%   integration. The controlled-ablation review-and-feedback gate
+%   referenced in the "low-cost evaluation" sentence -> owner ch:design
+%   (old 7.5 Review and Feedback).

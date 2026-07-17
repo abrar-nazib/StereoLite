@@ -62,6 +62,7 @@
   {\bfseries\fontsize{12}{15}\selectfont}{\thesubsection}{0.6em}{}
 % NO \subsubsection anywhere (department rule).
 \usepackage{placeins} % \FloatBarrier keeps figures inside their section
+\usepackage{rotating} % sidewaysfigure for the wide architecture overview
 
 \renewcommand{\contentsname}{List of Contents}
 \renewcommand{\bibname}{References}
@@ -106,15 +107,17 @@
 % (user decision 2026-07-05; frontmatter stays single-spaced).
 \onehalfspacing
 
-\include{mainmatter/ch1}
-\include{mainmatter/ch2}
-\include{mainmatter/ch3}
-\include{mainmatter/ch4}
-\include{mainmatter/ch5}
-\include{mainmatter/ch6}
-\include{mainmatter/ch7}
-\include{mainmatter/ch8}
-\include{mainmatter/ch9}
+% Restructured 2026-07-17 to the 2026-07-14 department format
+% (thesis/RESTRUCTURE_PLAN_V2.md); old chapters kept in mainmatter/.
+\include{mainmatter2/ch1}
+\include{mainmatter2/ch2}
+\include{mainmatter2/ch3}
+\include{mainmatter2/ch4}
+\include{mainmatter2/ch5}
+\include{mainmatter2/ch6}
+\include{mainmatter2/ch7}
+\include{mainmatter2/ch8}
+\include{mainmatter2/ch9}
 
 \cleardoublepage
 \phantomsection
@@ -129,10 +132,15 @@
 \titleformat{\chapter}[display]
   {\centering\bfseries\fontsize{16}{19}\selectfont}
   {Appendix \thechapter}{6pt}{}
-\include{appendices/app_a}
-\include{appendices/app_c}
-\include{appendices/app_d}
-\include{appendices/app_e}
+\include{appendices2/app_a}
+\include{appendices2/app_b}
+\include{appendices2/app_c}
+\include{appendices2/app_d}
+\include{appendices2/app_e}
+\include{appendices2/app_f}
+\include{appendices2/app_g}
+\include{appendices2/app_h}
+\include{appendices2/app_i}
 \end{appendices}
 
 \end{document}
