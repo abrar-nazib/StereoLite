@@ -1,57 +1,77 @@
 % ================= Certificate (unnumbered) ============================
-% Verbatim structure per ruet-thesis-expert section 2.2 (adapted from the
-% accepted June-2025 precedent, p.14). Content FINAL except the Head's
-% name (fill before printing) and signatures (collected physically).
+% Layout follows the department "Thesis or Project Dissertation Format"
+% approval page: header block (motto, university, department, logo,
+% underlined CERTIFICATE), certification statement, then a two by two
+% signature grid (supervisor | students, countersigned | external).
+% Content FINAL except the Head's name and the external examiner block,
+% which are filled at the defense.
 \thispagestyle{empty}
-\chapter*{Certificate}
 
-This is to certify that the thesis work ``AI-Enhanced Stereo Matching for
-High-Accuracy Depth Mapping and 3D Reconstruction'' by Md. Raihanul Haque
-Rahi, bearing Roll No. 2008011 \& Nazib Abrar, bearing Roll No. 2008026 has
-been carried out under my supervision in partial fulfillment of the
-requirements for the degree of Bachelor of Science in Mechatronics
-Engineering.
+% dotted signature rule used across this page
+\providecommand{\signatureline}[1][6cm]{\makebox[#1]{\dotfill}}
 
-\vspace{3.2em}
+\begin{center}
+  \textbf{Heaven's Light is Our Guide}\\[0.15cm]
+  {\large\bfseries RAJSHAHI UNIVERSITY OF ENGINEERING \& TECHNOLOGY}\\[0.1cm]
+  {\normalsize\bfseries Department of Mechatronics Engineering}\\[0.25cm]
+  \includegraphics[width=2.6cm]{ruet_logo}\\[0.3cm]
+  {\large\bfseries\underline{CERTIFICATE}}\\[0.3cm]
+\end{center}
 
-% Format follows the accepted June-2025 MTE precedent: the label sits
-% ABOVE the signature rule, and the name appears in parentheses below it.
-\noindent\textit{Signature of the Supervisor}\\[2.2em]
-\noindent\rule{2.6in}{0.4pt}\\
-(Md Zunaid Hossen)\\
-Lecturer, Department of Mechatronics Engineering\\
-Rajshahi University of Engineering \& Technology
+\noindent
+This is to certify that the thesis work \textbf{``AI-Enhanced Stereo
+Matching for High-Accuracy Depth Mapping and 3D Reconstruction''} by
+\textbf{Md. Raihanul Haque Rahi}, bearing Roll No.\ \textbf{2008011} \&
+\textbf{Nazib Abrar}, bearing Roll No.\ \textbf{2008026} has been carried
+out under my supervision in partial fulfillment of the requirements for
+the degree of Bachelor of Science in Mechatronics Engineering.
 
-\vspace{2.6em}
+\vspace{0.6cm}
 
-\noindent\textit{Signature of the Students}\\[2.2em]
-\noindent\rule{2.6in}{0.4pt}\\
-(Md. Raihanul Haque Rahi)\\
-Roll No. 2008011
+% --- Row 1: Supervisor (left) | Students (right) ---
+\noindent
+\begin{minipage}[t]{0.46\textwidth}
+  \textbf{Signature of the Supervisor}\\[1.5cm]
+  \signatureline[6cm]\\[0.15cm]
+  \textbf{(Md Zunaid Hossen)}\\
+  Lecturer\\
+  Department of Mechatronics Engineering\\
+  Rajshahi University of Engineering \&\\
+  Technology
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.46\textwidth}
+  \textbf{Signature of the Students}\\[1.5cm]
+  \signatureline[6cm]\\[0.15cm]
+  \textbf{(Md. Raihanul Haque Rahi)}\\
+  Roll No: 2008011\\[0.6cm]
+  \signatureline[6cm]\\[0.15cm]
+  \textbf{(Nazib Abrar)}\\
+  Roll No: 2008026
+\end{minipage}
 
-\vspace{1.6em}
+\vspace{0.8cm}
 
-\noindent\rule{2.6in}{0.4pt}\\
-(Nazib Abrar)\\
-Roll No. 2008026
-
-\vspace{2.6em}
-
-\noindent Countersigned
-
-\vspace{1.6em}
-
-\noindent\rule{2.6in}{0.4pt}\\
-(Md. Firoj Ali)\\
-Associate Professor and Head\\
-Department of Mechatronics Engineering\\
-Rajshahi University of Engineering \& Technology
-
-\vspace{2.6em}
-
-% Name intentionally left blank; filled at the defense.
-\noindent\textit{Signature of the External Examiner}\\[2.2em]
-\noindent\rule{2.6in}{0.4pt}\\
-(\hspace{1.4in})
+% --- Row 2: Countersigned (left) | External Examiner (right) ---
+\noindent
+\begin{minipage}[t]{0.46\textwidth}
+  \textbf{Countersigned}\\[1.5cm]
+  \signatureline[6cm]\\[0.15cm]
+  \textbf{(Md. Firoj Ali)}\\
+  Associate Professor and Head\\
+  Department of Mechatronics Engineering\\
+  Rajshahi University of Engineering \&\\
+  Technology
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.46\textwidth}
+  \textbf{Signature of the External Examiner}\\[1.5cm]
+  \signatureline[6cm]\\[0.15cm]
+  \textbf{(Name of the External)}\\
+  Designation\\
+  Department of \dotfill\\
+  Rajshahi University of Engineering \&\\
+  Technology
+\end{minipage}
 
 \clearpage

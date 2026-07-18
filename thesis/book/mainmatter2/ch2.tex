@@ -87,7 +87,7 @@ to the line joining the two camera centers, as Figure
 \ref{fig:rectify_geom} shows. After this warp every epipolar line
 coincides with an image row, so corresponding points share the same
 vertical coordinate and the match for a left pixel $(x, y)$ is found by
-sliding horizontally:
+sliding horizontally \cite{scharstein2002taxonomy}:
 \begin{equation}
 x' = x - d, \qquad y' = y
 \label{eq:correspondence}
@@ -108,7 +108,7 @@ directly in Chapter~\ref{ch:results}.
 \paragraph{Disparity and depth.}
 The horizontal shift $d$ between a point and its match is the disparity,
 and it fixes the depth of the scene point through the calibrated pinhole
-relation
+relation \cite{scharstein2002taxonomy}
 \begin{equation}
 Z = \frac{f\,B}{d}
 \label{eq:depth_from_disparity}
@@ -293,8 +293,9 @@ continuous disparity with the differentiable soft-argmin of
 \eqref{eq:softargmin}, an operator still used across cost-volume networks
 today.
 
-The correlation layer forms a scalar matching cost by taking the inner
-product of the two feature maps at each disparity along the scanline,
+The correlation layer \cite{mayer2016sceneflow} forms a scalar matching
+cost by taking the inner product of the two feature maps at each
+disparity along the scanline,
 \begin{equation}
 c(x, y, d) = \big\langle\, f_L(x, y),\; f_R(x - d,\, y) \,\big\rangle
            = \sum_{k} f_L^{(k)}(x, y)\, f_R^{(k)}(x - d, y)
@@ -305,8 +306,8 @@ disparity $d$, $f_L$ and $f_R$ the shared feature maps, and the inner
 product runs over the feature channels $k$; the search covers
 $d \in [0, D_{\max}]$.
 
-The soft-argmin turns the regularized cost volume into a continuous
-disparity by taking a softmax-weighted expectation,
+The soft-argmin \cite{kendall2017gcnet} turns the regularized cost volume
+into a continuous disparity by taking a softmax-weighted expectation,
 \begin{equation}
 \hat{d}(x, y) = \sum_{d=0}^{D-1} d \cdot
   \operatorname{softmax}_d\!\big(-c_d(x, y)\big)
@@ -355,9 +356,9 @@ and CFNet \cite{shen2021cfnet} shifted the objective toward cross-domain
 generalization through a fused multi-scale volume and an
 uncertainty-driven cascade that adaptively narrows the disparity search.
 
-The group-wise correlation splits the $N_c$ feature channels into $N_g$
-groups and computes a normalized inner-product correlation within each
-group,
+The group-wise correlation \cite{guo2019gwcnet} splits the $N_c$ feature
+channels into $N_g$ groups and computes a normalized inner-product
+correlation within each group,
 \begin{equation}
 C_{\mathrm{gwc}}(g, d, x, y) = \frac{N_g}{N_c}\,
   \big\langle\, f_L^{(g)}(x, y),\; f_R^{(g)}(x - d,\, y) \,\big\rangle
@@ -436,7 +437,7 @@ update and reset gates, $\tilde{h}_n$ the candidate state, $\sigma$ the
 sigmoid, and $\odot$ the element-wise product; a small head then predicts
 the disparity residual from $h_n$.
 
-The geometry encoding volume regularizes a group-wise correlation volume
+The geometry encoding volume of IGEV-Stereo \cite{xu2023igev} regularizes a group-wise correlation volume
 and combines it with the all-pairs correlation into a lookup structure,
 \begin{equation}
 C_G = R\big(C_{\mathrm{gwc}}(f_{L}, f_{R})\big), \qquad
@@ -898,31 +899,27 @@ StereoLite (ours) & 2026 & 2.96 & 0.78 & n/a & 49.8\\
 \section{Summary}
 \label{sec:ch2_summary}
 This chapter surveyed the literature that bears on an edge-deployable
-stereo network and then compared that literature directly rather than as
-a list of isolated methods.
-Section~\ref{sec:existing_research} traced deep stereo matching from the
-classical four-step pipeline through learned matching costs,
-three-dimensional cost-volume networks, iterative refinement, and the
-foundation-model systems that now hold the accuracy ceiling at a
-computational cost most edge devices cannot meet. It then stated four
-requirements for edge deployment (compact parameters, real-time
-latency on roughly four to six tera-operations per second, a small
-inference working set, and integer-friendly operators) and used them to
-classify the efficient literature into backbone substitution,
+stereo network and then compared that literature directly rather than
+treating it as a list of isolated methods. We traced deep stereo
+matching from the classical four-step pipeline through learned matching
+costs, three-dimensional cost-volume networks, iterative refinement, and
+the foundation-model systems that now hold the accuracy ceiling at a
+computational cost most edge devices cannot meet. From that survey we
+stated four requirements for edge deployment (compact parameters,
+real-time latency on roughly four to six tera-operations per second, a
+small inference working set, and integer-friendly operators) and used
+them to classify the efficient literature into backbone substitution,
 cost-volume compression, iterative-loop compression, knowledge
-distillation, and architectural and adaptive-compute techniques.
-Section~\ref{sec:comparative_analysis} compared these families directly:
-the review of cross-domain generalization showed that both
-architecture-level and training-recipe remedies narrow the
-synthetic-to-real gap, and that the relative contribution of iteration
-versus training pipeline to zero-shot accuracy remains unsettled in the
-literature; the benchmark review fixed the dual-metric, zero-shot
-evaluation convention the rest of this thesis follows; and the combined
-parameter-accuracy-latency comparison placed our own model on the same
-footing as every method it is compared against. Chapter~\ref{ch:design}
-draws on this survey to design a network for the edge envelope stated in
-Section~\ref{sec:edge_requirements}, selecting and adapting the specific
-mechanisms it inherits from the families reviewed here.
+distillation, and architectural and adaptive-compute techniques. We
+compared these families directly: the review of cross-domain
+generalization showed that both architecture-level and training-recipe
+remedies narrow the synthetic-to-real gap, and that the relative
+contribution of iteration versus training pipeline to zero-shot accuracy
+remains unsettled in the literature; the benchmark review fixed the
+dual-metric, zero-shot evaluation convention the rest of this thesis
+follows; and the combined parameter-accuracy-latency comparison placed
+our own model on the same footing as every method it is compared
+against.
 
 % SOURCES: thesis/book/mainmatter/ch2.tex sections 2.1 (Introduction),
 %   2.2 (Literature Review, all 5 subsections: Stereo Matching

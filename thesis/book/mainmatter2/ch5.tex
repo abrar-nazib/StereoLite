@@ -322,24 +322,25 @@ Chapter~\ref{ch:design} practical rather than an occasional afterthought.
 
 \FloatBarrier
 \section{Summary}
-This chapter recorded the conditions behind every number reported in
-Chapter~\ref{ch:results}. The test bench pairs a large cloud GPU for
-production training with a smaller, cheaper cloud GPU for ablations, a
-memory-constrained laptop GPU for a conservative latency reference, and
-the Jetson Orin Nano as the deployment target, alongside a calibrated
-low-cost stereo rig whose focal length, baseline, and imperfect factory
-rectification were all stated so that later reconstruction and
-robustness numbers are traceable to a physical measurement. Three data
-sources were described: the SceneFlow synthetic corpus that trains and
-in-domain-tests the network, the Middlebury 2014 benchmark that tests it
-zero-shot on unseen real imagery, and 997 real pairs collected from the
-project's own rig, for which a frozen FoundationStereo teacher supplied
-a pseudo-ground-truth reference in place of the dense ground truth the
-rig cannot provide. Four measurement protocols, latency and memory,
-controlled rectification perturbation, real-rig agreement, and dual-axis
-evaluation, were each fixed to a single stated procedure so that
-Chapter~\ref{ch:results} can report its numbers against a documented and
-reproducible method rather than an implicit one.
+This chapter fixed the test bench, the data sources, and the
+measurement protocols behind every number in the study. The test bench
+pairs a large cloud GPU for production training with a smaller,
+cheaper cloud GPU for ablations, a memory-constrained laptop GPU for a
+conservative latency reference, and the Jetson Orin Nano as the
+deployment target, alongside a calibrated low-cost stereo rig whose
+focal length, baseline, and imperfect factory rectification were all
+stated so that later reconstruction and robustness numbers are
+traceable to a physical measurement. Three data sources were
+described: the SceneFlow synthetic corpus that trains and
+in-domain-tests the network, the Middlebury 2014 benchmark that tests
+it zero-shot on unseen real imagery, and 997 real pairs collected from
+the project's own rig, for which a frozen FoundationStereo teacher
+supplied a pseudo-ground-truth reference in place of the dense ground
+truth the rig cannot provide. Four measurement protocols, latency and
+memory, controlled rectification perturbation, real-rig agreement, and
+dual-axis evaluation, were each fixed to a single stated procedure,
+giving every reported number a documented and reproducible method
+behind it rather than an implicit one.
 
 % SOURCES: old mainmatter/ch7.tex Section "Simulation and Experimental
 %   Setup" (7.6, full text: three data sources, fig:setup and fig:jetson

@@ -77,13 +77,25 @@ def fig_2_7_reqmap():
 
 
 def fig_3_12_methodflow():
-    # Serpentine 2 x 3 grid (was one 6-wide row on a 1320 px canvas that
-    # printed ~5 pt): row 1 flows left-to-right, row 2 right-to-left, so
-    # the canvas is only 780 px wide and fonts print ~12 pt.
-    d = D("methodflow", 780, 560)
-    W, H = 220, 104
-    xs = (30, 280, 530)
-    y1, y2 = 60, 330
+    # Serpentine 2 x 3 grid on a narrow canvas so the box font prints large
+    # at \textwidth. Row 1 flows left to right, row 2 right to left. Both
+    # feedback paths are dashed red and carry SHORT labels on the edge
+    # itself; there is no free-floating caption anywhere in the figure.
+    # The evaluation feedback rides the empty horizontal band between the
+    # two rows (y = 248) and a dedicated vertical channel at x = 668, well
+    # clear of the forward descent channel at x = 782.
+    d = D("methodflow", 880, 470)
+    W, H = 230, 110
+    xs = (40, 325, 610)
+    y1, y2 = 66, 320
+    FB = "#b85450"
+
+    def lab(t, color=FB):
+        # edge() hardcodes fontSize=10; inline HTML lifts it to 14 px and
+        # paints an opaque backdrop so the label never sits on the stroke.
+        return ('<span style="font-size:14px;color:' + color +
+                ';background-color:#ffffff;">&nbsp;' + t + '&nbsp;</span>')
+
     stages = [
         ("Literature study<br>(surveyed families,<br>reference designs)",
          GREY_F, GREY_S, xs[0], y1),
@@ -99,89 +111,121 @@ def fig_3_12_methodflow():
     ]
     ids = [d.box(x, y, W, H, label, fill=f, stroke=s, fs=15)
            for label, f, s, x, y in stages]
+    # forward serpentine
     d.edge(ids[0], ids[1], exit_=(1, 0.5), entry=(0, 0.5))
     d.edge(ids[1], ids[2], exit_=(1, 0.5), entry=(0, 0.5))
-    d.edge(ids[2], ids[3], exit_=(0.5, 1), entry=(0.5, 0))  # down
-    d.edge(ids[3], ids[4], exit_=(0, 0.5), entry=(1, 0.5))  # right-to-left
+    d.edge(ids[2], ids[3], exit_=(0.75, 1), entry=(0.75, 0))  # descend
+    d.edge(ids[3], ids[4], exit_=(0, 0.5), entry=(1, 0.5))    # right to left
     d.edge(ids[4], ids[5], exit_=(0, 0.5), entry=(1, 0.5))
-    d.text(508, 12, 270, 24, "evidence gate: winners only advance",
-           fs=13, color="#b85450")
-    # reject/retune self-loop on the ablation stage (above the box)
-    d.edge(ids[2], ids[2], exit_=(0.75, 0), entry=(0.25, 0), dashed=True,
-           points=((695, 40), (585, 40)), value="reject / retune")
-    # failed evaluation reopens the design: eval (row 2) up to ablations;
-    # label drawn as free text under the loop, NOT as an edge value
-    # (edge values center on the path and land on top of the eval box)
-    d.edge(ids[4], ids[2], exit_=(0.5, 1), entry=(0, 0.75), dashed=True,
-           points=((390, 500), (505, 500), (505, 138)))
-    d.text(120, 505, 260, 24, "failed evaluation reopens the design",
-           fs=13, color="#666666")
+    # a rejected ablation arm returns to the harness (compact loop above)
+    d.edge(ids[2], ids[2], exit_=(0.88, 0), entry=(0.12, 0), dashed=True,
+           color=FB, points=((812, 22), (638, 22)),
+           value=lab("rejected arm"))
+    # a failed evaluation reopens the design, routed through the clear band
+    # between the rows instead of looping outside the figure
+    d.edge(ids[4], ids[2], exit_=(0.75, 0), entry=(0.25, 1), dashed=True,
+           color=FB, points=((497, 248), (668, 248)),
+           value=lab("failed evaluation"))
     URLS["fig_3_12_methodflow"] = d.save(OUT / "fig_3_12_methodflow.drawio")
 
 
 def fig_4_5_export():
-    d = D("export", 1280, 430)
-    ck = d.box(40, 60, 190, 70, "Trained PyTorch<br>checkpoint (fp32)",
-               fill=GREY_F, stroke=GREY_S, fs=12)
-    go = d.box(300, 40, 270, 110,
-               "Graph optimization<br>(pre-export, equivalence-proven):<br>"
-               "context precomputed per scale,<br>fused gates and heads,<br>"
-               "dead code removed, GEV band narrowed",
-               fill=BLUE_F, stroke=BLUE_S, fs=11)
-    sw = d.box(300, 250, 270, 110,
-               "Operator swaps for INT8:<br>unfold in convex upsampling,<br>"
-               "group normalization,<br>3D convolution",
-               fill=RED_F, stroke=RED_S, fs=11)
-    ex = d.box(650, 60, 190, 70, "ONNX export", fill=LAV_F, stroke=LAV_S, fs=12)
-    ca = d.box(650, 250, 190, 70, "INT8 calibration", fill=YEL_F,
-               stroke=YEL_S, fs=12)
-    en = d.box(920, 150, 200, 80, "TensorRT engine<br>(eight-bit)",
-               fill=GREEN_F, stroke=GREEN_S, fs=12)
-    d.edge(ck, go)
-    d.edge(go, sw, points=((435, 200),))
-    d.edge(go, ex)
-    d.edge(sw, ca)
-    d.edge(ex, ca, points=((745, 180),))
-    d.edge(ca, en)
-    d.edge(ex, en, dashed=True)
-    jd = d.box(920, 300, 200, 60, "Jetson Orin Nano<br>measured on device",
-               fill=ORAN_F, stroke=ORAN_S, fs=12)
-    d.edge(en, jd)
-    d.text(300, 12, 420, 22,
-           "1.74x latency reduction before quantization", fs=11, bold=True)
+    # Was 1280 x 430 (labels printed ~5 pt, boxes stuffed with paragraphs);
+    # then a 6-row vertical spine, which printed legibly but ran taller than
+    # wide and forced a full-page float with a blank lower-right quadrant.
+    # Now a 3 x 3 serpentine grid: row 1 left-to-right, row 3 right-to-left,
+    # the INT8 operator-swap branch fills the middle-right cell and the
+    # 1.74x callout the middle-left cell, tied to the graph-optimization box
+    # by a dashed leader. Every grid cell is occupied, so the bounding box is
+    # roughly 2:1 and the float sits in a fraction of a page. Enumerated
+    # optimizations stay in the prose and Table 4.2, not in the boxes.
+    C1, C2, C3, W = 40, 390, 740, 310
+    R1, R2, R3, H, H2 = 50, 210, 355, 95, 85
+    d = D("export", 1130, 500)
+    ck = d.box(C1, R1, W, H, "Trained PyTorch checkpoint<br>(fp32)",
+               fill=GREY_F, stroke=GREY_S, fs=15)
+    go = d.box(C2, R1, W, H,
+               "Graph optimization<br>(pre-export)<br>"
+               "four equivalence-proven changes",
+               fill=BLUE_F, stroke=BLUE_S, fs=15)
+    ex = d.box(C3, R1, W, H, "ONNX export", fill=LAV_F, stroke=LAV_S, fs=15)
+    sw = d.box(C3, R2, W, H2,
+               "Operator swaps for INT8<br>three operators swapped",
+               fill=RED_F, stroke=RED_S, fs=15)
+    ca = d.box(C3, R3, W, H, "INT8 calibration", fill=YEL_F, stroke=YEL_S,
+               fs=15)
+    en = d.box(C2, R3, W, H, "TensorRT engine<br>(eight-bit)",
+               fill=GREEN_F, stroke=GREEN_S, fs=15)
+    jd = d.box(C1, R3, W, H, "Jetson Orin Nano<br>measured on device",
+               fill=ORAN_F, stroke=ORAN_S, fs=15)
+    # callout anchored to the graph-optimization stage it describes
+    nt = d.box(C2, R2, W, H2, "", fill="#ffffff", stroke="#b85450",
+               dashed=True)
+    d.text(C2, R2 + 17, W, 50,
+           "1.74x latency reduction<br>before quantization", fs=14,
+           bold=True, color="#b85450")
+    d.edge(go, nt, exit_=(0.25, 1), entry=(0.25, 0), dashed=True,
+           arrow=False, color="#b85450")
+    d.edge(ck, go, exit_=(1, 0.5), entry=(0, 0.5))
+    d.edge(go, ex, exit_=(1, 0.5), entry=(0, 0.5))
+    # branch turns below the ONNX box, then drops the right column
+    d.edge(go, sw, exit_=(0.9, 1), entry=(0.5, 0),
+           points=((669, 177), (895, 177)))
+    d.edge(sw, ca, exit_=(0.5, 1), entry=(0.5, 0))
+    # full-precision graph reaches calibration on an outer rail so it does
+    # not cut through the operator-swap box
+    d.edge(ex, ca, exit_=(1, 0.5), entry=(1, 0.5),
+           points=((1080, 97), (1080, 402)))
+    d.edge(ca, en, exit_=(0, 0.5), entry=(1, 0.5))
+    d.edge(en, jd, exit_=(0, 0.5), entry=(1, 0.5))
     URLS["fig_4_5_export"] = d.save(OUT / "fig_4_5_export.drawio")
 
 
 def fig_5_2_rig():
-    d = D("rig", 1120, 430)
-    # sensor + SBS frame
-    rig = d.box(40, 60, 170, 90, "Binocular rig<br>(single sensor<br>stream)",
-                fill=GREY_F, stroke=GREY_S, fs=12)
-    sbs = d.box(290, 50, 340, 110, "", fill="#ffffff", stroke=EDGE, rounded=0)
+    # Two stacked bands on a narrow canvas (was 1120 x 430, which printed
+    # every label at roughly 5 pt at \textwidth). Band 1 is the capture and
+    # split path, band 2 the rig geometry. No trailing caption sentence: the
+    # chapter prose already states the epipolar and Z = f B / d relations.
+    d = D("rig", 860, 500)
+    # band 1: capture and split
+    d.text(30, 12, 320, 24, "Capture and split", fs=14, bold=True,
+           align="left")
+    rig = d.box(30, 80, 150, 96, "Binocular rig<br>(single sensor<br>stream)",
+                fill=GREY_F, stroke=GREY_S, fs=14)
+    sbs = d.box(225, 84, 270, 88, "", fill="#ffffff", stroke=EDGE, rounded=0)
     d.edge(rig, sbs)
-    d.line(460, 50, 460, 160, width=1.3, dashed=True)
-    d.text(300, 56, 150, 20, "left half", fs=11)
-    d.text(470, 56, 150, 20, "right half", fs=11)
-    d.text(290, 165, 340, 20, "2560 x 720 side-by-side frame", fs=11)
-    L = d.box(760, 40, 250, 62, "Left image<br>1280 x 720 (rectified)",
-              fill=BLUE_F, stroke=BLUE_S, fs=12)
-    R = d.box(760, 130, 250, 62, "Right image<br>1280 x 720 (rectified)",
-              fill=GREEN_F, stroke=GREEN_S, fs=12)
-    d.edge(sbs, L, value="split + rectify")
+    d.line(360, 84, 360, 172, width=1.3, dashed=True)
+    d.text(228, 90, 128, 22, "left half", fs=13)
+    d.text(364, 90, 128, 22, "right half", fs=13)
+    d.text(225, 178, 270, 22, "2560 x 720 side-by-side frame", fs=13)
+    L = d.box(600, 60, 230, 66, "Left image<br>1280 x 720 (rectified)",
+              fill=BLUE_F, stroke=BLUE_S, fs=14)
+    R = d.box(600, 148, 230, 66, "Right image<br>1280 x 720 (rectified)",
+              fill=GREEN_F, stroke=GREEN_S, fs=14)
+    d.edge(sbs, L)
     d.edge(sbs, R)
-    # camera geometry with baseline / focal annotation
-    cLx, cRx, cy = 340, 560, 300
+    d.text(495, 192, 112, 40, "split and<br>rectify", fs=13)
+    # band 2: rig geometry, centred under band 1; the focal-length note is
+    # tied to the optical axis by a short leader so it cannot read as a
+    # free-floating label
+    d.text(30, 268, 320, 24, "Rig geometry", fs=14, bold=True, align="left")
+    cLx, cRx, cy = 300, 620, 396
     for x, name in ((cLx, "camera L"), (cRx, "camera R")):
-        d.box(x - 35, cy, 70, 44, "", fill="#e9ecef", stroke=EDGE)
-        d.text(x - 45, cy + 48, 90, 18, name, fs=11)
-    d.line(cLx, cy + 22, cRx, cy + 22, width=2)
-    d.text(cLx + 60, cy - 2, 160, 20, "baseline B = 52 mm", fs=12, bold=True)
-    d.line(cLx, cy, cLx, cy - 60, width=1.3, dashed=True)
-    d.text(cLx - 240, cy - 52, 230, 20,
-           "focal length f &#8776; 1005 px<br>at 1280-px width", fs=12)
-    d.text(40, 385, 700, 24,
-           "Epipolar lines become image rows after rectification; disparity "
-           "d maps to depth Z = f B / d.", fs=11)
+        d.box(x - 38, cy, 76, 48, "", fill="#e9ecef", stroke=EDGE)
+        d.text(x - 60, cy + 52, 120, 22, name, fs=13)
+    d.line(cLx, cy + 24, cRx, cy + 24, width=2)
+    d.text(360, cy - 34, 200, 24, "baseline B = 52 mm", fs=14, bold=True)
+    # image planes give the focal length a referent: f is the measured
+    # gap between each optical centre and its rectified image plane
+    d.line(cLx - 50, 330, cRx + 50, 330, width=1.3, dashed=True)
+    d.text(cLx - 50, 300, (cRx - cLx) + 100, 22, "rectified image planes",
+           fs=13)
+    d.line(cLx, 330, cLx, cy, width=1.2, dashed=True)
+    d.line(cRx, 330, cRx, cy, width=1.2, dashed=True)
+    d.line(232, 363, 232, 330, width=1.4, arrow="classic")
+    d.line(232, 363, 232, cy, width=1.4, arrow="classic")
+    d.text(34, 340, 188, 48,
+           "focal length f &#8776; 1005 px<br>at 1280 px width", fs=13)
     URLS["fig_5_2_rig"] = d.save(OUT / "fig_5_2_rig.drawio")
 
 

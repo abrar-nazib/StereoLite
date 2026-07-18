@@ -27,12 +27,11 @@ This chapter records how we managed the thesis: the schedule we followed,
 the resources we drew on, what we spent, and how we split the work
 between the two of us. Paper collection and the initial literature
 review began during the fourth-year odd semester (the seventh semester),
-ahead of the scheduled project work; the main project then ran from
-December 2025 to July 2026. Model training and the experimental studies
+and the work ran from July 2025 to July 2026 across both semesters. Model training and the experimental studies
 of Chapter~\ref{ch:experimental} used rented cloud GPUs, and we also
 bought a stereo camera and a Jetson Orin Nano board for real-data
 capture and on-device deployment testing. Section~\ref{sec:8-2}
-describes how we managed the work across seven overlapping phases and
+describes how we managed the work across eleven overlapping phases and
 how we coordinated with our supervisor; Section~\ref{sec:8-3} reports
 the overall project expenditure; Section~\ref{sec:8-4} sets out how we
 planned compute, data, software, and our own time; and
@@ -65,31 +64,37 @@ defense presentation in consultation with the supervisor.
 
 \subsection{Time Frame / Gantt Chart}
 \label{sec:8-2-1}
-The main project schedule ran from December 2025 to July 2026. Paper
-collection and the literature review had already begun in the
-fourth-year odd semester, before the scheduled model-development work
-started, and that early reading supplied the basis for model selection
-at the start of the schedule. Table~\ref{tab:timeframe} lists the
-periods and principal outputs of the seven project phases, and
-Figure~\ref{fig:gantt} shows the corresponding Gantt chart of their
-overlap.
+The full project schedule ran from July 2025 to July 2026, split across
+the fourth-year odd semester and the fourth-year even semester. The odd
+semester covered topic selection, the literature review, the thesis
+proposal, and dataset collection and processing; these four phases
+fixed the topic, the research gap, and the datasets that the even
+semester's experimental work then relied on. The even semester covered
+the remaining seven phases, from model selection and setup through
+final thesis writing. Table~\ref{tab:timeframe} lists the periods and
+principal outputs of all eleven phases, and Figure~\ref{fig:gantt}
+shows the corresponding Gantt chart of their overlap.
 
 \begin{table}[!htbp]
 \centering
-\caption{Seven project phases from December 2025 to July 2026.}
+\caption{Eleven project phases from July 2025 to July 2026.}
 \label{tab:timeframe}
 \small
 \begin{tabular}{p{4.2cm}p{3.0cm}p{6.3cm}}
 \toprule
 Phase & Period & Output\\
 \midrule
-1. Model selection and setup & Dec. 2025 to Jan. 2026 & Selected baseline models and a working experimental environment\\
-2. Pre-training and fine-tuning & Dec. 2025 to Mar. 2026 & Initial checkpoints and a stable training procedure\\
-3. Real-data capture & Jan. to Mar. 2026 & Calibrated and rectified stereo image pairs\\
-4. Ablation studies & Feb. to Apr. 2026 & Evidence for the final architectural and training choices\\
-5. Benchmarking and 3D reconstruction & Mar. to May 2026 & Accuracy, efficiency, and reconstruction results\\
-6. Result analysis and evaluation & Apr. to Jun. 2026 & Consolidated in-domain, zero-shot, robustness, and deployment findings\\
-7. Thesis writing and documentation & May to Jul. 2026 & Final thesis book and supporting documentation\\
+1. Topic selection & Jul. 2025 & Chosen thesis topic and scope\\
+2. Literature review & Aug. to Sep. 2025 & Surveyed paper corpus and research gap\\
+3. Thesis proposal & Sep. to Oct. 2025 & Approved proposal\\
+4. Dataset collection and processing & Oct. to Nov. 2025 & Prepared training and evaluation datasets\\
+5. Model selection and setup & Dec. 2025 to Jan. 2026 & Selected baseline models and a working experimental environment\\
+6. Pre-training and fine-tuning & Dec. 2025 to Mar. 2026 & Initial checkpoints and a stable training procedure\\
+7. Real-data capture & Jan. to Mar. 2026 & Calibrated and rectified stereo image pairs\\
+8. Ablation studies & Feb. to Apr. 2026 & Evidence for the final architectural and training choices\\
+9. Benchmarking and 3D reconstruction & Mar. to May 2026 & Accuracy, efficiency, and reconstruction results\\
+10. Result analysis and evaluation & Apr. to Jun. 2026 & Consolidated in-domain, zero-shot, robustness, and deployment findings\\
+11. Thesis writing and documentation & May to Jul. 2026 & Final thesis book and supporting documentation\\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -97,7 +102,7 @@ Phase & Period & Output\\
 \begin{figure}[H]
 \centering
 \includegraphics[width=\textwidth]{fig_b_1_gantt_fixed}
-\caption{Seven project phases from December 2025 to July 2026.}
+\caption{Gantt chart of the eleven project phases from July 2025 to July 2026.}
 \label{fig:gantt}
 \label{fig:gantt6}
 \end{figure}
@@ -251,11 +256,11 @@ Both authors reviewed and approved the final manuscript.
 \FloatBarrier
 \section{Summary}
 \label{sec:8-6}
-This chapter recorded how we managed and financed the thesis. The main
-schedule ran from December 2025 to July 2026, following the literature
-review conducted in the preceding semester, and consisted of seven
-overlapping phases from model setup to final documentation, punctuated
-by milestone reviews with our supervisor. Total expenditure was about
+This chapter recorded how we managed and financed the thesis. The
+overall schedule ran from July 2025 to July 2026 and consisted of
+eleven overlapping phases, from topic selection and the literature
+review through model setup, training, and final documentation,
+punctuated by milestone reviews with our supervisor. Total expenditure was about
 USD 420 (BDT 52,500): USD 140 for cloud GPU usage and USD 280 for the
 stereo camera and Jetson Orin Nano. We planned compute across three
 tiers (an RTX 3050 laptop GPU for local development, cloud T4 instances

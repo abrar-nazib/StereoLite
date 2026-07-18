@@ -346,29 +346,27 @@ throughout Chapter \ref{ch:results}.
 
 \FloatBarrier
 \section{Summary}
-This chapter traced the path from the architecture of Chapter
-\ref{ch:design} to a trained, deployable system. The codebase separates
-training, ablation, and evaluation into scripted drivers that each log
-their own configuration and metrics, running on Modal-orchestrated cloud
-A100 and T4 GPUs. The production model fixes a truncated YOLO26s
-backbone, a 32-channel recurrent state, an eight-group correlation
-volume, and a two, three, three iteration schedule, all recorded
-verbatim in Appendix~\ref{app:specs}. A six-change, equivalence-proven optimization
-pass cut inference latency by a factor of 1.74 and cleared the
-operators that block eight-bit deployment, producing a calibrated
-TensorRT engine for the Jetson Orin Nano. Training itself runs under an
-eleven-term multi-scale objective built around a threshold-stack and
-D1-relative hinge, applied to random native-resolution crops of the
-SceneFlow corpus with a three-part augmentation recipe and a
-sixty-thousand-step OneCycle schedule. The compute and sensing
-apparatus spans a cloud A100 for training, a cloud T4 for ablations, an
-RTX 3050 for local latency benchmarking, the Jetson Orin Nano deployment
-target, and a calibrated low-cost stereo rig for real-camera
-qualification. The principle of operation section walked through the
-resulting forward pass, from a rectified image pair to a
-full-resolution disparity map and an optional metric point cloud.
-Chapter \ref{ch:experimental} now describes the experimental setup and
-measurement protocols built on top of this implementation.
+This chapter traced the path from the network architecture to a
+trained, deployable system. The codebase separates training, ablation,
+and evaluation into scripted drivers that each log their own
+configuration and metrics, running on Modal-orchestrated cloud A100 and
+T4 GPUs. The production model fixes a truncated YOLO26s backbone, a
+32-channel recurrent state, an eight-group correlation volume, and a
+two, three, three iteration schedule, and this configuration is
+recorded in full. A six-change, equivalence-proven optimization pass
+cut inference latency by a factor of 1.74 and cleared the operators
+that block eight-bit deployment, producing a calibrated TensorRT engine
+for the Jetson Orin Nano. Training itself runs under an eleven-term
+multi-scale objective built around a threshold-stack and D1-relative
+hinge, applied to random native-resolution crops of the SceneFlow
+corpus with a three-part augmentation recipe and a sixty-thousand-step
+OneCycle schedule. The compute and sensing apparatus spans a cloud A100
+for training, a cloud T4 for ablations, an RTX 3050 for local latency
+benchmarking, the Jetson Orin Nano deployment target, and a calibrated
+low-cost stereo rig for real-camera qualification. The principle of
+operation section walked through the resulting forward pass, from a
+rectified image pair to a full-resolution disparity map and an optional
+metric point cloud.
 
 % SOURCES: mainmatter/ch7.tex sections 7.2 (Training Objective and
 % Datasets and Training Protocol subsections -> new section "Training
