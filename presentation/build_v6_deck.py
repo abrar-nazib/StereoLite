@@ -359,7 +359,8 @@ def rebuild_literature_review(prs):
     rows = [(p[0], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9])
              for p in PAPERS]
 
-    table_x = 0.40
+    # Center the table on the 10-inch slide (total width ~8.09)
+    table_x = (10.00 - sum(col_widths)) / 2
     header_y = 1.45
     row_h = 0.31
     header_h = 0.32
@@ -774,8 +775,10 @@ def rebuild_introduction(prs):
     add_filled_rect(s, 0.45, 3.90, 9.10, 0.012, fill_hex=ACCENT)
 
     # Two side-by-side example images
-    img_w = 1.95
-    img_h = 1.20
+    # Sized so image bottom (4.98) + caption row (5.02 to 5.24) stay
+    # clear of the footer band, which starts at y = 5.29.
+    img_w = 2.10
+    img_h = 1.00
     gap = 0.30
     total = 2 * img_w + gap
     x0 = (10.00 - total) / 2
@@ -783,7 +786,7 @@ def rebuild_introduction(prs):
         (photos / "intro_left_example.png", "Left view  (input)"),
         (photos / "intro_depth_example.png", "Depth map  (warm = far)"),
     ]
-    row_y = 4.00
+    row_y = 3.98
     for i, (path, cap) in enumerate(pairs):
         x = x0 + i * (img_w + gap)
         if path.exists():
@@ -1757,6 +1760,16 @@ def patch_objectives(prs):
                   for tf in _walk_text_frames(s.shapes))
         marker = "replaced" if hit else "NOT FOUND"
         print(f"  objectives: {marker} '{old[:40]}...'")
+
+    # The goals text shape (L=0.59, W=9.10) overruns the framed box
+    # whose right border sits at x=9.57; pull the text width in so the
+    # first objective no longer overflows the frame.
+    for sh in s.shapes:
+        if sh.has_text_frame and "1. To design" in sh.text_frame.text:
+            if sh.width > Inches(8.80):
+                sh.width = Inches(8.80)
+                print("  objectives: goals text width -> 8.80 in")
+            break
 
 
 def patch_impact_original(prs):
