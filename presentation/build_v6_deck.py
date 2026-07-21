@@ -402,7 +402,7 @@ def rebuild_literature_review(prs):
     add_text(s, table_x, foot_y, table_w, 0.20,
              "Latencies on different GPUs (varies by source); SF EPE on "
              "Scene Flow finalpass; KITTI 2015 D1-all from official "
-             "leaderboards. See slide 28 for citations.",
+             "leaderboards. See the References slide for citations.",
              size=8, italic=True, color=DARK, align="center")
 
 
@@ -1258,8 +1258,8 @@ def rebuild_conclusion(prs):
          "Competitive on Scene Flow test",
          "Met · EPE 0.78 px, D1 3.40%"),
         ("Cross-domain generalization",
-         "Zero-shot Middlebury 2014",
-         "Met · D1-all 10.9%"),
+         "Zero-shot on unseen datasets",
+         "Met · KITTI 3.9/4.3%, ETH3D 4.0%, MB14 10.9%"),
         ("Camera-imperfection tolerance",
          "Works on a real, imperfect rig",
          "Met · 1.45 px on 997 real pairs"),
@@ -1658,6 +1658,82 @@ def build_expansion_slides(prs):
                  "on the same pair set.")],
         after_idx=find_slide_idx(prs, "Results: Rectification Robustness"))
 
+    # 9. Zero-shot quartet table, right after the zero-shot Results slide
+    #    (before the per-scene slide, since this call runs after the
+    #    others and anchors directly on the zero-shot slide).
+    build_quartet_slide(prs)
+
+
+def build_quartet_slide(prs):
+    """Zero-shot quartet table (KITTI 2012/2015, ETH3D, MB14) next to the
+    in-domain reference row. Numbers from
+    model/benchmarks/20260704_fullsf_gev4onp_nc/kitti_eth3d_zero_shot.json
+    and mb14_zero_shot.json; same protocol across all rows."""
+    src_idx = find_slide_idx(prs, "Objectives")
+    after_idx = _find_slide_by_text(
+        prs, "Zero-shot generalization and on-device deployment")
+    if src_idx < 0 or after_idx < 0:
+        print("  WARNING: quartet slide anchors not found; skipped")
+        return
+    new = duplicate_slide(prs, src_idx)
+    for sh in new.shapes:
+        if sh.has_text_frame and sh.text_frame.text.strip() == "Objectives" \
+                and sh.top is not None and sh.top < Inches(0.85):
+            set_paragraph_text(sh.text_frame, "Results: Zero-Shot Quartet")
+            _fix_title_shape(sh)
+            break
+    _strip_to_title(new, "Results: Zero-Shot Quartet")
+
+    add_text(new, 0.45, 0.90, 9.10, 0.28,
+             "One checkpoint, four unseen datasets, one protocol "
+             "(384 x 640, valid disparities up to 192 px)",
+             size=11, italic=True, color=DARK, align="left")
+
+    table_y = 1.45
+    header_h = 0.40
+    row_h = 0.50
+    headers = [("Dataset", 3.10), ("Pairs", 1.10), ("EPE (px)", 1.40),
+               ("bad-2 (%)", 1.60), ("D1-all (%)", 1.90)]
+    add_filled_rect(new, 0.45, table_y, 9.10, header_h, fill_hex=NAVY)
+    x = 0.45
+    for label, w in headers:
+        add_text(new, x + 0.12, table_y + 0.08, w - 0.24, header_h - 0.12,
+                 label, size=12, bold=True, color=WHITE, align="left")
+        x += w
+
+    rows = [
+        ("KITTI 2012 (train)", "194", "0.82", "6.96", "4.33", False),
+        ("KITTI 2015 (train)", "200", "0.82", "6.42", "3.93", False),
+        ("ETH3D (train)", "27", "0.93", "6.47", "3.96", False),
+        ("Middlebury 2014", "23", "1.71", "14.5", "10.9", False),
+        ("Scene Flow FT3D test (in-domain)", "4,370", "0.78", "5.34",
+         "3.40", True),
+    ]
+    y = table_y + header_h
+    for r_i, (name, n, epe, bad2, d1, is_ref) in enumerate(rows):
+        bg = ROW_BG_ALT if r_i % 2 == 1 else ROW_BG
+        add_filled_rect(new, 0.45, y, 9.10, row_h, fill_hex=bg,
+                        line_hex=BORDER)
+        x = 0.45
+        vals = [name, n, epe, bad2, d1]
+        for (label, w), val in zip(headers, vals):
+            add_text(new, x + 0.12, y + 0.12, w - 0.24, row_h - 0.20,
+                     val, size=12, bold=(label == "D1-all (%)" or is_ref),
+                     color=(DARK if is_ref else INK), align="left")
+            x += w
+        y += row_h
+
+    add_text(new, 0.45, y + 0.20, 9.10, 0.35,
+             "Driving and outdoor domains land near the in-domain outlier "
+             "rate; indoor close-range (Middlebury) remains the weak axis.",
+             size=12, italic=True, bold=True, color=ACCENT, align="center")
+    add_text(new, 0.45, y + 0.60, 9.10, 0.30,
+             "Training-split evaluations under our protocol; official "
+             "leaderboard submissions pending.",
+             size=10, italic=True, color=DARK, align="center")
+    move_slide(prs, new, after_idx + 1)
+    print("  built Zero-Shot Quartet table slide")
+
 
 def patch_objectives(prs):
     """Match the deck objectives to the thesis section 1.4 wording
@@ -1972,8 +2048,11 @@ def rebuild_discussion(prs):
     bullets = [
         "In-domain: 0.78 px EPE, 3.40% D1 on the full FT3D test set "
         "at 2.96 M parameters.",
-        "Zero-shot: 10.9% D1 on Middlebury 2014, within 4 points of "
-        "LiteAnyStereo at 2.6x fewer parameters.",
+        "Zero-shot: D1 4.33% (KITTI 2012), 3.93% (KITTI 2015), 3.96% "
+        "(ETH3D); driving and outdoor domains land near the in-domain "
+        "outlier rate.",
+        "Middlebury 2014 is the remaining weak axis: 10.9% D1, within "
+        "4 points of LiteAnyStereo at 2.6x fewer parameters.",
         "Robust: EPE rises only 1.03 to 1.53 px up to 1 px of vertical "
         "misalignment.",
         "Deployable: 36.3 ms (27.5 FPS) INT8 on Jetson Orin Nano, "
@@ -1981,11 +2060,11 @@ def rebuild_discussion(prs):
         "Real rig: 1.45 px mean EPE agreement with the FoundationStereo "
         "teacher over 997 pairs.",
     ]
-    y = 1.30
+    y = 1.25
     for txt in bullets:
         add_filled_rect(s, 0.35, y + 0.05, 0.10, 0.10, fill_hex=ACCENT)
-        add_text(s, 0.57, y, 5.08, 0.58, txt, size=12, color=INK)
-        y += 0.62
+        add_text(s, 0.57, y, 5.08, 0.58, txt, size=11, color=INK)
+        y += 0.63
 
     fig = TFIGS / "fig_4_8_pareto_ours.png"
     if fig.exists():
@@ -2011,8 +2090,9 @@ def rebuild_future_work(prs):
         "Three-stage knowledge distillation: synthetic supervision, then "
         "self-distillation under input perturbation, then a frozen "
         "foundation teacher on unlabeled real pairs.",
-        "Complete the zero-shot quartet with official KITTI and ETH3D "
-        "evaluations; both datasets are already staged.",
+        "Submit to the official KITTI and ETH3D leaderboards; our "
+        "training-split zero-shot results already sit at D1 4.33, 3.93 "
+        "and 3.96 percent.",
         "Deployment hardening: full accuracy audit of the INT8 engine "
         "against the fp32 model, then ports to other edge boards.",
         "Temporal extension: propagate tile-plane state across video "
@@ -2052,7 +2132,8 @@ def update_challenges_content(prs):
         "recovery of thin and distant structures.",
         "Supervision is synthetic only, and results come from a single "
         "training run.",
-        "No official KITTI or ETH3D leaderboard submissions yet.",
+        "KITTI and ETH3D measured on training splits under our own "
+        "protocol; official leaderboard submissions still pending.",
         "Real-rig accuracy is agreement with the FoundationStereo "
         "teacher, not absolute ground truth.",
     ]
