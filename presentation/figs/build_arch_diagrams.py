@@ -494,148 +494,132 @@ def stage1_encoder_diagram():
 
 
 def methodology_diagram():
-    """Two-track flowchart: training pipeline (top) + inference
-    pipeline (bottom), linked by a 'load weights' connector.
-    Used on slide 11 (Methodology).  Wide canvas (5.5 in) so the
-    figure fills the slide-width area when embedded."""
-    # Wider canvas, taller to fit two rows + connector + footnote
-    fig, ax = plt.subplots(figsize=(11.0, 5.4), facecolor=CREAM)
+    """Grouped stage-panel methodology figure: four pastel panels
+    (Training, Optimization + Export, On-Device Inference,
+    3D Reconstruction), each holding a vertical chain of sub-step
+    boxes, linked by inter-panel arrows.  Used on slide 11
+    (Methodology).  2x2 grid read left-to-right, top-to-bottom."""
+    fig, ax = plt.subplots(figsize=(11.0, 4.67), facecolor=CREAM)
     ax.set_facecolor(CREAM)
-    W2, H2 = 22.0, 11.0
+    W2, H2 = 21.2, 9.0
     ax.set_xlim(0, W2); ax.set_ylim(0, H2)
     ax.set_aspect("equal"); ax.set_xticks([]); ax.set_yticks([])
     for sp in ax.spines.values(): sp.set_visible(False)
 
-    # ---- Title strip ----
-#     _txt(ax, W2 / 2, H2 - 0.55, "TRAINING + INFERENCE PIPELINES",
-#           size=11, weight="bold", color=ACCENT,
-#           family="DejaVu Sans Mono")
+    NAVY      = "#1F2C4E"
+    NAVY_MID  = "#2E467A"
+    SLATE     = "#5A4E7A"
+    SLATE_DK  = "#4A3E6E"
+    GREEN     = DOT_GREEN
 
-    # ---- Geometry ----
-    n = 5
-    box_w = 3.2
-    box_h = 1.80
-    gap = (W2 - 2.0 - n * box_w) / (n - 1)
-    row_x0 = 1.0
+    # ---- Panel geometry (2 x 2 grid) ----
+    pw, ph = 9.6, 3.90
+    px_l, px_r = 0.5, 11.1
+    py_t, py_b = 4.85, 0.25
 
-    NAVY_FILL = "#1F2C4E"
-    NAVY_LITE = "#2E467A"
-    INF_BORDER = ACCENT
-    INF_FILL = "#FBF1E5"
-    BAND_TRAIN = "#ECEDF2"
-    BAND_INF = "#FBF1E5"
+    SH, SG = 0.62, 0.20          # step-box height, chain gap
+    MAX_CHAIN = 4 * SH + 3 * SG  # tallest chain (4 steps)
 
-    # ---- Training row ----
-    train_y = H2 - 4.2          # box top y in graph units (note ax y axis up)
-    train_band_y = train_y - 0.40
-    train_band_h = box_h + 0.85
-
-    # Band background
-    ax.add_patch(FancyBboxPatch((row_x0 - 0.40, train_band_y),
-        W2 - 2.0 + 0.80, train_band_h,
-        boxstyle="round,pad=0.02,rounding_size=0.18",
-        linewidth=0.6, edgecolor="#D7D9DD",
-        facecolor=BAND_TRAIN, zorder=1))
-    # Row label (left, vertical)
-#     _txt(ax, row_x0 - 0.10, train_y + box_h / 2, "TRAINING",
-#           size=10, weight="bold", color="#1F2C4E", ha="right",
-#           family="DejaVu Sans Mono")
-
-    train_steps = [
-        ("Scene Flow", "35,454 pairs,\nfull finalpass"),
-        ("Train",      "60k steps,\nA100, OneCycle"),
-        ("Checkpoint", "2.96 M params,\n12 MB fp32"),
-        ("Optimize",   "graph surgery,\nONNX export"),
-        ("INT8 engine", "TensorRT,\nJetson Orin Nano"),
-    ]
-    train_xs = []
-    for i, (title, sub) in enumerate(train_steps):
-        x = row_x0 + i * (box_w + gap)
-        train_xs.append(x)
-        ax.add_patch(FancyBboxPatch((x, train_y), box_w, box_h,
-            boxstyle="round,pad=0.02,rounding_size=0.10",
-            linewidth=1.0, edgecolor=NAVY_FILL,
-            facecolor=NAVY_FILL, zorder=2))
-        _txt(ax, x + box_w / 2, train_y + box_h - 0.45, title,
-              size=11, weight="bold", color="white",
+    def draw_panel(px, py, fill, border, tcol, title, steps,
+                   highlight_last=False):
+        ax.add_patch(FancyBboxPatch((px, py), pw, ph,
+            boxstyle="round,pad=0.02,rounding_size=0.16",
+            linewidth=1.4, edgecolor=border, facecolor=fill, zorder=1))
+        _txt(ax, px + pw / 2, py + ph - 0.34, title,
+              size=13, weight="bold", color=tcol,
               family="DejaVu Serif")
-        _txt(ax, x + box_w / 2, train_y + box_h / 2 - 0.25, sub,
-              size=7, color="#CFD3DD",
-              family="DejaVu Serif")
-        if i < n - 1:
-            ax.add_patch(FancyArrowPatch(
-                (x + box_w + 0.05, train_y + box_h / 2),
-                (x + box_w + gap - 0.10, train_y + box_h / 2),
-                arrowstyle="-|>", mutation_scale=14,
-                color="#3B5078", linewidth=2.0, zorder=3))
+        k = len(steps)
+        total = k * SH + (k - 1) * SG
+        top_off = 0.66 + (MAX_CHAIN - total) / 2
+        sx, sw = px + 0.45, pw - 0.90
+        cx = sx + sw / 2
+        for j, (t, sub) in enumerate(steps):
+            by = py + ph - top_off - j * (SH + SG) - SH
+            last = highlight_last and j == k - 1
+            ax.add_patch(FancyBboxPatch((sx, by), sw, SH,
+                boxstyle="round,pad=0.02,rounding_size=0.07",
+                linewidth=2.0 if last else 1.0,
+                edgecolor=ACCENT if last else border,
+                facecolor="#FDFCF7", zorder=2))
+            if sub:
+                _txt(ax, sx + 0.30, by + SH / 2, t,
+                      size=9.5, weight="bold", color=INK, ha="left")
+                _txt(ax, sx + sw - 0.30, by + SH / 2, sub,
+                      size=8, color=SUBINK, ha="right")
+            else:
+                _txt(ax, cx, by + SH / 2, t,
+                      size=9.5, weight="bold", color=INK)
+            if j < k - 1:
+                ax.add_patch(FancyArrowPatch(
+                    (cx, by - 0.02), (cx, by - SG + 0.04),
+                    arrowstyle="-|>", mutation_scale=10,
+                    color=border, linewidth=1.4, zorder=3))
 
-    # ---- Inference row ----
-    infer_y = 1.5
-    infer_band_y = infer_y - 0.40
-    infer_band_h = box_h + 0.85
+    # ---- Panel 1: Training (top-left, blue pastel) ----
+    draw_panel(px_l, py_t, "#E7EBF4", NAVY_MID, NAVY, "Training", [
+        ("Scene Flow",     "35,454 pairs, full finalpass"),
+        ("Crop + augment", "native 384x640"),
+        ("Train",          "60k steps, A100, OneCycle"),
+        ("Checkpoint",     "2.96 M params, 12 MB fp32"),
+    ])
 
-    ax.add_patch(FancyBboxPatch((row_x0 - 0.40, infer_band_y),
-        W2 - 2.0 + 0.80, infer_band_h,
-        boxstyle="round,pad=0.02,rounding_size=0.18",
-        linewidth=0.6, edgecolor="#E5D7C5",
-        facecolor=BAND_INF, zorder=1))
-#     _txt(ax, row_x0 - 0.10, infer_y + box_h / 2, "INFERENCE",
-#           size=10, weight="bold", color=ACCENT, ha="right",
-#           family="DejaVu Sans Mono")
+    # ---- Panel 2: Optimization + Export (top-right, slate pastel) ----
+    draw_panel(px_r, py_t, "#ECE8F2", SLATE, SLATE_DK,
+               "Optimization + Export", [
+        ("Graph surgery",       "1.74x faster fp32"),
+        ("ONNX export",         ""),
+        ("INT8 operator swaps", ""),
+        ("TensorRT engine",     "calibrated"),
+    ], highlight_last=True)
 
-    infer_steps = [
-        ("Stereo\ncamera",  "AR0144,\nrectified pair"),
-        ("Pre-process",     "BGR → tensor,\ncrop / pad"),
-        ("StereoLite",      "encoder → tile init,\nrefine × 8, upsample"),
-        ("Disparity",       "px-resolution\nleft-frame map"),
-        ("Depth + 3D",      "triangulate →\nOpen3D point cloud"),
-    ]
-    infer_xs = []
-    for i, (title, sub) in enumerate(infer_steps):
-        x = row_x0 + i * (box_w + gap)
-        infer_xs.append(x)
-        ax.add_patch(FancyBboxPatch((x, infer_y), box_w, box_h,
-            boxstyle="round,pad=0.02,rounding_size=0.10",
-            linewidth=1.4, edgecolor=INF_BORDER,
-            facecolor=INF_FILL, zorder=2))
-        _txt(ax, x + box_w / 2, infer_y + box_h - 0.45, title,
-              size=11, weight="bold", color=INK,
-              family="DejaVu Serif")
-        _txt(ax, x + box_w / 2, infer_y + box_h / 2 - 0.25, sub,
-              size=7, color=SUBINK,
-              family="DejaVu Serif")
-        if i < n - 1:
-            ax.add_patch(FancyArrowPatch(
-                (x + box_w + 0.05, infer_y + box_h / 2),
-                (x + box_w + gap - 0.10, infer_y + box_h / 2),
-                arrowstyle="-|>", mutation_scale=14,
-                color=ACCENT, linewidth=2.0, zorder=3))
+    # ---- Panel 3: On-Device Inference (bottom-left, cream/orange) ----
+    draw_panel(px_l, py_b, "#FBF1E5", ACCENT, ACCENT,
+               "On-Device Inference", [
+        ("Stereo camera", "AR0144, rectified pair"),
+        ("Pre-process",   "BGR → tensor, crop / pad"),
+        ("StereoLite",    "tile init, refine × 8, upsample"),
+        ("Disparity map", "px resolution"),
+    ])
 
-    # ---- Vertical "load weights" connector ----
-    cp_cx = train_xs[-1] + box_w / 2
-    sl_cx = infer_xs[2] + box_w / 2
-    cp_bottom = train_y
-    sl_top = infer_y + box_h
-    mid_y = (cp_bottom + sl_top) / 2
+    # ---- Panel 4: 3D Reconstruction (bottom-right, green pastel) ----
+    draw_panel(px_r, py_b, "#E8F0E7", GREEN, GREEN,
+               "3D Reconstruction", [
+        ("Triangulate",         "Z = f B / d"),
+        ("Outlier filter",      "+ downsample"),
+        ("Open3D point cloud",  ""),
+    ])
 
-    # 3-segment polyline  (down, left, down with arrowhead)
-    ax.plot([cp_cx, cp_cx], [cp_bottom, mid_y],
-             color=ACCENT, linewidth=2.0, zorder=3)
-    ax.plot([cp_cx, sl_cx], [mid_y, mid_y],
-             color=ACCENT, linewidth=2.0, zorder=3)
-    ax.add_patch(FancyArrowPatch((sl_cx, mid_y), (sl_cx, sl_top + 0.05),
-        arrowstyle="-|>", mutation_scale=14,
-        color=ACCENT, linewidth=2.0, zorder=3))
-    # Annotation
-    _txt(ax, (cp_cx + sl_cx) / 2, mid_y + 0.30, "load trained model",
-          size=9, color=ACCENT, italic=True,
-          family="DejaVu Serif")
-
-    # ---- Footnote ----
-#     _txt(ax, W2 / 2, 0.35,
-#           "Training is offline; the trained checkpoint is loaded once and reused at inference.",
-#           size=9.5, italic=True, color=SUBINK,
-#           family="DejaVu Serif")
+    # ---- Inter-panel arrows ----
+    # P1 -> P2 (right)
+    y12 = py_t + ph / 2
+    ax.add_patch(FancyArrowPatch((px_l + pw + 0.06, y12),
+        (px_r - 0.12, y12),
+        arrowstyle="-|>", mutation_scale=15,
+        color="#3B5078", linewidth=2.4, zorder=3))
+    # P3 -> P4 (right)
+    y34 = py_b + ph / 2
+    ax.add_patch(FancyArrowPatch((px_l + pw + 0.06, y34),
+        (px_r - 0.12, y34),
+        arrowstyle="-|>", mutation_scale=15,
+        color=ACCENT, linewidth=2.4, zorder=3))
+    # P2 -> P3 elbow, labeled "deploy engine"
+    ex_from = px_r + pw / 2          # bottom-center of panel 2
+    ex_to = px_l + pw / 2            # top-center of panel 3
+    mid_y = (py_t + (py_b + ph)) / 2
+    ax.plot([ex_from, ex_from], [py_t, mid_y],
+             color=ACCENT, linewidth=2.6, zorder=3)
+    ax.plot([ex_from, ex_to], [mid_y, mid_y],
+             color=ACCENT, linewidth=2.6, zorder=3)
+    ax.add_patch(FancyArrowPatch((ex_to, mid_y),
+        (ex_to, py_b + ph + 0.05),
+        arrowstyle="-|>", mutation_scale=15,
+        color=ACCENT, linewidth=2.6, zorder=3))
+    ax.text((ex_from + ex_to) / 2, mid_y, "deploy engine",
+             fontsize=9.5, color=ACCENT, fontstyle="italic",
+             fontweight="bold", ha="center", va="center",
+             fontfamily="DejaVu Serif", zorder=4,
+             bbox=dict(boxstyle="round,pad=0.28", facecolor=CREAM,
+                       edgecolor="none"))
 
     out = OUT / "methodology_pipeline.png"
     fig.savefig(out, bbox_inches="tight", pad_inches=0.10,

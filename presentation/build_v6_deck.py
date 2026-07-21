@@ -1143,7 +1143,8 @@ def build_methodology(prs):
 
     # Subhead
     add_text(s, 0.45, 0.95, 9.10, 0.30,
-             "System overview · training pipeline (top) and inference pipeline (bottom)",
+             "System overview · four stages from synthetic training to "
+             "on-device 3D reconstruction",
              size=12, italic=True, color=DARK, align="center")
 
     # Embed the methodology figure (generated separately by build_arch_diagrams.py)
