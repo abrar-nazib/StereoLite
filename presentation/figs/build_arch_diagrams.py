@@ -542,12 +542,11 @@ def methodology_diagram():
 #           family="DejaVu Sans Mono")
 
     train_steps = [
-        ("Scene Flow", "synthetic\nstereo dataset"),
-        ("Pretrain",   "30 epochs,\n2 × T4 (Kaggle)"),
-        ("Foundation\nteacher",
-                       "FoundationStereo\npseudo-disparity"),
-        ("Finetune",   "indoor pseudo-GT,\nmulti-scale loss"),
-        ("Checkpoint", "0.87 M params,\n8.7 MB"),
+        ("Scene Flow", "35,454 pairs,\nfull finalpass"),
+        ("Train",      "60k steps,\nA100, OneCycle"),
+        ("Checkpoint", "2.96 M params,\n12 MB fp32"),
+        ("Optimize",   "graph surgery,\nONNX export"),
+        ("INT8 engine", "TensorRT,\nJetson Orin Nano"),
     ]
     train_xs = []
     for i, (title, sub) in enumerate(train_steps):
@@ -628,7 +627,7 @@ def methodology_diagram():
         arrowstyle="-|>", mutation_scale=14,
         color=ACCENT, linewidth=2.0, zorder=3))
     # Annotation
-    _txt(ax, (cp_cx + sl_cx) / 2, mid_y + 0.30, "load weights",
+    _txt(ax, (cp_cx + sl_cx) / 2, mid_y + 0.30, "load trained model",
           size=9, color=ACCENT, italic=True,
           family="DejaVu Serif")
 
