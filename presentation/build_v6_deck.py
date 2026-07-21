@@ -790,8 +790,8 @@ def rebuild_introduction(prs):
     total = 2 * img_w + gap
     x0 = (10.00 - total) / 2
     pairs = [
-        (photos / "intro_left_example.png", "Left view  (input)"),
-        (photos / "intro_depth_example.png", "Depth map  (warm = far)"),
+        (photos / "intro_left_example.png", "Left view"),
+        (photos / "intro_depth_example.png", "Depth map"),
     ]
     row_y = 3.98
     for i, (path, cap) in enumerate(pairs):
