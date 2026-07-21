@@ -254,7 +254,7 @@ PAPERS = [
     ("7", "lightstereo","LightStereo-S",     "2025", "Lightweight",   "3.4",  "0.73", "2.30",   "17 ms",    "Yes"),
     ("8", "fstereo",    "FoundationStereo",  "2025", "Foundation",    "~340", "0.34", "—",      "—",        "No"),
     ("9", "defom",      "DEFOM-Stereo",      "2025", "Foundation",    "47.3", "0.42", "—",      "316 ms",   "No"),
-    ("*", "stereolite", "StereoLite (Ours)", "2026", "Tile + Iter.",  "2.96", "0.78", "-",      "50 ms",    "Yes"),
+    ("*", "stereolite", "StereoLite (Ours)", "2026", "Tile + Iter.",  "2.96", "0.78", "3.93*",  "50 ms",    "Yes"),
 ]
 # Citation breadcrumbs (paper:table:page) used for verification:
 # psmnet      Chang & Chen, CVPR 2018, Tab 5 p7 (SF EPE 1.09); KITTI 2.32 Tab 4 p7
@@ -400,10 +400,13 @@ def rebuild_literature_review(prs):
 
     # Footnote on data sources / hardware caveat
     foot_y = y + 0.10
-    add_text(s, table_x, foot_y, table_w, 0.20,
+    add_text(s, table_x, foot_y, table_w, 0.40,
              "Latencies on different GPUs (varies by source); SF EPE on "
              "Scene Flow finalpass; KITTI 2015 D1-all from official "
-             "leaderboards. See the References slide for citations.",
+             "leaderboards, where each method is fine-tuned on KITTI.\n"
+             "* Ours is ZERO-SHOT on the KITTI 2015 training split under "
+             "our protocol (no KITTI fine-tuning). See the References "
+             "slide for citations.",
              size=8, italic=True, color=DARK, align="center")
 
 
