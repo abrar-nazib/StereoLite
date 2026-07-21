@@ -431,8 +431,10 @@ def rebuild_literature_review(prs):
 # R ✓ at 36.3 ms INT8 TensorRT on Jetson Orin Nano (measured);
 # I ✓ ConvGRU refinement, 2+3+3 = 8 updates across 1/16, 1/8, 1/4;
 # P ✓ plane rendering from slanted tile states;
-# C ~ measured zero-shot Middlebury 2014 D1-all 10.9% (competitive
-#   but behind foundation-prior methods, hence partial).
+# C ✓ measured zero-shot quartet (2026-07-21, kitti_eth3d_zero_shot.json):
+#   KITTI 2012 D1 4.33% / KITTI 2015 3.93% / ETH3D 3.96% sit at the
+#   in-domain outlier rate (3.40%); MB14 10.9% trails foundation-prior
+#   methods but is far from the tile-paradigm collapse band (40%).
 
 CAPS = ["≤3 M params", "<60 ms edge", "Iterative", "Plane / tile",
          "Foundation", "Cross-domain"]
@@ -447,7 +449,7 @@ MATRIX = [
     ("lightstereo",     "~", "✓", "✗", "✗", "✗", "✗"),
     ("fstereo",         "✗", "✗", "✓", "✗", "✓", "✓"),
     ("defom",           "✗", "✗", "✓", "✗", "✓", "✓"),
-    ("stereolite",      "✓", "✓", "✓", "✓", "✗", "~"),
+    ("stereolite",      "✓", "✓", "✓", "✓", "✗", "✓"),
 ]
 
 
@@ -542,7 +544,9 @@ def rebuild_review_summary(prs):
     foot_y = y + 0.12
     add_text(s, table_x, foot_y, table_w, 0.22,
              "StereoLite is the only method combining lightweight, real-time, "
-             "iterative, and plane-tile geometry simultaneously.",
+             "iterative, and plane-tile geometry simultaneously, and it "
+             "generalizes zero-shot across four unseen datasets "
+             "(Middlebury still trails foundation-prior methods).",
              size=10, italic=True, color=DARK, align="center")
 
 
