@@ -765,7 +765,11 @@ def main():
     elif args.model == "liteanystereo":
         iw, ih = 640, 384          # LiteAnyStereo is heavy; keep it low
     else:
-        iw, ih = 1280, 720         # native res: crisper, fixes aspect squash
+        # Match the SceneFlow training density (native_crop at 960x540 native
+        # sampling). Feeding the camera at 960 wide keeps disparities in the
+        # trained range: 1280 doubles them (out of range -> speckle) and 640
+        # halves them (the resize protocol that oversmooths).
+        iw, ih = 960, 544
     INF["w"] = max(16, (iw // 16) * 16)
     INF["h"] = max(16, (ih // 16) * 16)
     print(f"inference resolution: {INF['w']}x{INF['h']}")
