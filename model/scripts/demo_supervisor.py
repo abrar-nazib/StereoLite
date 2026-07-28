@@ -111,11 +111,15 @@ def resolve_ckpt(user_ckpt: str | None) -> str:
     """
     if user_ckpt:
         return user_ckpt
-    preferred = os.path.join(PROJ, "model", "checkpoints",
-                             "finetune_realcam_best.pth")
-    fallback = os.path.join(PROJ, "model", "benchmarks",
-                            "20260704_fullsf_gev4onp_nc", "best.pth")
-    return preferred if os.path.exists(preferred) else fallback
+    # Preference: native_crop fine-tune (protocol-matched to 960 inference),
+    # then the resize fine-tune, then the base SceneFlow checkpoint.
+    for rel in ("model/checkpoints/finetune_realcam_ncrop_best.pth",
+                "model/checkpoints/finetune_realcam_best.pth",
+                "model/benchmarks/20260704_fullsf_gev4onp_nc/best.pth"):
+        p = os.path.join(PROJ, rel)
+        if os.path.exists(p):
+            return p
+    return os.path.join(PROJ, "model/benchmarks/20260704_fullsf_gev4onp_nc/best.pth")
 
 
 def load_model(ckpt_path: str, device: torch.device):
@@ -511,8 +515,36 @@ def infer_disparity_las(model, L_bgr: np.ndarray, R_bgr: np.ndarray,
     return disp_native.astype(np.float32), ms
 
 
+def make_sgbm():
+    """Classical OpenCV StereoSGBM, run at native resolution (CPU). A grounded
+    non-learned baseline for the live A/B."""
+    nd = 192  # must be divisible by 16; covers up to 192 px disparity
+    bs = 5
+    matcher = cv2.StereoSGBM_create(
+        minDisparity=0, numDisparities=nd, blockSize=bs,
+        P1=8 * 3 * bs * bs, P2=32 * 3 * bs * bs, disp12MaxDiff=1,
+        uniquenessRatio=10, speckleWindowSize=100, speckleRange=2,
+        mode=cv2.STEREO_SGBM_MODE_SGBM_3WAY)
+    print("classical StereoSGBM  (numDisparities=192, blockSize=5, native res)")
+    return matcher
+
+
+def infer_disparity_sgbm(matcher, L_bgr, R_bgr, device):
+    """SGBM on native-resolution grayscale. Disparity is already in native px."""
+    gl = cv2.cvtColor(L_bgr, cv2.COLOR_BGR2GRAY)
+    gr = cv2.cvtColor(R_bgr, cv2.COLOR_BGR2GRAY)
+    t0 = time.time()
+    disp16 = matcher.compute(gl, gr)          # 16 * disparity, int16
+    ms = (time.time() - t0) * 1000.0
+    disp = disp16.astype(np.float32) / 16.0
+    disp[disp < 0] = 0.0                       # invalid pixels -> 0
+    return disp.astype(np.float32), ms
+
+
 def build_runtime(args, device):
     """Return (model, infer_fn) for the requested --model."""
+    if args.model == "sgbm":
+        return make_sgbm(), infer_disparity_sgbm
     if args.model == "liteanystereo":
         ckpt = args.ckpt or os.path.join(PROJ, "model", "checkpoints",
                                          "LiteAnyStereo.pth")
@@ -732,10 +764,11 @@ def main():
                    help="/dev/video<N> for the stereo camera (source=camera)")
     p.add_argument("--dataset_root", default=DATASET_ROOT,
                    help="root with left/, right/, clean_pairs.txt")
-    p.add_argument("--model", choices=["stereolite", "liteanystereo"],
+    p.add_argument("--model", choices=["stereolite", "liteanystereo", "sgbm"],
                    default="stereolite",
                    help="stereolite = our fine-tuned edge model (default); "
-                        "liteanystereo = 7.6 M foundation-era reference")
+                        "liteanystereo = 7.6 M foundation-era reference; "
+                        "sgbm = classical OpenCV StereoSGBM baseline")
     p.add_argument("--ckpt", default=None,
                    help="checkpoint path; stereolite default prefers "
                         "finetune_realcam_best.pth then base best.pth; "
