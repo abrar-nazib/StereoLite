@@ -45,17 +45,21 @@ image = (
         "opencv-python-headless", "Pillow", "matplotlib",
         "pandas", "ultralytics==8.3.40", "timm", "scipy",
     )
+    # add_local_* must be LAST (they are startup mounts, no build step after).
+    # best.pth is uploaded to the realcam-finetune volume and read from /data.
     .add_local_dir(f"{PROJECT_ROOT}/model", "/workspace/model",
                    ignore=["benchmarks/**/*", "checkpoints/*",
                            "teachers/**/*", "kaggle/**/*",
                            "**/__pycache__/**"])
-    .add_local_file(BASE_CKPT, "/workspace/best.pth", copy=True)
 )
 
 MAX_DISP = 192.0
 
 
-@app.function(image=image, gpu="T4", timeout=4 * 3600,
+# A100-40GB: this GEV+GRU model is sequential-heavy, so per-step time (not
+# memory) dominates. The A100 cuts step time vs L4/T4 and fits a larger batch.
+# Peak at batch 16 / 640x384 was 22.4 GB, so batch 20 sits comfortably in 40 GB.
+@app.function(image=image, gpu="A100-40GB", timeout=4 * 3600,
               volumes={"/data": data_vol, "/cache": cache_vol,
                        "/results": results_vol})
 def train(steps: int = 2500, batch: int = 24, lr: float = 1e-4,
@@ -103,7 +107,7 @@ def train(steps: int = 2500, batch: int = 24, lr: float = 1e-4,
 
     # ---- model ----
     model, cfg = build_model("gev4_opt_narrow_plane")
-    ck = torch.load("/workspace/best.pth", map_location="cpu")
+    ck = torch.load("/data/best.pth", map_location="cpu")
     model.load_state_dict(ck["model"])
     model.to(dev).train()
     n_par = sum(p.numel() for p in model.parameters() if p.requires_grad)
