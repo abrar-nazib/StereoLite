@@ -454,16 +454,77 @@ def annotate_bar(img: np.ndarray, lines: list[str]):
 # Self test (headless, no window, no camera)
 # ---------------------------------------------------------------------------
 
+def load_liteanystereo(ckpt_path: str, device: torch.device):
+    """Load the official LiteAnyStereo (7.6 M, foundation-era lightweight).
+
+    Uses the vendored repo under model/scripts/modal/lite_any_stereo_repo.
+    """
+    las_root = os.path.join(PROJ, "model", "scripts", "modal",
+                            "lite_any_stereo_repo")
+    if las_root not in sys.path:
+        sys.path.insert(0, las_root)
+    from core.liteanystereo import LiteAnyStereo
+    model = LiteAnyStereo()
+    sd = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+    if any(k.startswith("module.") for k in sd):
+        sd = {k.replace("module.", "", 1): v for k, v in sd.items()}
+    inc = model.load_state_dict(sd, strict=False)
+    model.to(device).eval()
+    n = sum(p.numel() for p in model.parameters())
+    print(f"loaded checkpoint: {ckpt_path}")
+    print(f"architecture: LiteAnyStereo  ({n / 1e6:.3f} M params, "
+          f"{len(inc.missing_keys)} missing)  device={device}")
+    return model
+
+
+@torch.no_grad()
+def infer_disparity_las(model, L_bgr: np.ndarray, R_bgr: np.ndarray,
+                        device: torch.device) -> tuple[np.ndarray, float]:
+    """LiteAnyStereo forward. Same 384x640 protocol as infer_disparity, but
+    LiteAnyStereo takes RGB in [0, 255] (no /255) and needs /32 padding."""
+    from core.utils.utils import InputPadder
+    L = cv2.resize(L_bgr, (TRAIN_W, TRAIN_H), interpolation=cv2.INTER_AREA)
+    R = cv2.resize(R_bgr, (TRAIN_W, TRAIN_H), interpolation=cv2.INTER_AREA)
+
+    def to_tensor(bgr):
+        rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+        return torch.from_numpy(rgb).permute(2, 0, 1).unsqueeze(0).float().to(device)
+
+    Lt, Rt = to_tensor(L), to_tensor(R)
+    padder = InputPadder(Lt.shape, divis_by=32)
+    Ltp, Rtp = padder.pad(Lt, Rt)
+    if device.type == "cuda":
+        torch.cuda.synchronize()
+    t0 = time.time()
+    disp = model(Ltp, Rtp, max_disp=192, test_mode=True)
+    if device.type == "cuda":
+        torch.cuda.synchronize()
+    ms = (time.time() - t0) * 1000.0
+    disp = padder.unpad(disp).squeeze().float().cpu().numpy()  # (384, 640)
+    disp_native = cv2.resize(disp, (NATIVE_W, NATIVE_H),
+                             interpolation=cv2.INTER_LINEAR) * DISP_SCALE
+    return disp_native.astype(np.float32), ms
+
+
+def build_runtime(args, device):
+    """Return (model, infer_fn) for the requested --model."""
+    if args.model == "liteanystereo":
+        ckpt = args.ckpt or os.path.join(PROJ, "model", "checkpoints",
+                                         "LiteAnyStereo.pth")
+        return load_liteanystereo(ckpt, device), infer_disparity_las
+    model, _ = load_model(resolve_ckpt(args.ckpt), device)
+    return model, infer_disparity
+
+
 def run_selftest(args, device):
     print("=== demo_supervisor self test (headless) ===")
-    ckpt = resolve_ckpt(args.ckpt)
-    model, _ = load_model(ckpt, device)
+    model, infer_fn = build_runtime(args, device)
 
     src = DatasetSource(args.dataset_root, fps=1000.0)
     L, R = src.read()
     print(f"frame: left {L.shape}  right {R.shape}")
 
-    disp, ms = infer_disparity(model, L, R, device)
+    disp, ms = infer_fn(model, L, R, device)
     valid = disp[disp > 1.0]
     print(f"disparity: shape {disp.shape}  latency {ms:.1f} ms")
     if valid.size:
@@ -493,8 +554,7 @@ def run_selftest(args, device):
 # ---------------------------------------------------------------------------
 
 def run_live(args, device):
-    ckpt = resolve_ckpt(args.ckpt)
-    model, _ = load_model(ckpt, device)
+    model, infer_fn = build_runtime(args, device)
 
     if args.source == "camera":
         src = CameraSource(args.device)
@@ -504,7 +564,7 @@ def run_live(args, device):
     # Warmup so the first displayed latency is representative.
     warm_L, warm_R = src.read()
     for _ in range(3):
-        infer_disparity(model, warm_L, warm_R, device)
+        infer_fn(model, warm_L, warm_R, device)
 
     win = "StereoLite supervisor demo"
     cv2.namedWindow(win, cv2.WINDOW_NORMAL)
@@ -560,7 +620,7 @@ def run_live(args, device):
         else:
             L, R = frozen
 
-        disp, ms = infer_disparity(model, L, R, device)
+        disp, ms = infer_fn(model, L, R, device)
         ms_hist.append(ms)
         ms_hist = ms_hist[-30:]
         med_ms = float(np.median(ms_hist))
@@ -666,9 +726,14 @@ def main():
                    help="/dev/video<N> for the stereo camera (source=camera)")
     p.add_argument("--dataset_root", default=DATASET_ROOT,
                    help="root with left/, right/, clean_pairs.txt")
+    p.add_argument("--model", choices=["stereolite", "liteanystereo"],
+                   default="stereolite",
+                   help="stereolite = our fine-tuned edge model (default); "
+                        "liteanystereo = 7.6 M foundation-era reference")
     p.add_argument("--ckpt", default=None,
-                   help="checkpoint path; default prefers finetune_realcam_"
-                        "best.pth then the base thesis best.pth")
+                   help="checkpoint path; stereolite default prefers "
+                        "finetune_realcam_best.pth then base best.pth; "
+                        "liteanystereo default is checkpoints/LiteAnyStereo.pth")
     p.add_argument("--focal", type=float, default=1005.0,
                    help="horizontal focal length in px at native 1280 width")
     p.add_argument("--baseline", type=float, default=0.052,
