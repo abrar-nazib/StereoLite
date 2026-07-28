@@ -85,7 +85,27 @@ TRAIN_H, TRAIN_W = 384, 640      # model input (matches training)
 NATIVE_W, NATIVE_H = 1280, 720   # per eye native resolution (display + depth)
 DISP_SCALE = NATIVE_W / TRAIN_W  # 2.0: convert 640 wide disparity to native px
 
+# Inference resolution (set from CLI in main). Higher = crisper edges but
+# slower and noisier on textureless regions. Disparity is always rescaled to
+# native pixels afterwards, so depth/cloud scale is invariant to this choice.
+INF = {"w": TRAIN_W, "h": TRAIN_H}
+
 DATASET_ROOT = "/media/abrar/AbrarSSD/Datasets/stereo_samples_20260425_104147"
+
+
+def texture_mask(L_bgr: np.ndarray, thresh: float) -> np.ndarray:
+    """Return a bool mask (True = enough local texture to trust disparity).
+
+    On textureless / blown-out regions the stereo model has no matching
+    signal and emits a smooth wobbling guess (the 'wave'). Local intensity
+    standard deviation flags those regions so the demo can gray them out
+    instead of showing unstable colour.
+    """
+    g = cv2.cvtColor(L_bgr, cv2.COLOR_BGR2GRAY).astype(np.float32)
+    m = cv2.boxFilter(g, -1, (7, 7))
+    m2 = cv2.boxFilter(g * g, -1, (7, 7))
+    std = np.sqrt(np.clip(m2 - m * m, 0, None))
+    return std > thresh
 
 # On-frame button geometry (top left of the composed window), in composed
 # pixel coordinates. BTN = generate point cloud, CLR_BTN = clear depth points.
@@ -141,8 +161,8 @@ def infer_disparity(model, L_bgr: np.ndarray, R_bgr: np.ndarray,
     Returns (disp_native, latency_ms) where disp_native is (NATIVE_H,
     NATIVE_W) float32 disparity in native pixels.
     """
-    L = cv2.resize(L_bgr, (TRAIN_W, TRAIN_H), interpolation=cv2.INTER_AREA)
-    R = cv2.resize(R_bgr, (TRAIN_W, TRAIN_H), interpolation=cv2.INTER_AREA)
+    L = cv2.resize(L_bgr, (INF["w"], INF["h"]), interpolation=cv2.INTER_AREA)
+    R = cv2.resize(R_bgr, (INF["w"], INF["h"]), interpolation=cv2.INTER_AREA)
 
     def to_tensor(bgr):
         rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
@@ -155,14 +175,14 @@ def infer_disparity(model, L_bgr: np.ndarray, R_bgr: np.ndarray,
         torch.cuda.synchronize()
     t0 = time.time()
     out = model(Lt, Rt, aux=True)
-    disp = out["d_final"][0, 0].float().cpu().numpy()  # (384, 640), 640 px units
+    disp = out["d_final"][0, 0].float().cpu().numpy()  # (INF h, INF w), INF-w units
     if device.type == "cuda":
         torch.cuda.synchronize()
     ms = (time.time() - t0) * 1000.0
 
     # Upscale to native and rescale disparity magnitude to native pixels.
     disp_native = cv2.resize(disp, (NATIVE_W, NATIVE_H),
-                             interpolation=cv2.INTER_LINEAR) * DISP_SCALE
+                             interpolation=cv2.INTER_LINEAR) * (NATIVE_W / INF["w"])
     return disp_native.astype(np.float32), ms
 
 
@@ -483,8 +503,8 @@ def infer_disparity_las(model, L_bgr: np.ndarray, R_bgr: np.ndarray,
     """LiteAnyStereo forward. Same 384x640 protocol as infer_disparity, but
     LiteAnyStereo takes RGB in [0, 255] (no /255) and needs /32 padding."""
     from core.utils.utils import InputPadder
-    L = cv2.resize(L_bgr, (TRAIN_W, TRAIN_H), interpolation=cv2.INTER_AREA)
-    R = cv2.resize(R_bgr, (TRAIN_W, TRAIN_H), interpolation=cv2.INTER_AREA)
+    L = cv2.resize(L_bgr, (INF["w"], INF["h"]), interpolation=cv2.INTER_AREA)
+    R = cv2.resize(R_bgr, (INF["w"], INF["h"]), interpolation=cv2.INTER_AREA)
 
     def to_tensor(bgr):
         rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
@@ -500,9 +520,9 @@ def infer_disparity_las(model, L_bgr: np.ndarray, R_bgr: np.ndarray,
     if device.type == "cuda":
         torch.cuda.synchronize()
     ms = (time.time() - t0) * 1000.0
-    disp = padder.unpad(disp).squeeze().float().cpu().numpy()  # (384, 640)
+    disp = padder.unpad(disp).squeeze().float().cpu().numpy()  # (INF h, INF w)
     disp_native = cv2.resize(disp, (NATIVE_W, NATIVE_H),
-                             interpolation=cv2.INTER_LINEAR) * DISP_SCALE
+                             interpolation=cv2.INTER_LINEAR) * (NATIVE_W / INF["w"])
     return disp_native.astype(np.float32), ms
 
 
@@ -613,6 +633,7 @@ def run_live(args, device):
     save_count = 0
     pc_count = 0
     ms_hist: list[float] = []
+    ema = None
 
     while True:
         if frozen is None:
@@ -625,14 +646,30 @@ def run_live(args, device):
         ms_hist = ms_hist[-30:]
         med_ms = float(np.median(ms_hist))
 
-        # Colour map bounds from the valid disparity percentiles.
-        valid = disp[disp > 1.0]
+        # Temporal smoothing (EMA) to damp the frame-to-frame wobble.
+        if args.temporal < 1.0:
+            if ema is not None and ema.shape == disp.shape:
+                disp = args.temporal * disp + (1.0 - args.temporal) * ema
+            ema = disp.copy()
+
+        # Texture-validity mask: where the left image has no local texture the
+        # model has no matching signal, so those pixels are grayed out (display)
+        # and dropped (point cloud) instead of showing a wobbling guess.
+        if args.texture_mask:
+            tex = texture_mask(L, args.texture_thresh)
+        else:
+            tex = np.ones(disp.shape, bool)
+        disp_cloud = np.where(tex, disp, 0.0).astype(np.float32)
+
+        # Colour map bounds from the valid, textured disparity percentiles.
+        valid = disp[(disp > 1.0) & tex]
         if valid.size > 64:
             lo = float(np.percentile(valid, 5))
             hi = float(np.percentile(valid, 95))
         else:
             lo, hi = 0.0, 96.0
         disp_col = colourise(disp, lo, hi)
+        disp_col[~tex] = (60, 60, 60)   # gray = no reliable depth here
 
         state["disp"] = disp
         state["L"] = L
@@ -655,7 +692,8 @@ def run_live(args, device):
             + ("  FROZEN" if frozen is not None else ""),
         ])
         annotate_bar(right_panel, [
-            f"disparity (TURBO)  {med_ms:.1f} ms  range {lo:.1f}..{hi:.1f} px",
+            f"disp (TURBO) {med_ms:.0f}ms  inf {INF['w']}x{INF['h']}"
+            f"  smooth {args.temporal:.1f}  gray=low-texture",
             "click a pixel for depth  |  p or button = point cloud",
         ])
 
@@ -680,7 +718,7 @@ def run_live(args, device):
             state["trigger_pc"] = False
             ply = f"/tmp/demo_supervisor_pc_{pc_count:03d}.ply"
             build_and_show_pointcloud(
-                L, disp, focal_px=args.focal, baseline_m=args.baseline,
+                L, disp_cloud, focal_px=args.focal, baseline_m=args.baseline,
                 stride=args.stride, max_depth=args.max_depth,
                 show_window=True, ply_out=ply)
             pc_count += 1
@@ -702,7 +740,7 @@ def run_live(args, device):
         elif key == ord("p"):
             ply = f"/tmp/demo_supervisor_pc_{pc_count:03d}.ply"
             build_and_show_pointcloud(
-                L, disp, focal_px=args.focal, baseline_m=args.baseline,
+                L, disp_cloud, focal_px=args.focal, baseline_m=args.baseline,
                 stride=args.stride, max_depth=args.max_depth,
                 show_window=True, ply_out=ply)
             pc_count += 1
@@ -744,9 +782,34 @@ def main():
                    help="discard point-cloud points beyond this many metres")
     p.add_argument("--fps", type=float, default=10.0,
                    help="dataset source playback rate")
+    p.add_argument("--inf_width", type=int, default=0,
+                   help="inference width (0 = auto: 1280 for stereolite, 640 "
+                        "for liteanystereo). Higher = crisper but slower.")
+    p.add_argument("--inf_height", type=int, default=0,
+                   help="inference height (0 = auto, paired with inf_width)")
+    p.add_argument("--temporal", type=float, default=0.5,
+                   help="temporal EMA weight on new frame (0.3 = smooth/stable, "
+                        "1.0 = off). Damps the frame-to-frame wobble.")
+    p.add_argument("--texture_mask", type=int, default=1,
+                   help="1 = gray out / drop low-texture regions (no matching "
+                        "signal); 0 = show raw disparity everywhere")
+    p.add_argument("--texture_thresh", type=float, default=6.0,
+                   help="local intensity std below which a pixel is low-texture")
     p.add_argument("--selftest", action="store_true",
                    help="headless self test (no window, no camera)")
     args = p.parse_args()
+
+    # Resolve inference resolution (rounded to a multiple of 16 for the model).
+    if args.inf_width and args.inf_height:
+        iw, ih = args.inf_width, args.inf_height
+    elif args.model == "liteanystereo":
+        iw, ih = 640, 384          # LiteAnyStereo is heavy; keep it low
+    else:
+        iw, ih = 1280, 720         # native res: crisper, fixes aspect squash
+    INF["w"] = max(16, (iw // 16) * 16)
+    INF["h"] = max(16, (ih // 16) * 16)
+    print(f"inference resolution: {INF['w']}x{INF['h']}  "
+          f"temporal={args.temporal}  texture_mask={args.texture_mask}")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
