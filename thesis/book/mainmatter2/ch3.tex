@@ -41,8 +41,7 @@ competing variants are compared under identical data, seed, and compute.
 The surviving configuration is then trained on the full dataset on cloud
 GPUs and evaluated in three ways: in domain, zero-shot on an unseen real
 benchmark, and under controlled rectification perturbation. It is finally
-optimized and measured on the target edge device. The steps, elaborated
-in this chapter and the ones that follow, are:
+optimized and measured on the target edge device. The steps are:
 \begin{enumerate}
 \item Study of the stereo matching literature and its efficient and
 edge-deployable families;
@@ -260,20 +259,20 @@ system.
 \toprule
 Decision & Evidence\\
 \midrule
-YOLO26s shared encoder & encoder ablation, Table \ref{tab:ablation_encoder}: best EPE of three encoders at +2 ms\\
-Separate left context encoder & RAFT-Stereo lineage \cite{lipson2021raftstereo}; context-gated variants win the family ablation, Table \ref{tab:ablation_gev4line}\\
+YOLO26s shared encoder & encoder ablation: best EPE of three encoders at +2 ms\\
+Separate left context encoder & RAFT-Stereo lineage \cite{lipson2021raftstereo}; context-gated variants win the family ablation\\
 Group-wise cost at one coarse scale & GwcNet \cite{guo2019gwcnet} graceful degradation under small aggregation budgets\\
-Iterated coarse-to-fine refinement & refinement ablation, Table \ref{tab:ablation_refinement}: single-pass collapses, finer scales add cost without gain\\
-Local $\pm 2$ correlation lookup & CREStereo \cite{li2022crestereo}: local search beats all-pairs; also confers rectification tolerance, Section \ref{sec:rectification}\\
-Slanted tile planes & HITNet \cite{tankovich2021hitnet}; plane rendering wins the blur study, Table \ref{tab:ablation_blurfix}\\
-Narrow GEV band + fail-soft gate & family ablation best EPE, Table \ref{tab:ablation_gev4line}; narrowing accuracy-neutral, Table \ref{tab:ablation_efficiency}\\
-Rejected: selective recurrent unit & family ablation, Table \ref{tab:ablation_gev4line}: EPE worsens on the compact chassis\\
-Rejected: fresh 1/4 initialization & family ablation, Table \ref{tab:ablation_gev4line}: EPE and bad-1 worsen\\
-Rejected: fix compositions & blur study, Table \ref{tab:ablation_blurfix}: worse than plane rendering alone\\
-Threshold-stack + D1 objective & loss ablation, Table \ref{tab:ablation_loss}: wins EPE, bad-2, D1 together\\
-Native-crop input protocol & input-protocol study, Table \ref{tab:ablation_native}: native axis EPE 6.67 to 2.87 at no resized-axis cost\\
+Iterated coarse-to-fine refinement & refinement ablation: single-pass collapses, finer scales add cost without gain\\
+Local $\pm 2$ correlation lookup & CREStereo \cite{li2022crestereo}: local search beats all-pairs; also confers rectification tolerance\\
+Slanted tile planes & HITNet \cite{tankovich2021hitnet}; plane rendering wins the blur study\\
+Narrow GEV band + fail-soft gate & family ablation best EPE; narrowing accuracy-neutral\\
+Rejected: selective recurrent unit & family ablation: EPE worsens on the compact chassis\\
+Rejected: fresh 1/4 initialization & family ablation: EPE and bad-1 worsen\\
+Rejected: fix compositions & blur study: worse than plane rendering alone\\
+Threshold-stack + D1 objective & loss ablation: wins EPE, bad-2, D1 together\\
+Native-crop input protocol & input-protocol study: native axis EPE 6.67 to 2.87 at no resized-axis cost\\
 Augmentation triplet & matched comparison: best val EPE 2.778 to 1.921\\
-OneCycle 60k schedule & training dynamics, results chapter: validation floor reached before the budget ends\\
+OneCycle 60k schedule & training dynamics: validation floor reached before the budget ends\\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -290,10 +289,9 @@ blocks are retained, producing features at one quarter, one eighth, and
 one sixteenth resolution with 128, 256, and 256 channels. The choice of a
 detection backbone is deliberate: its features are pretrained to localize
 objects across scales, which is close to what stereo matching needs from
-an encoder, and the encoder ablation of Table \ref{tab:ablation_encoder}
-confirms that this backbone beats both a hand-built GhostConv stack and
-its own smaller sibling on every accuracy metric at a two-millisecond
-cost. We remove the detection neck and head above the one-sixteenth stage
+an encoder, and the encoder ablation confirms that this backbone beats
+both a hand-built GhostConv stack and its own smaller sibling on every
+accuracy metric at a two-millisecond cost. We remove the detection neck and head above the one-sixteenth stage
 at construction rather than leaving them unused, because dead blocks
 would waste parameters and forward compute. The two views are
 concatenated along the batch dimension and pass through a single shared
@@ -443,10 +441,9 @@ The geometry encoding volume adds an independent global proposal at one
 quarter resolution, in the spirit of IGEV-Stereo \cite{xu2023igev}. In
 the trained configuration it is narrow: rather than the full 64 disparity
 planes of the base design, it samples 33 hypotheses in a band of plus or
-minus 16 around the current tile disparity. The efficiency study of Table
-\ref{tab:ablation_efficiency} validates this change as accuracy-neutral,
-and it also removes roughly a quarter of the model's multiply-accumulate
-operations. The band is less restrictive than it sounds: 16
+minus 16 around the current tile disparity. The efficiency study
+validates this change as accuracy-neutral, and it also removes roughly a
+quarter of the model's multiply-accumulate operations. The band is less restrictive than it sounds: 16
 quarter-resolution planes correspond to 64 full-resolution pixels on
 either side of the current estimate, and since the coarse initialization
 has already localized the disparity, the band's job is correction, not
@@ -507,8 +504,8 @@ combination of nearby coarse values. This is the same convex upsampling
 used in RAFT-Stereo \cite{lipson2021raftstereo}. Before upsampling, a
 plane-rendering step reconstructs each tile from its disparity and slopes
 and applies an edge gate; this was the decisive fix in the
-boundary-sharpness study of Table \ref{tab:ablation_blurfix}, where it
-reduced the bad-0.5 rate by roughly 22 percent relative to the control.
+boundary-sharpness study, where it reduced the bad-0.5 rate by roughly 22
+percent relative to the control.
 Convex upsampling can select different source neighbors near a boundary,
 but it cannot invent a disparity hypothesis absent from the one-quarter
 prediction, so thin and distant structures remain a limitation.

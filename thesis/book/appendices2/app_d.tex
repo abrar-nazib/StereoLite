@@ -1,6 +1,17 @@
-% ============ Appendix D: Plagiarism Report =============================
+% ============ Appendix: Plagiarism Report ================================
 % Source: thesis/book/appendices/app_c.tex, section "Similarity Report".
-\chapter{Plagiarism Report}
+% Page number intentionally omitted from the ToC: the Turnitin report is
+% physically appended after submission and its page number is not known
+% until then (user decision 2026-07-19). \addcontentsline is suppressed
+% for this one \chapter call and a manual ToC line with "--" for the
+% page field is written instead (the "Appendix X" prefix and lettering
+% must match what the appendices package would have produced).
+\begingroup
+  \renewcommand{\addcontentsline}[3]{}
+  \chapter{Plagiarism Report}
+\endgroup
+\addtocontents{toc}{\protect\contentsline{chapter}{Appendix
+  \protect\numberline{\thechapter}Plagiarism Report}{--}{}}
 \label{app:plagiarism}
 
 The plagiarism (similarity) report is attached at the end of this document.

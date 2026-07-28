@@ -35,10 +35,8 @@ protocol applied on top of the training corpus. Hardware and Embedded
 Deployment lists the compute and sensing apparatus, including the
 Jetson Orin Nano deployment target and the physical stereo rig.
 Principle of Operation walks through the
-forward pass end to end. Chapter \ref{ch:experimental} then describes
-the experimental setup and measurement protocols built on top of this
-implementation, and Chapter \ref{ch:results} reports the resulting
-numbers; this chapter is concerned only with how the system was built.
+forward pass end to end; this chapter is concerned only with how the
+system was built.
 
 \FloatBarrier
 \section{Software Development}
@@ -65,9 +63,8 @@ single-A100 Modal path once the architecture and loss were fixed, since
 a single larger GPU trains the full SceneFlow corpus faster than two
 smaller ones split across processes. Keeping training, ablation, and
 evaluation as separate scripted drivers, each logging its own metadata,
-is what let every number in Chapter \ref{ch:results} trace back to a
-specific run rather than to a notebook cell that may since have
-changed.
+is what let every reported number trace back to a specific run rather
+than to a notebook cell that may since have changed.
 
 \FloatBarrier
 \section{Network Implementation}
@@ -92,9 +89,9 @@ Table \ref{tab:train_config} lists the training-side configuration that
 Chapter \ref{ch:design} selected and justified: the optimizer, schedule,
 batch size, input protocol, augmentation set, training data, validation
 protocol, and training hardware. Every value in the table is the result
-of a controlled ablation reported in Chapter \ref{ch:results}, and the
-design-evidence audit of Chapter \ref{ch:design} traces each choice to
-its justification. Section \ref{sec:training_objective} below fixes the
+of a controlled ablation, and the design-evidence audit of
+Chapter \ref{ch:design} traces each choice to its justification.
+Section \ref{sec:training_objective} below fixes the
 training objective and the protocol narrative behind this table in
 full.
 
@@ -155,9 +152,8 @@ normalization on some accelerator toolchains, and three-dimensional
 convolution on neural processing units. We swapped each for a
 quantization-friendly equivalent, then exported and calibrated the
 resulting graph to an eight-bit TensorRT engine for the Jetson Orin
-Nano, whose measured on-device latency Chapter \ref{ch:results}
-reports. Table \ref{tab:efficiency_findings} summarizes the six changes
-and their equivalence status.
+Nano. Table \ref{tab:efficiency_findings} summarizes the six changes and
+their equivalence status.
 
 \begin{table}[!htbp]
 \centering
@@ -173,7 +169,7 @@ Batched correlation lookups, cached grids & 3 to 8\% latency & identical math\\
 Static GRU input channels hoisted per scale & 8 to 10\% of MACs & exact\\
 Fused gate convolutions and output heads & 1 to 3\% latency & bitwise\\
 Dead inference-path code removed & memory + launches & exact\\
-Narrow GEV band ($\pm 16$ around tile $d$) & 25 to 30\% of MACs & matched A/B (Ch.~\ref{ch:results})\\
+Narrow GEV band ($\pm 16$ around tile $d$) & 25 to 30\% of MACs & matched A/B\\
 \midrule
 Combined & fp32 61.4 ms vs 106.7 ms base ($1.74\times$) & \\
 \bottomrule
@@ -205,7 +201,7 @@ trustworthy. The slant term pairs with plane rendering: it makes the
 slopes accurate enough for the rendering step to sharpen boundaries.
 
 We chose this composition by ablation rather than guesswork. The loss
-study of Chapter \ref{ch:results} tested nine formulations: plain L1
+study tested nine formulations: plain L1
 under-serves the outlier metrics, hinge terms on a single threshold
 overfit that threshold, and the threshold stack combined with the D1
 hinge was the only formulation to win both the end-point error and the
@@ -245,14 +241,14 @@ $\mathcal{L}_{\mathrm{slant}}$ the gated slant supervision.
 
 \FloatBarrier
 \subsection{Datasets and Training Protocol}
-Chapter \ref{ch:experimental} describes the SceneFlow finalpass corpus
-itself, its split, and its role as the training and in-domain test set;
-here we fix the protocol applied on top of that corpus. Training samples
+This subsection fixes the protocol applied on top of the SceneFlow
+finalpass corpus, the thesis's training and in-domain test set. Training
+samples
 random 384 by 640 windows, co-located in both views, from the native 960
 by 540 frames, which preserves native disparity magnitudes rather than
-shrinking them. Chapter \ref{ch:results} shows this native-crop protocol
-substantially outperforms the legacy protocol of downscaling the whole
-frame before cropping. Three augmentations from the OpenStereo recipe
+shrinking them; this native-crop protocol substantially outperforms the
+legacy protocol of downscaling the whole frame before cropping. Three
+augmentations from the OpenStereo recipe
 apply during training: asymmetric color jitter, right-image-only random
 erasing, and random scaling. Optimization uses AdamW with a OneCycle
 schedule over 60,000 steps at a peak learning rate of $8 \times 10^{-4}$,
@@ -280,20 +276,18 @@ which keeps a controlled study practical after every design change. The
 local latency benchmark runs on an RTX 3050 laptop GPU with roughly 4
 gigabytes of memory, representing the low end of the deployment memory
 budget. The intended deployment target is the Jetson Orin Nano class of
-edge accelerator (Figure \ref{fig:jetson}), on which we measured the
-optimized eight-bit model directly; Chapter \ref{ch:results} reports the
-on-device result.
+edge accelerator, on which we measured the optimized eight-bit model
+directly.
 
 On the sensing side, real-camera pairs come from a calibrated low-cost
 binocular rig that streams a 2560 by 720 side-by-side image, split into
 a rectified 1280 by 720 pair per frame. This rig supplies the real-data
 qualification of the trained model: the zero-shot qualitative pairs, the
-real-camera agreement protocol of Section \ref{sec:testing_protocols},
-and the three-dimensional reconstructions of Chapter
-\ref{ch:results}. Housing both the training-side compute and the
-sensing-side rig in the same section keeps the apparatus that produced
-every downstream number in one place, ahead of the experimental
-protocols that Chapter \ref{ch:experimental} builds on top of it.
+real-camera agreement protocol, and the three-dimensional
+reconstructions it supports. Housing both
+the training-side compute and the sensing-side rig in the same section
+keeps the apparatus that produced every downstream number in one place,
+ahead of the experimental protocols built on top of it.
 
 \FloatBarrier
 \section{Principle of Operation}
@@ -341,8 +335,8 @@ the camera frame, colored by its left-image pixel. On the project's
 rig, the calibrated focal length and baseline scale to the inference
 resolution by the width ratio, so the point cloud is metric without
 further tuning. This single forward pass, from image pair to disparity
-map and optional colored point cloud, is the operation measured
-throughout Chapter \ref{ch:results}.
+map and optional colored point cloud, is the operation this thesis
+measures throughout.
 
 \FloatBarrier
 \section{Summary}

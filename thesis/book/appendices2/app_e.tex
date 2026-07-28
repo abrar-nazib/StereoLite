@@ -1,6 +1,17 @@
-% ============ Appendix E: AI Writing Report =============================
+% ============ Appendix: AI Writing Report ================================
 % Source: thesis/book/appendices/app_c.tex, section "AI Usage Disclosure".
-\chapter{AI Writing Report}
+% Page number intentionally omitted from the ToC: the AI-writing report
+% is physically appended after submission and its page number is not
+% known until then (user decision 2026-07-19). \addcontentsline is
+% suppressed for this one \chapter call and a manual ToC line with "--"
+% for the page field is written instead (the "Appendix X" prefix and
+% lettering must match what the appendices package would have produced).
+\begingroup
+  \renewcommand{\addcontentsline}[3]{}
+  \chapter{AI Writing Report}
+\endgroup
+\addtocontents{toc}{\protect\contentsline{chapter}{Appendix
+  \protect\numberline{\thechapter}AI Writing Report}{--}{}}
 \label{app:aireport}
 
 The AI writing report is attached at the end of this document.

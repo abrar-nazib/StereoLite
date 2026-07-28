@@ -54,7 +54,7 @@ is what this thesis sets out to make affordable.
 Binocular stereo recovers depth from the horizontal shift of a scene
 point between two horizontally separated views. That shift, the
 disparity, is inversely proportional to depth through a calibrated
-pinhole relation developed in Chapter~\ref{ch:lit}. A dense disparity map
+pinhole relation. A dense disparity map
 therefore yields a dense depth map, which downstream perception and
 reconstruction consume directly, and computing that disparity map
 accurately and quickly is the task this thesis addresses.
@@ -119,15 +119,13 @@ literature on this trade-off and marks the region this thesis targets.
 \section{Research Questions / Problem Statements}
 Stereo matching takes a pair of rectified images and produces a dense
 disparity map, from which metric depth follows directly through the
-calibrated relation between disparity and depth given in
-Chapter~\ref{ch:lit}. This thesis addresses that task under a hardware
-budget rather than an accuracy budget alone. The requirements that motivate
-that budget are reviewed in Chapter~\ref{ch:lit}, and the resulting hard
-envelope, a few million parameters, real-time latency on the target device,
-a small inference working set, and integer-friendly operators, is stated in
-Chapter~\ref{ch:design}. The design assumes rectified binocular input, a
-maximum disparity of 192 pixels at the inference resolution, and training on
-synthetic data with dense ground truth.
+calibrated relation between disparity and depth. This thesis addresses
+that task under a hardware budget rather than an accuracy budget alone:
+a few million parameters, real-time latency on the target device, a
+small inference working set, and integer-friendly operators. The design
+assumes rectified binocular input, a maximum disparity of 192 pixels at
+the inference resolution, and training on synthetic data with dense
+ground truth.
 
 Those requirements frame four research questions, each of which the thesis
 answers with measured evidence:
@@ -167,8 +165,8 @@ and this is the reconstruction named in the thesis title. Active sensing,
 self-supervised training, monocular depth estimation, and the production
 of a deployment software development kit fall outside the scope. Evidence
 for the second objective, tolerance to imperfect rectification, is
-twofold and is reported in Chapter~\ref{ch:results}. The first part is a
-controlled perturbation study on synthetic data with known ground truth.
+twofold. The first part is a controlled perturbation study on synthetic
+data with known ground truth.
 The second is a real-data demonstration on a low-cost stereo rig whose
 factory rectification is imperfect, where the model still keeps error low.
 
@@ -249,10 +247,8 @@ limitations, and outlines future work.
 \end{itemize}
 The appendices address the knowledge profiles, the complex engineering
 problems, and the complex engineering activities engaged by the thesis
-(Appendices A to C), followed by the plagiarism report, the AI writing
-report, the ethical clearance, the technical specifications, and the
-program-outcome and knowledge-profile attainment tracker (Appendices D
-to H).
+(Appendices A to C), followed by the technical specifications, the
+plagiarism report, and the AI writing report (Appendices D to F).
 
 % SOURCES: old mainmatter/ch1.tex 1.1 Overview, 1.2 Background and
 %   Motivation (with nm{} nomenclature block + fig:edge_gap intact), 1.3

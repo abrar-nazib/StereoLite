@@ -41,8 +41,7 @@ families directly: it reviews cross-domain generalization and the
 benchmarks used to measure it, then sets published parameter counts,
 accuracy, and latency figures for the surveyed methods side by side,
 alongside our own model. Section~\ref{sec:ch2_summary} closes the
-chapter and hands off to Chapter~\ref{ch:design}, which designs a
-network informed by this survey.
+chapter with the design lessons this survey establishes.
 
 \FloatBarrier
 \section{Existing Research}
@@ -95,8 +94,8 @@ x' = x - d, \qquad y' = y
 where $(x', y')$ is the matching pixel in the right image and $d \ge 0$ is
 the disparity. We assume rectified input throughout, so the
 correspondence search always reduces to a horizontal scan, and the
-accuracy of the rectification itself becomes a source of error we examine
-directly in Chapter~\ref{ch:results}.
+accuracy of the rectification itself becomes a source of error worth
+examining directly.
 
 \begin{figure}[H]
 \centering
@@ -367,8 +366,7 @@ C_{\mathrm{gwc}}(g, d, x, y) = \frac{N_g}{N_c}\,
 where $g$ indexes the group, $d$ the disparity, and $f_L^{(g)}$,
 $f_R^{(g)}$ the channel slice of each feature map belonging to group $g$;
 the resulting volume carries one channel per group. We use this operator
-at a single coarse scale in our tile initialization, as \eqref{eq:gwc}
-makes explicit in Chapter~\ref{ch:design}.
+at a single coarse scale in our tile initialization.
 
 \FloatBarrier
 \subsection{Iterative Refinement}
@@ -390,8 +388,8 @@ combination of a coarse neighborhood.
 \end{figure}
 
 Three of these mechanisms, the group-wise cost lookup, the recurrent
-update, and convex upsampling, reappear in modified form in the model we
-design in Chapter~\ref{ch:design}. IGEV-Stereo
+update, and convex upsampling, reappear in modified form in our own
+design. IGEV-Stereo
 \cite{xu2023igev} improved the paradigm by building a geometry encoding
 volume, a lightweight three-dimensional-regularized cost volume that both
 provides a warm-start disparity through soft-argmin and is looked up each
@@ -417,7 +415,7 @@ selective recurrent unit that runs two gate branches with different
 kernel sizes and fuses them per pixel through a contextual attention
 map, reaching the quality of many more iterations in a few; when we tried
 the same unit in our ablation campaign it did not transfer to the
-compact tile setting, a result Chapter~\ref{ch:results} reports.
+compact tile setting.
 
 The recurrent update is a convolutional gated recurrent unit
 \cite{lipson2021raftstereo} that updates a hidden state from a
@@ -538,9 +536,8 @@ technique family below. Fourth, the network must use operators that
 quantize cleanly to eight-bit integers, since accelerators reach rated
 throughput only under integer quantization; operators that resist
 quantization, such as trilinear interpolation in three-dimensional
-volumes, forfeit that throughput regardless of parameter count.
-Chapter~\ref{ch:design} restates these as formal problem and design
-statements that frame the classification below.
+volumes, forfeit that throughput regardless of parameter count. These
+observations frame the classification below.
 
 \FloatBarrier
 \subsection{Classification of Efficient Stereo Methods}
@@ -582,8 +579,7 @@ The lesson generalizes beyond MobileNet: any well-pretrained compact
 backbone can serve, and a detection backbone carries an added advantage,
 since its features are already trained to localize objects across
 scales. We follow this route and use a truncated detection backbone as
-our shared encoder, a choice Chapter~\ref{ch:results} validates against
-two alternatives.
+our shared encoder.
 
 \subsection{Cost-Volume Compression}
 The three-dimensional cost volume is the dominant cost in most stereo
@@ -667,8 +663,8 @@ where $\hat{d}_S$ and $\hat{d}_T$ are the student and teacher disparities,
 $\Omega$ the image domain, and $m_i$ an optional teacher-confidence mask.
 This three-stage pipeline, illustrated in Figure \ref{fig:kd_stages}, has
 not yet been applied to our model, although it may offer
-the largest accuracy gain among the surveyed mechanisms, and we revisit
-it as future work in Chapter~\ref{ch:conclusion}.
+the largest accuracy gain among the surveyed mechanisms and remains
+promising future work.
 
 \begin{figure}[!htbp]
 \centering
@@ -713,8 +709,8 @@ matching networks within the stereo pipeline and reaches 0.78 pixel
 end-point error at 1.81 million parameters, showing a well-allocated
 small budget can rival hand designs an order of magnitude larger.
 
-Three lessons from the efficient family shape the design in
-Chapter~\ref{ch:design}. First, the cost volume is where the budget goes:
+Three lessons from the efficient family shape our design.
+First, the cost volume is where the budget goes:
 every successful compact method shrinks, prunes, or replaces it with a
 sparser hypothesis structure, and the tile representation we adopt is the
 most aggressive. Second, image-derived guidance is cheap and effective:
@@ -762,9 +758,8 @@ settled in the literature: some efficient methods argue that iteration is
 necessary for cross-domain accuracy, while LiteAnyStereo reaches
 competitive zero-shot numbers without any iteration, and the cleanest
 controlled evidence attributes its accuracy to the training pipeline
-rather than to any recurrent module. Chapter~\ref{ch:results} returns to
-this question and shows that the training pipeline closes most of the
-cross-domain gap for our non-iterative tile network.
+rather than to any recurrent module. Our own non-iterative tile network
+follows this second line of evidence.
 
 \FloatBarrier
 \subsection{Benchmarks and Datasets}
@@ -795,8 +790,7 @@ noting: end-point error rewards sub-pixel accuracy on smooth surfaces and
 can look healthy while boundaries are poor, whereas the bad-$t$ and
 D1-all rates count outlier pixels and expose exactly the boundary and
 textureless failures that end-point error averages away. For this
-reason, we report both families of metric together throughout
-Chapter~\ref{ch:results}.
+reason, we report both families of metric together.
 
 \begin{table}[!htbp]
 \centering
@@ -850,10 +844,8 @@ similar synthetic-data accuracy can differ by an order of magnitude in
 zero-shot outlier rate depending on their training pipeline rather than
 their parameter count, so a fair comparison across families has to weigh
 generalization alongside the raw numbers in Table
-\ref{tab:method_comparison}. This is the gap the following chapters
-close for our own model: Chapter~\ref{ch:design} sizes the architecture
-against the frontier established here, and Chapter~\ref{ch:results}
-reports where it lands on both axes.
+\ref{tab:method_comparison}. Our own design targets this gap directly,
+sizing the architecture against the frontier established here.
 
 \begin{table}[!htbp]
 \centering

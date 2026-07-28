@@ -36,8 +36,8 @@ physical stereo rig that together form the test bench, the calibration
 that makes the rig's geometry usable for depth recovery, the three data
 sources the thesis draws on, how the real-camera pairs were collected
 and how a frozen teacher network supplied a comparison reference for
-them, and the four measurement protocols that produced every accuracy,
-latency, and robustness figure in Chapter~\ref{ch:results}.
+them, and the four measurement protocols that produce every accuracy,
+latency, and robustness figure this thesis reports.
 
 The chapter is organized to move from apparatus to data to procedure.
 Section~\ref{sec:exp_setup_bench} lists the compute platforms and the
@@ -51,8 +51,8 @@ how pseudo-ground-truth was obtained for them. Section
 \ref{sec:testing_protocols} closes the chapter with the four measurement
 protocols, latency and memory, rectification tolerance, real-camera
 agreement, and the dual-axis evaluation convention, each stated once
-here so that Chapter~\ref{ch:results} can report numbers without
-re-deriving the procedure behind them.
+here so that reported numbers need not re-derive the procedure behind
+them.
 
 \FloatBarrier
 \section{Experimental Setup and Test Bench}
@@ -165,8 +165,7 @@ This thesis draws on three data sources, summarized in Table
 \ref{tab:exp_datasets}: a synthetic corpus with dense ground truth for
 training and in-domain testing, a real benchmark the network never
 trains on for zero-shot cross-domain testing, and the project's own
-physical rig for real-camera qualification. Chapter~\ref{ch:results}
-reports every number produced from them; this section describes what
+physical rig for real-camera qualification. This section describes what
 each source contains.
 
 \begin{table}[!htbp]
@@ -207,8 +206,8 @@ with structured-light ground truth at up to roughly $3000\times 2000$
 pixels, carry public ground truth and are the scenes this thesis
 evaluates on; the benchmark's remaining 10 scenes withhold their ground
 truth on a submission server and are not used here. The network never
-trains on any Middlebury imagery, so every result reported against this
-benchmark in Chapter~\ref{ch:results} is a genuine zero-shot measurement.
+trains on any Middlebury imagery, so every result against this
+benchmark is a genuine zero-shot measurement.
 Its disparities extend to several hundred pixels and its scenes include
 thin structures and repeated texture that the synthetic training
 distribution under-represents, which is why it functions as a stress
@@ -258,9 +257,9 @@ the resulting numbers are used.
 \FloatBarrier
 \section{Experimental Procedure and Evaluation Metrics}
 \label{sec:testing_protocols}
-Every number Chapter~\ref{ch:results} reports follows one of four
-measurement protocols, defined here so that each has a single stated
-procedure rather than an implicit one repeated across tables. Accuracy
+Every reported number follows one of four measurement protocols,
+defined here so that each has a single stated procedure rather than an
+implicit one repeated across tables. Accuracy
 throughout follows the standard stereo metrics of \eqref{eq:metrics}:
 end-point error \cite{mayer2016sceneflow}, the bad-$t$ rates
 \cite{scharstein2002taxonomy}, and the D1-all outlier rate
@@ -329,8 +328,8 @@ cheaper cloud GPU for ablations, a memory-constrained laptop GPU for a
 conservative latency reference, and the Jetson Orin Nano as the
 deployment target, alongside a calibrated low-cost stereo rig whose
 focal length, baseline, and imperfect factory rectification were all
-stated so that later reconstruction and robustness numbers are
-traceable to a physical measurement. Three data sources were
+stated so that reconstruction and robustness numbers stay traceable to
+a physical measurement. Three data sources were
 described: the SceneFlow synthetic corpus that trains and
 in-domain-tests the network, the Middlebury 2014 benchmark that tests
 it zero-shot on unseen real imagery, and 997 real pairs collected from
