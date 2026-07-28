@@ -74,6 +74,10 @@ def train(steps: int = 2500, batch: int = 20, lr: float = 1e-4,
     os.makedirs(ex, exist_ok=True)
     print(f"extracting {zpath} ({os.path.getsize(zpath)/1e6:.0f} MB) ...", flush=True)
     subprocess.run(["unzip", "-q", "-o", zpath, "-d", ex], check=True)
+    # The OneDrive export nests part2.zip/part3.zip/part4.zip; extract any
+    # inner zips too so the scene folders surface.
+    for p in glob.glob(f"{ex}/**/*.zip", recursive=True):
+        subprocess.run(["unzip", "-q", "-o", p, "-d", ex], check=True)
 
     # ---- discover (left, right, left_disp) triples ----
     lefts = sorted(glob.glob(f"{ex}/**/left.png", recursive=True))
