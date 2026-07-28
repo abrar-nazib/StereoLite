@@ -72,12 +72,17 @@ def train(steps: int = 2500, batch: int = 20, lr: float = 1e-4,
     zpath = "/ds/instereo2k/InStereo2K.zip"
     ex = "/tmp/is2k"
     os.makedirs(ex, exist_ok=True)
+    import zipfile
     print(f"extracting {zpath} ({os.path.getsize(zpath)/1e6:.0f} MB) ...", flush=True)
-    subprocess.run(["unzip", "-q", "-o", zpath, "-d", ex], check=True)
-    # The OneDrive export nests part2.zip/part3.zip/part4.zip; extract any
-    # inner zips too so the scene folders surface.
+    # Use Python zipfile, not the `unzip` binary: the 5.3 GB OneDrive export is
+    # a zip64 archive that Info-ZIP unzip 6.0 rejects ("central directory not
+    # found"), while zipfile reads zip64 fine.
+    with zipfile.ZipFile(zpath) as z:
+        z.extractall(ex)
+    # The export nests part2/3/4.zip; extract those inner zips too.
     for p in glob.glob(f"{ex}/**/*.zip", recursive=True):
-        subprocess.run(["unzip", "-q", "-o", p, "-d", ex], check=True)
+        with zipfile.ZipFile(p) as z:
+            z.extractall(ex)
 
     # ---- discover (left, right, left_disp) triples ----
     lefts = sorted(glob.glob(f"{ex}/**/left.png", recursive=True))
