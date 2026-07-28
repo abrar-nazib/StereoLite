@@ -63,7 +63,10 @@ MAX_DISP = 192.0
               volumes={"/data": data_vol, "/cache": cache_vol,
                        "/results": results_vol})
 def train(steps: int = 2500, batch: int = 24, lr: float = 1e-4,
-          eval_every: int = 200, seed: int = 42, slant_w: float = 0.3):
+          eval_every: int = 200, seed: int = 42, slant_w: float = 0.3,
+          data_prefix: str = "realcam_ncrop", crop_h: int = 384,
+          crop_w: int = 640,
+          out_name: str = "finetune_realcam_ncrop_best.pth"):
     import os
     import sys
     import time
@@ -91,17 +94,32 @@ def train(steps: int = 2500, batch: int = 24, lr: float = 1e-4,
     print(f"GPU {torch.cuda.get_device_name(0)}  {tot:.1f} GB total", flush=True)
 
     # ---- data ----
-    tr = np.load("/data/realcam_train.npz")
-    va = np.load("/data/realcam_val.npz")
+    tr = np.load(f"/data/{data_prefix}_train.npz")
+    va = np.load(f"/data/{data_prefix}_val.npz")
     Ltr, Rtr, Dtr = tr["L"], tr["R"], tr["D"]
     Lva, Rva, Dva = va["L"], va["R"], va["D"]
     N = Ltr.shape[0]
-    print(f"train {N}  val {Lva.shape[0]}  imgs {Ltr.shape[1:]} ", flush=True)
+    Hf, Wf = Ltr.shape[1], Ltr.shape[2]
+    print(f"train {N}  val {Lva.shape[0]}  frames {Ltr.shape[1:]}  "
+          f"crop {crop_h}x{crop_w} ({'native_crop' if (Hf,Wf)!=(crop_h,crop_w) else 'full'})",
+          flush=True)
 
-    def to_batch(Ls, Rs, Ds, idx):
-        L = torch.from_numpy(Ls[idx]).to(dev).float().permute(0, 3, 1, 2) / 255.0
-        R = torch.from_numpy(Rs[idx]).to(dev).float().permute(0, 3, 1, 2) / 255.0
-        D = torch.from_numpy(Ds[idx].astype(np.float32)).to(dev).unsqueeze(1)
+    def to_batch(Ls, Rs, Ds, idx, mode):
+        """Crop a crop_h x crop_w window (random for train, center for val),
+        applying the SAME window to L, R and D (native_crop protocol)."""
+        Lb, Rb, Db = [], [], []
+        for k in idx:
+            if mode == "rand":
+                y0 = int(rng.integers(0, Hf - crop_h + 1))
+                x0 = int(rng.integers(0, Wf - crop_w + 1))
+            else:
+                y0, x0 = (Hf - crop_h) // 2, (Wf - crop_w) // 2
+            Lb.append(Ls[k, y0:y0 + crop_h, x0:x0 + crop_w])
+            Rb.append(Rs[k, y0:y0 + crop_h, x0:x0 + crop_w])
+            Db.append(Ds[k, y0:y0 + crop_h, x0:x0 + crop_w])
+        L = torch.from_numpy(np.stack(Lb)).to(dev).float().permute(0, 3, 1, 2) / 255.0
+        R = torch.from_numpy(np.stack(Rb)).to(dev).float().permute(0, 3, 1, 2) / 255.0
+        D = torch.from_numpy(np.stack(Db).astype(np.float32)).to(dev).unsqueeze(1)
         V = ((D > 0) & (D < MAX_DISP)).float()
         return L, R, D, V
 
@@ -123,7 +141,7 @@ def train(steps: int = 2500, batch: int = 24, lr: float = 1e-4,
         errs, npx = 0.0, 0
         for i in range(0, Lva.shape[0], 8):
             j = list(range(i, min(i + 8, Lva.shape[0])))
-            L, R, D, V = to_batch(Lva, Rva, Dva, j)
+            L, R, D, V = to_batch(Lva, Rva, Dva, j, "center")
             with torch.cuda.amp.autocast(dtype=torch.float16):
                 out = model(L, R, aux=True)
             d = out["d_final"].float()
@@ -147,7 +165,7 @@ def train(steps: int = 2500, batch: int = 24, lr: float = 1e-4,
             ptr = 0
         idx = perm[ptr:ptr + batch]
         ptr += batch
-        L, R, D, V = to_batch(Ltr, Rtr, Dtr, idx.tolist())
+        L, R, D, V = to_batch(Ltr, Rtr, Dtr, idx.tolist(), "rand")
 
         opt.zero_grad(set_to_none=True)
         with torch.cuda.amp.autocast(dtype=torch.float16):
@@ -176,7 +194,7 @@ def train(steps: int = 2500, batch: int = 24, lr: float = 1e-4,
                           "val_epe": e, "base_epe": base_epe, "cfg": ck.get("cfg"),
                           "arch": "gev4_opt_narrow_plane", "finetune": "realcam"}
                 os.makedirs("/results/realcam_finetune", exist_ok=True)
-                torch.save(out_ck, "/results/realcam_finetune/finetune_realcam_best.pth")
+                torch.save(out_ck, f"/results/realcam_finetune/{out_name}")
                 results_vol.commit()
                 tag = "  <- best, saved"
             print(f"[step {step}] val EPE = {e:.4f}  (best {best:.4f}){tag}", flush=True)
