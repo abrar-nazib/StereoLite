@@ -111,9 +111,10 @@ def resolve_ckpt(user_ckpt: str | None) -> str:
     """
     if user_ckpt:
         return user_ckpt
-    # Preference: native_crop fine-tune (protocol-matched to 960 inference),
-    # then the resize fine-tune, then the base SceneFlow checkpoint.
-    for rel in ("model/checkpoints/finetune_realcam_ncrop_best.pth",
+    # Preference: InStereo2K real-GT native_crop fine-tune (best real-data
+    # pedigree), then the realcam native_crop / resize fine-tunes, then base.
+    for rel in ("model/checkpoints/finetune_instereo2k_ncrop_best.pth",
+                "model/checkpoints/finetune_realcam_ncrop_best.pth",
                 "model/checkpoints/finetune_realcam_best.pth",
                 "model/benchmarks/20260704_fullsf_gev4onp_nc/best.pth"):
         p = os.path.join(PROJ, rel)
