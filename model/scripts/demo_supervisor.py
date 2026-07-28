@@ -55,6 +55,14 @@ import sys
 import time
 from pathlib import Path
 
+# Wayland sessions break both OpenCV's Qt highgui and Open3D's GLFW+GLEW
+# viewer (GLEW needs an X11/GLX context, which native Wayland does not give).
+# Force the X11 / XWayland path so cv2 windows and the Open3D point-cloud
+# viewer both get a working OpenGL context. Must run before importing cv2.
+if os.environ.get("DISPLAY"):
+    os.environ.setdefault("QT_QPA_PLATFORM", "xcb")
+    os.environ.pop("WAYLAND_DISPLAY", None)
+
 import cv2
 import numpy as np
 import torch
@@ -79,9 +87,10 @@ DISP_SCALE = NATIVE_W / TRAIN_W  # 2.0: convert 640 wide disparity to native px
 
 DATASET_ROOT = "/media/abrar/AbrarSSD/Datasets/stereo_samples_20260425_104147"
 
-# Generate PointCloud button geometry (top left of the composed window),
-# in composed pixel coordinates.
+# On-frame button geometry (top left of the composed window), in composed
+# pixel coordinates. BTN = generate point cloud, CLR_BTN = clear depth points.
 BTN = dict(x0=12, y0=12, w=220, h=44)
+CLR_BTN = dict(x0=242, y0=12, w=150, h=44)
 
 
 # ---------------------------------------------------------------------------
@@ -173,6 +182,86 @@ def depth_from_disp(disp_native_px: float, focal_px: float,
 # Point cloud
 # ---------------------------------------------------------------------------
 
+# One shared offscreen renderer, created lazily and reused across clicks
+# (Filament dislikes being re-instantiated within a process).
+_PC_RENDERER = {"r": None}
+
+
+def _show_pointcloud_interactive(pcd, win="StereoLite point cloud",
+                                 width=1024, height=768):
+    """Wayland-safe interactive point-cloud viewer.
+
+    Open3D's GLFW/GLEW window cannot get a GL context on native Wayland, so
+    the cloud is rendered offscreen with the EGL renderer and shown in a cv2
+    window driven by an orbit camera: drag to rotate, +/- (or scroll) to
+    zoom, r to reset, q or ESC to close and return to the live demo.
+    """
+    import open3d.visualization.rendering as rendering
+
+    if len(pcd.points) == 0:
+        print("point cloud: nothing to display")
+        return
+
+    aabb = pcd.get_axis_aligned_bounding_box()
+    center = np.asarray(aabb.get_center(), dtype=np.float64)
+    radius = float(np.linalg.norm(aabb.get_extent())) / 2.0 or 1.0
+
+    if _PC_RENDERER["r"] is None:
+        _PC_RENDERER["r"] = rendering.OffscreenRenderer(width, height)
+    renderer = _PC_RENDERER["r"]
+    renderer.scene.clear_geometry()
+    renderer.scene.set_background([0.08, 0.08, 0.10, 1.0])
+    mat = rendering.MaterialRecord()
+    mat.shader = "defaultUnlit"
+    mat.point_size = 2.5
+    renderer.scene.add_geometry("pc", pcd, mat)
+
+    st = dict(az=0.0, el=0.3, dist=1.8 * radius, last=None)
+    up = [0.0, -1.0, 0.0]  # image Y points down, so -Y up shows it upright.
+
+    def eye():
+        e, a, d = st["el"], st["az"], st["dist"]
+        return center + np.array([d * np.cos(e) * np.sin(a),
+                                  d * np.sin(e),
+                                  d * np.cos(e) * np.cos(a)])
+
+    def on_mouse(event, x, y, flags, param):
+        if event == cv2.EVENT_LBUTTONDOWN:
+            st["last"] = (x, y)
+        elif event == cv2.EVENT_LBUTTONUP:
+            st["last"] = None
+        elif event == cv2.EVENT_MOUSEMOVE and (flags & cv2.EVENT_FLAG_LBUTTON) \
+                and st["last"] is not None:
+            dx, dy = x - st["last"][0], y - st["last"][1]
+            st["az"] -= dx * 0.008
+            st["el"] = float(np.clip(st["el"] + dy * 0.008, -1.4, 1.4))
+            st["last"] = (x, y)
+        elif event == cv2.EVENT_MOUSEWHEEL:
+            st["dist"] *= 0.9 if flags > 0 else 1.1
+
+    cv2.namedWindow(win, cv2.WINDOW_NORMAL)
+    cv2.resizeWindow(win, width, height)
+    cv2.setMouseCallback(win, on_mouse)
+    while True:
+        renderer.setup_camera(60.0, center.tolist(), eye().tolist(), up)
+        rgb = np.asarray(renderer.render_to_image())
+        frame = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+        cv2.putText(frame, "drag = rotate   +/- = zoom   r = reset   q = close",
+                    (12, height - 16), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                    (255, 255, 255), 1, cv2.LINE_AA)
+        cv2.imshow(win, frame)
+        k = cv2.waitKey(20) & 0xFF
+        if k in (ord("q"), ord("Q"), 27):
+            break
+        elif k in (ord("+"), ord("=")):
+            st["dist"] *= 0.9
+        elif k in (ord("-"), ord("_")):
+            st["dist"] *= 1.1
+        elif k == ord("r"):
+            st.update(az=0.0, el=0.3, dist=1.8 * radius)
+    cv2.destroyWindow(win)
+
+
 def build_and_show_pointcloud(L_bgr: np.ndarray, disp_native: np.ndarray,
                               focal_px: float, baseline_m: float,
                               stride: int, max_depth: float,
@@ -187,9 +276,11 @@ def build_and_show_pointcloud(L_bgr: np.ndarray, disp_native: np.ndarray,
 
     L_rgb = cv2.cvtColor(L_bgr, cv2.COLOR_BGR2RGB)
     # disparity_to_points expects image and disparity at matching resolution.
+    # min_disp floor of 2 px caps depth at f*B/2 (about 26 m here) so a few
+    # low-confidence far pixels do not stretch the cloud over a huge Z range.
     pts, cols = disparity_to_points(
         L_rgb, disp_native, f_px=focal_px, baseline_m=baseline_m,
-        min_disp=1.0, max_depth_m=max_depth, stride=stride)
+        min_disp=2.0, max_depth_m=max_depth, stride=stride)
 
     n = len(pts)
     if n == 0:
@@ -201,21 +292,21 @@ def build_and_show_pointcloud(L_bgr: np.ndarray, disp_native: np.ndarray,
     print(f"point cloud: {n:,} points -> {ply_out}")
 
     if show_window:
-        # Build an Open3D cloud, drop depth-edge fliers, and open the viewer.
+        # Build an Open3D cloud, drop depth-edge fliers, and open the
+        # Wayland-safe offscreen viewer.
         pcd = o3d.geometry.PointCloud()
         pcd.points = o3d.utility.Vector3dVector(pts.astype(np.float64))
         pcd.colors = o3d.utility.Vector3dVector(cols.astype(np.float64))
         pcd, _ = pcd.remove_statistical_outlier(nb_neighbors=20, std_ratio=2.0)
-        # Flip Y and Z so the cloud is right way up in the default Open3D view
-        # (camera looks down +Z, image Y points down).
-        pcd.transform([[1, 0, 0, 0],
-                       [0, -1, 0, 0],
-                       [0, 0, -1, 0],
-                       [0, 0, 0, 1]])
-        print("opening Open3D viewer (close its window to return to the demo)")
-        o3d.visualization.draw_geometries(
-            [pcd], window_name="StereoLite point cloud",
-            width=1280, height=720)
+        print("opening point-cloud viewer (drag to rotate, +/- zoom, q closes)")
+        try:
+            _show_pointcloud_interactive(pcd)
+        except Exception as exc:
+            print(f"viewer failed to open ({exc}).")
+            print(f"The cloud is saved at {ply_out}; open it with:")
+            print(f"    python -c \"import open3d as o3d; "
+                  f"o3d.visualization.draw_geometries("
+                  f"[o3d.io.read_point_cloud('{ply_out}')])\"")
     return n
 
 
@@ -322,17 +413,29 @@ def draw_marker(img: np.ndarray, x: int, y: int, label: str,
 
 
 def draw_button(img: np.ndarray):
-    """Draw the Generate PointCloud button overlay in the top left corner."""
+    """Draw the on-frame buttons (Generate PointCloud + Clear Points)."""
     x0, y0, w, h = BTN["x0"], BTN["y0"], BTN["w"], BTN["h"]
     cv2.rectangle(img, (x0, y0), (x0 + w, y0 + h), (40, 40, 40), -1)
     cv2.rectangle(img, (x0, y0), (x0 + w, y0 + h), (0, 200, 255), 2)
     cv2.putText(img, "Generate PointCloud", (x0 + 10, y0 + 28),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 220, 255), 1, cv2.LINE_AA)
+    cx0, cy0, cw, ch = CLR_BTN["x0"], CLR_BTN["y0"], CLR_BTN["w"], CLR_BTN["h"]
+    cv2.rectangle(img, (cx0, cy0), (cx0 + cw, cy0 + ch), (40, 40, 40), -1)
+    cv2.rectangle(img, (cx0, cy0), (cx0 + cw, cy0 + ch), (80, 80, 255), 2)
+    cv2.putText(img, "Clear Points", (cx0 + 10, cy0 + 28),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.55, (120, 120, 255), 1, cv2.LINE_AA)
+
+
+def _inside(mx: int, my: int, b: dict) -> bool:
+    return b["x0"] <= mx <= b["x0"] + b["w"] and b["y0"] <= my <= b["y0"] + b["h"]
 
 
 def inside_button(mx: int, my: int) -> bool:
-    x0, y0, w, h = BTN["x0"], BTN["y0"], BTN["w"], BTN["h"]
-    return x0 <= mx <= x0 + w and y0 <= my <= y0 + h
+    return _inside(mx, my, BTN)
+
+
+def inside_clear(mx: int, my: int) -> bool:
+    return _inside(mx, my, CLR_BTN)
 
 
 def annotate_bar(img: np.ndarray, lines: list[str]):
@@ -423,9 +526,13 @@ def run_live(args, device):
         # Map the window click back to composed-image coordinates.
         cx = int(mx / max(state["display_scale"], 1e-6))
         cy = int(my / max(state["display_scale"], 1e-6))
-        # 1) Button takes priority over depth-point placement.
+        # 1) Buttons take priority over depth-point placement.
         if inside_button(cx, cy):
             state["trigger_pc"] = True
+            return
+        if inside_clear(cx, cy):
+            state["points"].clear()
+            print("cleared depth markers (button)")
             return
         # 2) Otherwise treat as a depth point. A click in the right panel
         #    maps to the same image pixel as the left panel (subtract the

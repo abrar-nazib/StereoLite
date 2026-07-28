@@ -38,26 +38,28 @@ def disparity_to_points(L_rgb: np.ndarray, disp: np.ndarray, f_px: float,
                          max_depth_m: float = 50.0,
                          stride: int = 1):
     """Convert (H, W, 3) RGB + (H, W) disparity → (N, 3) XYZ + (N, 3) RGB."""
-    H, W = disp.shape
+    H0, W0 = disp.shape                      # original (full-res) grid
     if cx is None:
-        cx = W / 2.0
+        cx = W0 / 2.0
     if cy is None:
-        cy = H / 2.0
+        cy = H0 / 2.0
     if stride > 1:
         L_rgb = L_rgb[::stride, ::stride]
         disp = disp[::stride, ::stride]
-        H, W = disp.shape
-        cx /= stride
-        cy /= stride
-        # Note: f_px does NOT change with stride — the same focal length
-        # describes the camera regardless of how we subsample the grid.
+    # Sample the pixel grid in ORIGINAL pixel coordinates (0, stride, 2*stride,
+    # ...). cx, cy and f_px all stay in original pixels, so back-projected X/Y
+    # keep the same metric scale as Z regardless of stride. (The previous code
+    # rescaled cx/cy by stride while indexing the grid in strided units, which
+    # shrank X and Y by a factor of `stride` and pancaked the cloud.)
+    xs = np.arange(0, W0, stride)[:disp.shape[1]]
+    ys = np.arange(0, H0, stride)[:disp.shape[0]]
+    xx, yy = np.meshgrid(xs, ys)             # shape (h, w), original px coords
 
     valid = (disp > min_disp) & np.isfinite(disp)
     Z = np.zeros_like(disp, dtype=np.float32)
     Z[valid] = f_px * baseline_m / disp[valid]
     valid &= (Z > 0) & (Z < max_depth_m)
 
-    yy, xx = np.meshgrid(np.arange(H), np.arange(W), indexing="ij")
     X = (xx - cx) * Z / f_px
     Y = (yy - cy) * Z / f_px
 
