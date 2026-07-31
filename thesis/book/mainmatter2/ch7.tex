@@ -1,31 +1,38 @@
 % =====================================================================
-% CHAPTER 7: Socio-Economic Impact and Sustainability (9-chapter template)
-% Ported from mainmatter/ch4.tex with structure preserved.
-% RED headings kept verbatim; hard-coded chapter references converted to \ref.
-% POs demonstrated: PO6 (engineer and society), PO7 (environment and
-% sustainability).
+% CHAPTER 7: Societal, Environmental Impact and Sustainability
+% Restructured 2026-07-31 per external examiner's final feedback:
+%   7.1 Introduction
+%   7.2 Impact of the Thesis on Societal, Health, and Cultural Issues
+%   7.3 Safety and Ethical Considerations
+%   7.4 Alignment with Sustainable Development Goals (SDGs)
+%   7.5 Summary
+% Environmental and sustainability material folded into the SDG section
+% (SDG 12 in particular). Chapter label ch:socio kept (referenced by
+% ch1 organization list and app_i PO tracker). POs demonstrated:
+% PO6 (engineer and society), PO7 (environment and sustainability).
 % =====================================================================
-\chapter{Socio-Economic Impact and Sustainability}
+\chapter{Societal, Environmental Impact and Sustainability}
 \label{ch:socio}
 
 \section{Introduction}
-The results of this thesis carry practical implications beyond the
-benchmark numbers, and this chapter states them. The system under
-discussion is the compact stereo matching network designed in
-\ref{ch:design}, implemented and deployed in \ref{ch:implementation},
-and evaluated in \ref{ch:results}: a passive depth sensor built from
-two commodity image sensors and an embedded accelerator, whose entire
-depth computation runs on the device. Each property of that design
-(on-device processing, passive sensing, and a small computational
-footprint) translates into a concrete societal or environmental
-consequence. Section~\ref{sec:7-2} examines the societal, health,
-safety, legal, and cultural dimensions; Section~\ref{sec:7-3} examines
-the environmental and sustainability dimensions; Section~\ref{sec:7-4}
-summarizes.
+The value of this work is not exhausted by its benchmark numbers. A depth
+sensor that runs its whole computation on the device, emits nothing into
+the scene, and is built from a handful of commodity parts carries
+consequences for the people around it, for the environment it operates
+in, and for the wider goals that engineering is meant to serve. This
+chapter draws those consequences out. Section~\ref{sec:soc_impact}
+examines the societal, health, and cultural effects that follow from
+where the computation happens and how the scene is sensed.
+Section~\ref{sec:safety_ethics} turns to safety and to the ethical
+questions a camera-carrying, autonomy-enabling system raises.
+Section~\ref{sec:sdg} maps the work onto three of the United Nations
+Sustainable Development Goals and, in doing so, sets out its
+environmental and sustainability case. Section~\ref{sec:soc_summary}
+draws the chapter together.
 
 \FloatBarrier
-\section{Impact of the Thesis on Societal, Health, Safety, Legal and Cultural Issues}
-\label{sec:7-2}
+\section{Impact of the Thesis on Societal, Health, and Cultural Issues}
+\label{sec:soc_impact}
 The most direct societal consequence of this work follows from where the
 computation happens. Because the network runs the depth computation on
 the device rather than in the cloud, the video stream stays local: no
@@ -43,91 +50,154 @@ or transmitted; an embedded sensor that consumes its own video internally
 and emits only geometry is easier to deploy responsibly in homes,
 workplaces, and public settings.
 
-Safety is the second dimension. A mobile robot or drone acts safely in
-three-dimensional space only to the extent that its depth perception is
-reliable, and the evaluation of \ref{ch:results} addressed exactly the failure
-modes that make depth unreliable in the field: the model was tested not
-only in its training domain but zero-shot on unseen real scenes, under
-controlled rectification error, and on the physical stereo rig itself.
-On-device inference also removes the network round trip from the control
-loop, so the depth estimate a robot acts on does not depend on the
-availability or latency of a wireless link; a platform whose obstacle
-avoidance survives a lost connection is categorically safer than one
-whose perception stalls with the network. The choice of sensing modality
-also carries health implications. A passive stereo rig emits no laser and
-no structured infrared light; it only observes. Bystanders are therefore
-not exposed to any emitted radiation, a relevant distinction from active
-depth sensors, whose emitters must be engineered and certified for eye
-safety, particularly around children and in crowded indoor spaces.
+The choice of sensing modality carries a health implication that is easy
+to overlook. A passive stereo rig emits no laser and no structured
+infrared light; it only observes. Bystanders are therefore not exposed to
+any emitted radiation, a real distinction from active depth sensors,
+whose emitters must be engineered and certified for eye safety,
+particularly around children and in crowded indoor spaces. A depth sensor
+that adds no new emission to a shared room is, by that measure, gentler
+on the people in it.
 
-Finally, the work has an accessibility dimension. A compact, low-cost,
-passive depth sensor lowers the barrier to robotics and assistive
-technology in settings where specialized depth hardware is unaffordable.
-Depth perception built from two commodity image sensors and an embedded
-accelerator puts spatial sensing within reach of student projects,
-small workshops, assistive devices, and products aimed at price-sensitive
-markets, communities that a sensor costing several times as much would
-simply exclude. This broadening of who can build and afford spatially
-aware machines is itself a societal outcome, and it follows directly
-from the design constraints this thesis set out to satisfy.
+Finally, the work has an accessibility dimension with a cultural reach.
+A compact, low-cost, passive depth sensor lowers the barrier to robotics
+and assistive technology in settings where specialized depth hardware is
+unaffordable. Depth perception built from two commodity image sensors and
+an embedded accelerator puts spatial sensing within reach of student
+projects, small workshops, assistive devices, and products aimed at
+price-sensitive markets, communities that a sensor costing several times
+as much would simply exclude. Widening who can build and afford spatially
+aware machines is itself a societal outcome, and it follows directly from
+the design constraints this thesis set out to satisfy.
 
 \FloatBarrier
-\section{Impact of the Thesis on the Environment and Sustainability}
-\label{sec:7-3}
-The environmental case for on-device stereo begins with energy. The
-deployed network operates within a power envelope of a few watts to a few
-tens of watts, and computing the depth locally consumes far less energy
-per frame than transmitting the video stream to a datacenter and back.
-A cloud-processed alternative pays the energy of radio transmission, of
-the network infrastructure along the path, and of the datacenter
-inference itself, for every frame, over the entire operating life of the
-device. On-device inference removes that recurring per-frame transport
-cost, so the energy advantage grows over the deployed lifetime of every
-unit.
+\section{Safety and Ethical Considerations}
+\label{sec:safety_ethics}
+Safety is the first concern for any system that senses depth so that a
+machine can move. A mobile robot or drone acts safely in
+three-dimensional space only to the extent that its depth perception is
+reliable, and the evaluation of Chapter~\ref{ch:results} was built around
+exactly the failure modes that make depth unreliable in the field: the
+model was tested not only in its training domain but zero-shot on unseen
+real scenes, under controlled rectification error, and on the physical
+stereo rig itself. On-device inference also removes the network round
+trip from the control loop, so the depth estimate a robot acts on does
+not depend on the availability or latency of a wireless link; a platform
+whose obstacle avoidance survives a lost connection is categorically safer
+than one whose perception stalls with the network. The passive rig
+reinforces this: with no laser and no projected pattern, the sensor poses
+no eye-safety hazard to the people it works alongside.
 
-The choice of passive stereo over active sensing also matters for
-materials. A stereo rig uses two commodity image sensors rather than a
-specialized time-of-flight or LiDAR unit, and it emits no laser or
-structured light. It therefore carries no emitter hardware at all: no
-laser diode, no pattern projector, and none of the associated drive
-electronics. Commodity image sensors are manufactured at large scale for
-the phone and webcam markets, so a depth sensor assembled from them draws
-on the low material cost and established supply chain of that scale,
-rather than requiring the specialized components of an active unit. Fewer
-and more common parts also make the sensor easier to source, repair, and
-replace over its service life, which are practical measures of hardware
-sustainability.
+Reliability, though, has limits that honesty requires stating. The
+network is trained on synthetic data and is not perfect on real scenes;
+its errors concentrate at depth boundaries and on thin, repeated, or
+reflective structures, and its accuracy degrades gracefully rather than
+failing silently, but it degrades. A system that acts on this depth
+should therefore treat it as one cue among several rather than as ground
+truth, and this thesis reports the error rates plainly, including where
+they are worst, so that a downstream integrator can design for them
+instead of being surprised by them.
 
-Sustainability also applies to the development of the model itself, and
-this thesis reports its training footprint. The production model was
-trained in roughly one day on a single cloud GPU, and the ablation and
-evaluation runs each cost a fraction of a dollar of cloud time. This
-footprint is deliberately modest by the standards of modern deep
-learning, where the largest stereo systems are built on foundation-scale
-pretraining whose compute is orders of magnitude larger. The methodology
-that made this possible, the small controlled ablation harness of
-\ref{ch:design} that filtered design candidates cheaply before the single
-full training run of \ref{ch:implementation}, is itself a sustainability
-practice: compute was spent once, on a design already validated by that
-cheaper process.
+The ethical questions extend past safety. A device that perceives
+three-dimensional space is inherently dual-use: the same depth stream
+that lets a robot avoid a person can, in another deployment, help track
+one. The design choices here lean against the harmful use, on-device
+processing keeps imagery from being collected centrally, and passive
+sensing avoids the covert illumination that active depth can use, but no
+architecture can prevent misuse on its own, and it would be dishonest to
+claim otherwise. Two further points of engineering ethics bear on this
+work directly. First, the data: the real pairs used for qualification
+were captured by the authors in their own institutional spaces, with no
+third parties as subjects, and no personal imagery was collected,
+retained, or distributed. Second, the reporting: every accuracy, latency,
+and efficiency figure in this thesis is tied to a specific scripted run
+whose configuration is logged, comparisons against published methods use
+each paper's own reported numbers, and the model's shortcomings are
+stated alongside its strengths, so that the record is one a reader can
+trust and reproduce rather than one tuned to flatter.
+
+\FloatBarrier
+\section{Alignment with Sustainable Development Goals (SDGs)}
+\label{sec:sdg}
+The work aligns with three of the United Nations Sustainable Development
+Goals. Each connection is concrete rather than aspirational, and the
+environmental case for the design is made here, under the goal it serves
+most directly.
+
+\paragraph{SDG 9: Industry, Innovation and Infrastructure.}
+This goal calls for resilient infrastructure and for broad, affordable
+access to the fruits of innovation. A stereo network that delivers usable
+depth within the memory, latency, and power budget of a low-cost edge
+board moves a capability that until recently required either expensive
+sensors or a datacenter onto hardware that small manufacturers,
+researchers, and startups can actually afford. By showing that a design
+methodology, controlled ablation under a hard budget, can produce a
+competitive model at a few million parameters, the thesis also
+contributes a repeatable way of building efficient perception rather than
+a single artifact, which is the kind of transferable innovation this goal
+seeks.
+
+\paragraph{SDG 11: Sustainable Cities and Communities.}
+This goal includes safe, accessible, and sustainable mobility and living
+spaces. Reliable, low-cost, on-device depth perception is an enabling
+technology for exactly the machines that operate in shared human
+environments: service and delivery robots, inspection drones, and
+assistive devices for people with limited mobility or vision. Because the
+sensor keeps imagery local and emits nothing, it can be deployed in homes,
+sidewalks, and public buildings with a lighter privacy and safety
+footprint than a cloud-connected or actively illuminating alternative,
+which is what makes such deployments socially sustainable rather than
+merely technically possible.
+
+\paragraph{SDG 12: Responsible Consumption and Production.}
+This goal is where the environmental case sits, and it applies to the
+hardware, the running energy, and the development of the model alike. On
+the hardware side, a stereo rig uses two commodity image sensors rather
+than a specialized time-of-flight or LiDAR unit and carries no emitter
+hardware at all: no laser diode, no pattern projector, and none of the
+associated drive electronics. Those commodity sensors are manufactured at
+enormous scale for the phone and webcam markets, so a depth sensor
+assembled from them draws on an established supply chain rather than
+specialized parts, and its fewer, more common components make it easier
+to source, repair, and replace over its service life. On the energy side,
+the deployed network runs within a few watts to a few tens of watts and
+computes each frame locally, avoiding the recurring per-frame cost of
+transmitting video to a datacenter and back; because that transport cost
+is paid for every frame over a device's whole life, removing it compounds
+over the deployed fleet. On the development side, the production model was
+trained in roughly one day on a single cloud GPU, and each ablation and
+evaluation run cost a fraction of a dollar of cloud time, a footprint
+kept deliberately small by the cheap controlled-ablation harness of
+Chapter~\ref{ch:design}, which filtered design candidates before any
+expensive full training run. Compute, in other words, was spent once, on
+a design already validated by a cheaper process, which is responsible
+production applied to model building itself.
 
 \FloatBarrier
 \section{Summary}
-\label{sec:7-4}
-This chapter traced the design properties of the system to their
-societal and environmental consequences. On-device inference keeps
-imagery local, which protects the privacy of observed people and spaces
-and eases legal and cultural concerns; reliable, connection-independent
-depth makes robots and drones safer; passive sensing emits no laser and
-poses no eye-safety hazard; and the low cost of the sensor widens access
-to assistive and robotic technology. Environmentally, local computation
-avoids the recurring energy cost of a cloud round trip, the passive rig
-needs no specialized emitter hardware beyond two commodity image
-sensors, and the model's training footprint is small: roughly one day
-on a single cloud GPU, with ablations costing a fraction of a dollar
-each. These impacts follow directly from the edge-deployment
-constraints that shaped the design.
+\label{sec:soc_summary}
+This chapter traced the design properties of the system to their human
+and environmental consequences. On-device inference keeps imagery local,
+which protects the privacy of observed people and eases legal and
+cultural concerns; passive sensing emits no laser and poses no eye-safety
+hazard; and the low cost of the sensor widens access to assistive and
+robotic technology. On safety and ethics, connection-independent depth
+makes robots and drones safer, the thesis reports its errors honestly
+rather than only its successes, and it acknowledges the dual-use nature
+of depth sensing while leaning its design choices against misuse.
+Finally, the work aligns with three Sustainable Development Goals,
+affordable innovation (SDG 9), safe machines in shared spaces (SDG 11),
+and responsible production (SDG 12), and it is under the last of these
+that the environmental case is made: commodity parts over specialized
+emitters, local computation over a repeated cloud round trip, and a
+training footprint of about one GPU-day. These impacts follow directly
+from the edge-deployment constraints that shaped the design.
 
-% SOURCES: mainmatter/ch4.tex (sections 4.1, 4.2, 4.3, 4.4 — all four sections ported)
-% DROPPED: none. All original content preserved.
-% MOVED-AWAY: none. This chapter is entirely self-contained per the ownership map.
+% SOURCES: mainmatter2/ch7.tex prior version (societal/privacy,
+%   legal/cultural, accessibility, safety, environment, and training-
+%   footprint prose all carried over and re-sectioned). New prose: the
+%   ethical-considerations paragraphs (dual-use, data provenance, honest
+%   reporting) and the three SDG mappings.
+% DROPPED: none substantive; the old separate "Environment and
+%   Sustainability" section content was folded into SDG 12.
+% MOVED-AWAY: none. Chapter label ch:socio retained.

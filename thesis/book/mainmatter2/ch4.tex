@@ -12,31 +12,23 @@
 \label{ch:implementation}
 
 \section{Introduction}
-Chapter \ref{ch:design} fixed the architecture of StereoLite and the
-evidence behind every design choice, from the truncated-backbone
-encoder through the fail-soft geometry gate. This chapter covers how
-that architecture became a trained, optimized, and deployable system.
-We describe the software stack and codebase that trains and evaluates
-the network, the concrete parameter values the design settled on, the
-optimization pass that brought the inference graph inside the edge
-latency budget, the compute and sensing hardware the project used, and
-the principle of operation that turns a rectified image pair into a
-disparity map and, optionally, a metric point cloud.
+A design on paper only becomes useful once it is written as code,
+trained until it stops improving, and made fast enough to run on the
+hardware it was meant for. This chapter is about that step. It turns
+StereoLite from a fixed architecture into a working system and records,
+in one place, everything needed to rebuild it: the software that trains
+and evaluates the network, the exact settings the final model uses, the
+work done to bring one forward pass inside the target speed and memory
+budget, the computing and camera hardware involved, and what actually
+happens inside the network when a rectified image pair goes in and a
+disparity map comes out.
 
-The chapter is organized around what was built rather than what was
-measured. Software Development covers the training and evaluation
-codebase and the cloud infrastructure behind it. Network Implementation
-gives the exact hyperparameters chosen for the production model.
-Optimization and Configuration Selection describes the six changes that
-cut inference latency and the further changes required for eight-bit
-deployment. Training Objective and Protocol fixes what the network
-minimizes during training and the crop, augmentation, and optimizer
-protocol applied on top of the training corpus. Hardware and Embedded
-Deployment lists the compute and sensing apparatus, including the
-Jetson Orin Nano deployment target and the physical stereo rig.
-Principle of Operation walks through the
-forward pass end to end; this chapter is concerned only with how the
-system was built.
+The emphasis here is on what was built, not on the numbers it produced;
+those belong with the results. Each value that matters, how the network
+is sized, how it is trained, and what is changed to run it in eight-bit
+on an edge board, is pinned down once so that every result reported
+afterwards rests on a configuration a reader can see in full and
+reproduce.
 
 \FloatBarrier
 \section{Software Development}
@@ -242,22 +234,108 @@ $\mathcal{L}_{\mathrm{slant}}$ the gated slant supervision.
 \FloatBarrier
 \subsection{Datasets and Training Protocol}
 This subsection fixes the protocol applied on top of the SceneFlow
-finalpass corpus, the thesis's training and in-domain test set. Training
-samples
-random 384 by 640 windows, co-located in both views, from the native 960
-by 540 frames, which preserves native disparity magnitudes rather than
-shrinking them; this native-crop protocol substantially outperforms the
-legacy protocol of downscaling the whole frame before cropping. Three
-augmentations from the OpenStereo recipe
-apply during training: asymmetric color jitter, right-image-only random
-erasing, and random scaling. Optimization uses AdamW with a OneCycle
-schedule over 60,000 steps at a peak learning rate of $8 \times 10^{-4}$,
-a batch of 32, and bfloat16 mixed precision, on a single A100 GPU. Input
-is normalized to the unit interval at the model boundary. Validation
-uses a fixed 400-pair subset of the test set at the native 960 by 540
-axis, evaluated every thousand steps, with a resized-axis measurement
-logged alongside for comparison against work that reports at the resized
-scale. Table \ref{tab:train_config} lists this configuration in full.
+finalpass corpus, the thesis's training and in-domain test set, and the
+project's own rig captures used only for qualification. Optimization uses
+AdamW with a OneCycle schedule over 60,000 steps at a peak learning rate
+of $8 \times 10^{-4}$, a batch of 32, and bfloat16 mixed precision, on a
+single A100 GPU. Input is normalized to the unit interval at the model
+boundary. Table \ref{tab:train_config} lists this configuration in full;
+the paragraphs below detail the two parts a reader is most likely to want
+to reproduce, the data split and the crop-and-augment pipeline.
+
+\paragraph{Data split.}
+Table \ref{tab:data_split} gives the exact split. SceneFlow finalpass is
+the union of three rendered subsets, FlyingThings3D, Monkaa, and Driving,
+whose training halves sum to the 35,454 pairs the production model trains
+on. Only FlyingThings3D carries an official held-out test split, 4,370
+pairs, which serves as the in-domain benchmark and is never seen during
+training. In-training validation is not a fourth pool of data: it is a
+fixed 400-pair subset drawn from that test split, evaluated every
+thousand steps at the native $960\times 540$ axis so that progress is
+tracked against the same distribution the final number is reported on.
+The project's own stereo rig contributes 997 real indoor pairs, and its
+split is deliberately degenerate: none of them train or fine-tune the
+network at any point, so all 997 sit on the test side as a zero-shot
+real-camera qualification set, of which three scenes are carried through
+to the metric reconstruction of Chapter~\ref{ch:results}.
+
+\begin{table}[!htbp]
+\centering
+\caption{Dataset split used for training, validation, and evaluation.}
+\label{tab:data_split}
+\small
+\begin{tabular}{llrrr}
+\toprule
+Source & Subset & Train & Val & Test\\
+\midrule
+SceneFlow finalpass & FlyingThings3D & 22{,}390 & 400$^{\dagger}$ & 4{,}370\\
+SceneFlow finalpass & Monkaa & 8{,}664 & & \\
+SceneFlow finalpass & Driving & 4{,}400 & & \\
+\midrule
+SceneFlow finalpass & total & 35{,}454 & 400$^{\dagger}$ & 4{,}370\\
+\midrule
+Stereo rig & indoor captures & 0 & 0 & 997\\
+\bottomrule
+\end{tabular}
+
+\smallskip
+{\footnotesize $^{\dagger}$The 400-pair validation set is a fixed subset
+drawn from the FlyingThings3D test split, evaluated every 1{,}000 steps;
+it is not additional data.}
+\end{table}
+
+\paragraph{Cropping.}
+Training samples a random $384\times 640$ window, co-located at the same
+coordinates in both the left and right view, from each native $960\times
+540$ frame. Cropping at the native resolution rather than downscaling the
+whole frame first is a deliberate choice: a disparity is a distance in
+pixels, so shrinking the image also shrinks every disparity, and a
+network trained on downscaled frames learns to predict a compressed
+disparity range that no longer matches full-resolution input. The native
+crop keeps disparity magnitudes at their true scale while still fitting
+the memory budget, and the ablation of Chapter~\ref{ch:design} found this
+native-crop protocol substantially ahead of the legacy
+downscale-then-crop protocol; Figure~\ref{fig:input_protocol} contrasts
+the two. Cropping the same window from both views is what preserves the
+epipolar correspondence: shifting the crops relative to each other would
+silently offset every disparity by the shift, so the window is always
+identical in the two images.
+
+\paragraph{Augmentation.}
+Three augmentations, drawn from the OpenStereo recipe, are applied to the
+training crop only; Figure~\ref{fig:augmentation} shows each acting on a
+real pair, and each answers a specific failure mode of a
+synthetic-only model on real cameras. \emph{Asymmetric color jitter}
+perturbs brightness, contrast, and saturation each within
+$[0.6, 1.4]$, and one time in five it draws different parameters for the
+left and right image rather than the same ones. A real low-cost stereo
+rig has two separate sensors that never expose or white-balance
+identically, so the two views differ photometrically; jittering them
+asymmetrically forces the matcher to rely on structure rather than on an
+assumption that corresponding pixels share an exact color, which is what
+lets the SceneFlow-trained model survive on the rig. \emph{Right-image
+random erasing} blanks one or two rectangles of 50 to 100 pixels in the
+right view only, filling them with the image mean. Because the erased
+content has no match in the left view, this manufactures occlusion on
+demand and trains the network to infer disparity from context where a
+direct match is unavailable, exactly the situation at object boundaries
+and image borders. \emph{Random scaling with anisotropic stretch}
+resizes the crop by a factor of $2^{U(-0.2,0.4)}$, with an extra
+horizontal stretch of $2^{U(-0.2,0.2)}$, and rescales the disparity by
+the horizontal factor before recropping to $384\times 640$. Scaling
+widens the range of object sizes and, crucially, of disparity magnitudes
+the network sees, so it does not overfit to the specific scale statistics
+of the synthetic set; the horizontal stretch changes disparity directly,
+which is why the disparity target is multiplied by the same horizontal
+factor. Evaluation applies none of these, so every reported number
+measures the network on unperturbed data.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{fig_4_3_augmentation}
+\caption[Training augmentations applied to a native co-located crop.]{Training augmentations applied to a native $384\times 640$ co-located crop of a real rectified pair (Middlebury 2014 Motorcycle \cite{scharstein2014middlebury}): asymmetric color jitter, right-only random erasing (boxes outlined), and random scale with horizontal stretch. The eraser and the two views' color jitter act independently on the right image; scaling rescales the disparity target by the horizontal factor.}
+\label{fig:augmentation}
+\end{figure}
 
 \begin{figure}[!htbp]
 \centering

@@ -24,35 +24,25 @@
 \label{ch:experimental}
 
 \section{Introduction}
-Chapter~\ref{ch:implementation} described how the StereoLite network was
-built, trained, and optimized. Before its numbers can be trusted, the
-conditions under which they were produced need to be stated precisely:
-what hardware ran the training and the timing runs, what data the
-network saw during training and what it never saw, where the real
-camera pairs came from and how the rig behind them was calibrated, and
-what procedure turned a forward pass into a reported number. This
-chapter fixes that record. It covers the compute platforms and the
-physical stereo rig that together form the test bench, the calibration
-that makes the rig's geometry usable for depth recovery, the three data
-sources the thesis draws on, how the real-camera pairs were collected
-and how a frozen teacher network supplied a comparison reference for
-them, and the four measurement protocols that produce every accuracy,
-latency, and robustness figure this thesis reports.
+A measurement is only as trustworthy as the conditions that produced it,
+and this chapter sets those conditions down before any result is
+reported. It answers a plain set of questions: what machines the work
+ran on, what data the network learned from and what data it was only
+ever tested on, where the real camera images came from and how the rig
+behind them was calibrated, how every one of those images is prepared
+before it reaches the network, and exactly what procedure turns a single
+forward pass into a number that can be quoted.
 
-The chapter is organized to move from apparatus to data to procedure.
-Section~\ref{sec:exp_setup_bench} lists the compute platforms and the
-stereo rig that make up the test bench. Section~\ref{sec:calibration}
-gives the rig's calibrated parameters and the rectification convention
-they support. Section~\ref{sec:exp_datasets} describes the three data
-sources in turn: the synthetic training and test corpus, the zero-shot
-real benchmark, and the physical rig's own captures. Section
-\ref{sec:data_collection} details how the real pairs were captured and
-how pseudo-ground-truth was obtained for them. Section
-\ref{sec:testing_protocols} closes the chapter with the four measurement
-protocols, latency and memory, rectification tolerance, real-camera
-agreement, and the dual-axis evaluation convention, each stated once
-here so that reported numbers need not re-derive the procedure behind
-them.
+The chapter is arranged from apparatus to data to procedure. It first
+describes the test bench, the computing platforms and the stereo rig,
+and the calibration that makes the rig's geometry usable for depth. It
+then covers the three sources of data the work draws on and the single
+preparation path that carries all of them to the network's input:
+bringing each image to a common resolution, normalising it, and, for
+training only, augmenting it. It closes with the four measurement
+procedures that every reported accuracy, latency, and robustness figure
+follows, each stated once so those figures can later be quoted without
+re-explaining how they were obtained.
 
 \FloatBarrier
 \section{Experimental Setup and Test Bench}
@@ -225,18 +215,24 @@ obtained for them despite the absence of ground truth.
 \FloatBarrier
 \section{Data Collection}
 \label{sec:data_collection}
-Real pairs were captured directly from the rig's live 2560 by 720
-side-by-side stream, described in Section~\ref{sec:calibration}, and
-split in software into the rectified 1280 by 720 left and right frames
-that the network consumes at its inference resolution. No frame
-selection criterion beyond basic scene variety was applied: the capture
-set spans ordinary indoor scenes at the range the rig was calibrated
-for, since the purpose of these pairs is to qualify the network on
-unremarkable real data rather than to stress a particular scenario.
-This yielded 997 rectified pairs, none of which contributed to training
-or fine-tuning at any stage; the network that produces disparity on
-these pairs is exactly the SceneFlow-trained checkpoint of Chapter
-\ref{ch:implementation}.
+Real pairs were captured with the rig connected over USB to a laptop
+running a capture script built on OpenCV's V4L2 backend, which requests
+the sensor's native 2560 by 720 side-by-side stream at up to 60 frames
+per second and reads it as motion JPEG. Each captured frame is split in
+software at its horizontal midpoint into the rectified 1280 by 720 left
+and right views described in Section~\ref{sec:calibration} and written
+to disk as a matched pair before the next frame is taken, so every saved
+pair shares one exposure instant rather than being assembled from two
+separate captures. Collection proceeded in short indoor sessions across
+different rooms, lighting conditions, and object arrangements; no frame
+selection criterion beyond this basic scene variety was applied, since
+the purpose of these pairs is to qualify the network on unremarkable
+real data rather than to stress a particular scenario. This yielded 997
+rectified pairs, none of which contributed to training or fine-tuning at
+any stage; the network that produces disparity on these pairs is exactly
+the SceneFlow-trained checkpoint of Chapter \ref{ch:implementation}, run
+through the same resize-and-normalize step every other input passes
+through, detailed in Section~\ref{sec:preprocessing}.
 
 Because the rig supplies no dense ground truth, the real-camera
 agreement protocol of Section~\ref{sec:testing_protocols} instead
@@ -253,6 +249,87 @@ measures agreement under real conditions rather than absolute error
 against a laboratory-perfect reference, and Section
 \ref{sec:testing_protocols} states this distinction explicitly wherever
 the resulting numbers are used.
+
+\FloatBarrier
+\section{Image Preprocessing Pipeline}
+\label{sec:preprocessing}
+Three different data sources feed the network: rendered SceneFlow pairs,
+photographed Middlebury pairs, and the rig's own captures. Each arrives
+in a different raw format, but every pair, regardless of source, is
+brought through the same two stages before it reaches the network: a
+resolution step that puts the pair on the pixel grid the current use
+case needs, and then a fixed normalization step at the model boundary.
+Table \ref{tab:preprocessing} summarizes how each source fills in that
+pattern; the paragraphs below explain the reasoning behind each row.
+
+\begin{table}[!htbp]
+\centering
+\caption{Preprocessing applied to each data source before the network boundary.}
+\label{tab:preprocessing}
+\small
+\begin{tabular}{p{2.4cm}p{3.1cm}p{4.3cm}p{2.6cm}}
+\toprule
+Source & Raw format & Resolution step & Augmentation\\
+\midrule
+SceneFlow, training & $960\times540$ rendered pair, dense PFM disparity & random co-located $384\times640$ crop, same window in both views & color jitter, right-image erasing, random scale\\
+SceneFlow, testing & $960\times540$ rendered pair & native full frame (primary axis), or area-resized to $640\times384$ (logged for comparison) & none\\
+Middlebury 2014 & real photograph up to ${\sim}3000\times2000$, structured-light disparity & area-resized to $640\times384$; disparity resized and rescaled by the width ratio & none\\
+Stereo rig & $2560\times720$ live stream & split at midpoint to $1280\times720$, then area-resized to $640\times384$ & none\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+SceneFlow pairs render already rectified, with a dense per-pixel
+disparity map at the same $960\times540$ resolution as the image, so no
+rectification or interpolation of the ground truth is needed at this
+stage. During training, a random $384\times640$ window is cropped from
+matching coordinates in both the left and right image, which keeps
+disparity magnitudes at their native scale rather than shrinking them
+the way a whole-frame resize would; Section~\ref{sec:training_objective}
+in Chapter~\ref{ch:implementation} gives the reasoning behind this
+native-crop choice and the three augmentations, asymmetric color jitter,
+right-image-only random erasing, and random scaling, that are applied to
+the cropped window only during training. Evaluation never crops or
+augments: the primary in-domain metric runs the network on the full
+native $960\times540$ frame, which the architecture's fully convolutional
+design accepts directly, and a $640\times384$ resized-axis measurement is
+logged alongside it purely for comparison with work that reports at the
+resized scale.
+
+Middlebury pairs arrive at whatever resolution the scene was
+photographed at, up to roughly $3000\times2000$ pixels, far larger than
+the network's working resolution. Both views are downsampled with
+area interpolation, which averages pixels rather than sampling a single
+one and so avoids aliasing high-resolution detail, to the fixed
+$640\times384$ inference size; the structured-light ground truth is
+resized with linear interpolation to match and its values rescaled by
+the same width ratio, since a disparity is a distance in pixels and
+shrinks proportionally to the image. This is the only rescaling the
+zero-shot protocol applies, and it is applied identically to the trained
+model and to every reference checkpoint it is compared against.
+
+The rig contributes the longest chain, because it is the only source
+that is not already a single rectified frame. Its raw $2560\times720$
+stream frame is split at the midpoint into left and right $1280\times720$
+views, as described above; each view is then downsampled with the same
+area interpolation used for Middlebury, to the network's $640\times384$
+working resolution. This resize step is the reason the rig's calibrated
+focal length is scaled by the width ratio wherever it is used for metric
+back-projection (Section~\ref{sec:calibration} and
+Section~\ref{sec:reconstruction_method}): the disparity the network
+predicts is a distance in pixels on the resized grid, and the geometry
+that converts it to depth has to be expressed on that same grid.
+
+At the model boundary, every source ends up on a common footing
+regardless of how it got there. The RGB tensor, in the $[0,255]$ range
+after loading, is divided by 255 to the unit interval immediately before
+the first convolution; no further per-channel standardization is
+applied, so the same simple boundary serves training, evaluation, and
+on-device deployment alike. Augmentation is the one stage that is not
+shared: only the SceneFlow training crop is randomly jittered, erased,
+and rescaled, precisely because the point of testing on SceneFlow's held
+out pairs, on Middlebury, and on the rig is to measure how the network
+behaves on data it was not artificially perturbed to expect.
 
 \FloatBarrier
 \section{Experimental Procedure and Evaluation Metrics}

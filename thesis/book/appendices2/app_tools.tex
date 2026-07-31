@@ -1,0 +1,56 @@
+% ============ Appendix: List of Modern Tools Usage =====================
+% Added 2026-07-31 per external examiner's final feedback. Placed first
+% among the appendices (Appendix A). Demonstrates PO5 (modern tool usage).
+% Every tool, version, and hardware item here is stated elsewhere in the
+% thesis (Chapters 4 and 5, Appendix on technical specifications); this
+% appendix collects them in one place.
+\chapter{List of Modern Tools Usage}
+\label{app:tools}
+
+This appendix collects the modern engineering tools, software libraries,
+and hardware platforms used to design, train, optimize, deploy, and
+document StereoLite. The choices favor open, widely supported tools so
+that the work can be reproduced without proprietary dependencies beyond
+the cloud compute itself. Table~\ref{tab:sw_tools} lists the software and
+Table~\ref{tab:hw_tools} the computing and sensing hardware.
+
+\begin{table}[H]
+\centering
+\caption{Software tools and libraries used in the thesis.}
+\label{tab:sw_tools}
+\small
+\begin{tabular}{p{3.1cm}p{2.5cm}p{6.8cm}}
+\toprule
+Tool / library & Version / type & Role in the thesis\\
+\midrule
+Python & 3.10 & Implementation language for all the code.\\
+PyTorch & 2.11 & Model definition, autograd, and training framework.\\
+CUDA & 12.8 & GPU backend for training and inference.\\
+Ultralytics YOLO & YOLO26s & Pretrained detection backbone for the encoder.\\
+NumPy & array library & Disparity, metric, and calibration processing.\\
+OpenCV & 4.x & Image I/O, stream splitting, and resizing.\\
+Open3D & 0.18 & Point-cloud build, filtering, and rendering.\\
+Matplotlib & plotting & Disparity, training-curve, and comparison figures.\\
+Modal & cloud orchestration & Cloud A100 and T4 training and ablation jobs.\\
+NVIDIA TensorRT & INT8 export & Graph optimization and eight-bit engine build.\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Computing and sensing hardware used in the thesis.}
+\label{tab:hw_tools}
+\small
+\begin{tabular}{p{3.4cm}p{2.7cm}p{6.3cm}}
+\toprule
+Hardware & Class & Role in the thesis\\
+\midrule
+NVIDIA A100 80\,GB & cloud GPU & Full-data production training of the final model.\\
+NVIDIA T4 & cloud GPU & Low-cost ablations and cross-domain evaluations.\\
+NVIDIA RTX 3050 & laptop GPU (${\sim}4$\,GB) & Conservative local latency benchmark.\\
+Jetson Orin Nano & edge accelerator & Deployment target; on-device eight-bit latency.\\
+Waveshare AR0144 & stereo USB camera & Low-cost binocular rig for real-camera capture.\\
+\bottomrule
+\end{tabular}
+\end{table}

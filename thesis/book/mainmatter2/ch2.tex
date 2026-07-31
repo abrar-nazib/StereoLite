@@ -36,12 +36,14 @@ hold the accuracy ceiling. Because this thesis targets deployment on an
 edge accelerator rather than accuracy alone, that section then states
 the hardware requirements edge deployment imposes and classifies the
 efficient and edge-deployable literature by the technique family each
-uses to meet them. Section~\ref{sec:comparative_analysis} compares these
-families directly: it reviews cross-domain generalization and the
-benchmarks used to measure it, then sets published parameter counts,
-accuracy, and latency figures for the surveyed methods side by side,
-alongside our own model. Section~\ref{sec:ch2_summary} closes the
-chapter with the design lessons this survey establishes.
+uses to meet them. Section~\ref{sec:research_gap} draws the survey
+together into the specific gap this thesis targets.
+Section~\ref{sec:comparative_analysis} then compares the families
+directly: it reviews cross-domain generalization and the benchmarks used
+to measure it, then sets published parameter counts, accuracy, and
+latency figures for the surveyed methods side by side, alongside our own
+model. Section~\ref{sec:ch2_summary} closes the chapter with the design
+lessons this survey establishes.
 
 \FloatBarrier
 \section{Existing Research}
@@ -723,6 +725,53 @@ trained, so we treat and ablate our training protocol with the same
 rigor as the architecture. These families are largely
 complementary; our model combines several, pairing a substituted
 backbone with a compressed cost volume and a compressed recurrent loop.
+
+\FloatBarrier
+\section{Research Gap}
+\label{sec:research_gap}
+The survey above points to a specific opening rather than a general call
+for smaller networks. Three observations, taken together, define it.
+
+First, accuracy and deployability sit at opposite ends of the surveyed
+work. The foundation-model and iterative systems hold the accuracy
+ceiling but carry tens to hundreds of millions of parameters and hundreds
+of milliseconds of latency, which no edge accelerator of the target class
+can afford. The efficient family fits the budget, but each of its members
+attacks a single source of cost in isolation: backbone substitution
+replaces the encoder, cost-volume compression shrinks or removes the
+volume, iterative-loop compression trims the update schedule, and
+knowledge distillation reduces the accuracy penalty through training
+rather than architecture. What is missing is a single compact design that
+combines several of these reductions at once, a substituted detection
+backbone, a tile-hypothesis representation in place of a dense volume, a
+short recurrent loop, and a narrow-band geometry volume, and shows that
+the combination still lands inside the edge budget. Building and
+justifying that combination is the task of Chapter~\ref{ch:design}.
+
+Second, the efficient literature is reported almost entirely on
+in-domain accuracy, parameters, and latency, and says far less about how
+these compact models behave when the input geometry is imperfect. The
+benchmarks that drive the field are near-perfectly rectified, yet the
+low-cost stereo rigs these models are meant for leave a residual vertical
+misalignment of up to about a pixel. A method that is only ever measured
+on flawless input leaves its field robustness untested, and the survey
+found no compact model that reports its accuracy as a function of
+controlled rectification error. Closing that measurement gap is the
+second objective of this thesis.
+
+Third, the survey left one methodological question unsettled: how much of
+a compact network's cross-domain accuracy comes from its architecture and
+how much from its training recipe. The distillation results show the same
+small network reaching very different zero-shot accuracy purely from how
+it is trained, while other efficient methods credit their recurrent core.
+The literature does not resolve this with controlled evidence, which is
+why this thesis treats the training protocol as a first-class design
+variable and ablates it under the same single-knob discipline it applies
+to the architecture.
+
+These three gaps, an unbuilt combination, an untested robustness, and an
+unsettled attribution, are what the comparison in the next section
+quantifies and what the design chapter sets out to close.
 
 \FloatBarrier
 \section{Comparative Analysis}

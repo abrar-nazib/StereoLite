@@ -32,7 +32,8 @@ The problem it addresses is a joint one: dense and accurate stereo depth
 on hardware that supplies only a few tera-operations per second, a few
 gigabytes of memory, and a few watts of power. This chapter states the
 background and motivation, the research questions the thesis answers, the
-objectives, the key contributions, and the organization of the work.
+objectives, the scope of the work, the key contributions, and the
+organization of the report.
 
 \FloatBarrier
 \section{Background and Motivation}
@@ -144,7 +145,11 @@ stereo rig produces, which is the second objective of this thesis?
 
 \FloatBarrier
 \section{Research Objectives}
-The objectives of this thesis are:
+The thesis is built around two objectives, one for each half of the
+problem set out above: making stereo matching cheap enough to run on
+edge hardware, and making it robust to the imperfect camera geometry
+that such hardware supplies in practice. The objectives of this thesis
+are:
 \begin{enumerate}
 \item To design a computationally efficient stereo matching pipeline,
 leveraging AI-based disparity refinement to enhance depth estimation on
@@ -153,22 +158,38 @@ resource-limited platforms.
 imperfections.
 \end{enumerate}
 
-This thesis addresses passive rectified binocular stereo, trained under
-supervision on synthetic data with dense ground truth. The network is
-compact, on the order of a few million parameters, and is evaluated both
-in domain and zero-shot on an unseen real domain. Its inference is
-optimized for the edge latency envelope and checked on real camera pairs.
-The recovered disparity is then used for metric three-dimensional
-reconstruction: real scenes captured by the project's stereo rig are
-back-projected into colored point clouds through the calibrated geometry,
-and this is the reconstruction named in the thesis title. Active sensing,
-self-supervised training, monocular depth estimation, and the production
-of a deployment software development kit fall outside the scope. Evidence
-for the second objective, tolerance to imperfect rectification, is
-twofold. The first part is a controlled perturbation study on synthetic
-data with known ground truth.
-The second is a real-data demonstration on a low-cost stereo rig whose
-factory rectification is imperfect, where the model still keeps error low.
+The first objective is the heart of the thesis. Stereo matching is
+accurate today mainly because the leading networks are very large; the
+aim here is to keep most of that accuracy while shedding the size, so
+that depth estimation can run on the small, low-power computers that
+robots, drones, headsets, and handheld sensors actually carry, machines
+that offer only a few tera-operations per second, a few gigabytes of
+memory, and a few watts of power. The phrase \emph{AI-based disparity
+refinement} in the objective points to how this is done. The largest
+networks build one big cost volume and read the answer off it in a
+single step, and that step is where most of their cost lies. StereoLite
+instead starts from a rough disparity for each small image region and
+improves it a few times with a learned update; it is this repeated
+refinement, rather than a single expensive pass, that recovers accuracy
+without a large parameter count. Chapter~\ref{ch:design} weighs the
+choice against the alternatives in full. The objective is met when the
+first three research questions are answered together: accuracy in
+domain, accuracy on an unseen real domain, and real-time speed on the
+edge board once the model is optimised and quantised.
+
+The second objective addresses something the first does not. A network
+can score well on benchmark image pairs, which are aligned almost
+perfectly, and still struggle on a real camera, because a cheap stereo
+rig is never perfectly aligned: its two views are typically off by a
+fraction of a pixel to about a pixel in the vertical direction. An
+architecture that only works on flawless input is not yet ready for the
+hardware it is built for, so the second objective asks the network to
+hold its accuracy when that small misalignment is present. The thesis
+checks this two ways, which together answer the fourth research
+question: by shifting one image vertically by a known amount and
+watching how much the error grows, and by running the trained model on
+the project's own, imperfectly aligned rig to confirm the error stays
+low.
 
 One might ask why this thesis designs a new compact network instead of
 compressing an existing large one. There are two reasons. The accuracy of
@@ -180,38 +201,88 @@ families were built for efficiency from the start and give a cleaner
 starting point for an edge budget.
 
 \FloatBarrier
+\section{Scope of the Research}
+\label{sec:scope}
+It helps to state plainly what this thesis does and does not attempt, so
+the results are read against the right yardstick. The work is limited to
+passive, rectified, binocular stereo: depth is recovered from two
+horizontally separated cameras whose images have already been rectified,
+and nothing is emitted into the scene. The network is trained under
+supervision on synthetic image pairs with dense ground truth, kept
+compact at a few million parameters, and evaluated in three ways, on the
+synthetic test set it shares a domain with, zero-shot on an unseen real
+benchmark, and on the project's own stereo rig. Its inference is then
+optimized and quantized to eight bits so it can be timed on the intended
+edge board rather than only on a desktop GPU. The recovered disparity is
+finally turned into metric depth and, for the rig scenes, into colored
+three-dimensional point clouds through the calibrated camera geometry;
+this reconstruction is the one named in the thesis title.
+
+Several neighboring problems are deliberately left out, not because they
+lack value but because each would pull the work away from the edge-stereo
+question at its center. The thesis does not use active depth sensors such
+as LiDAR or structured light, does not train without labels through
+self-supervision, and does not estimate depth from a single image. It
+also stops at a working, measured research prototype: packaging the model
+as a deployment software development kit, and the systems engineering that
+a shipped product would require, are outside its scope. Where these
+boundaries touch a result, the relevant chapter says so, and the ones
+worth revisiting are collected as future work in
+Chapter~\ref{ch:conclusion}.
+
+\FloatBarrier
 \section{Key Contributions}
-The contributions of this thesis are the following:
+Meeting the two objectives above required building something (a
+network), deciding how to build it defensibly (a methodology), and then
+showing with measurements that both hold up (a set of results). The
+contributions of this thesis fall into those three kinds.
+
+\textbf{An architecture.} This thesis contributes StereoLite, a 2.96
+million parameter edge-budget stereo network purpose-built for objective
+1. It combines a truncated YOLO feature encoder, a left-image recurrent
+context stream, plane-aware coarse-to-fine tile refinement, and a
+fail-soft quarter-resolution geometry encoding volume, four blocks
+chosen and combined specifically to keep parameter count, latency, and
+memory inside the edge budget without discarding the accuracy that
+larger cost-volume networks get from full-resolution search.
+
+\textbf{A design methodology.} Building that network raised a recurring
+question: how does a designer justify keeping one block over an
+alternative under a hard parameter budget, rather than by intuition
+alone? This thesis answers it with an evidence-gated design methodology
+that admits an architectural choice only after it wins a controlled
+single-knob ablation on a fixed 100-pair harness, where competing
+variants share data, seed, and step budget so a measured difference is
+attributable to the design change alone. Every block listed above
+passed this test before being kept. The same evidence-gathering habit
+also produced a survey of the efficient and edge-deployable stereo
+families that grounds the design choices, stating what edge-deployable
+stereo requires and mapping the accuracy, latency, and memory
+trade-offs of the published literature.
+
+\textbf{Results that follow from applying both.} Four measured outcomes
+demonstrate that the architecture and the methodology deliver on the
+two objectives:
 \begin{itemize}
-\item StereoLite, a 2.96 million parameter edge-budget stereo network that
-combines a truncated YOLO feature encoder, a left-image recurrent context
-stream, plane-aware coarse-to-fine tile refinement, and a fail-soft
-quarter-resolution geometry encoding volume.
-\item An evidence-gated design methodology that admits an architectural
-choice only after it wins a controlled single-knob ablation on a fixed
-100-pair harness, where competing variants share data, seed, and step
-budget so a measured difference is attributable to the design change alone.
-\item A trained checkpoint that reaches 0.78 pixel end-point error and 3.40
-percent D1-all on the full FlyingThings3D test set of 4,370 pairs while
-running in real time on a laptop RTX 3050 GPU, at 49.8 ms per forward pass
-at $384 \times 640$ in half precision.
-\item A training pipeline that gives the compact tile-hypothesis model its
-cross-domain accuracy, reaching 10.9 percent zero-shot Middlebury 2014
-D1-all, within four points of the larger distillation-trained
-LiteAnyStereo.
-\item An equivalence-proven inference-optimization pass that cuts latency by
-a factor of 1.74 with no loss of accuracy and identifies the operators that
-block eight-bit deployment, so that the optimized eight-bit model runs in
-36.3 ms, or 27.5 frames per second, on the Jetson Orin Nano.
-\item A demonstration that the design tolerates imperfect rectification:
-under a controlled vertical misalignment sweep, end-point error rises only
-from 1.03 to 1.53 px across the sub-pixel to one-pixel range a calibrated
-rig produces, and the predicted disparity back-projects into metric colored
-point clouds on real indoor scenes.
-\item A survey of the efficient and edge-deployable stereo families that
-grounds the design choices, stating what edge-deployable stereo requires and
-mapping the accuracy, latency, and memory trade-offs of the published
-literature.
+\item \emph{In-domain accuracy (objective 1).} The trained checkpoint
+reaches 0.78 pixel end-point error and 3.40 percent D1-all on the full
+FlyingThings3D test set of 4,370 pairs, while running in real time on a
+laptop RTX 3050 GPU at 49.8 ms per forward pass at $384 \times 640$ in
+half precision.
+\item \emph{Cross-domain accuracy (objective 1).} The same training
+pipeline gives the compact network 10.9 percent zero-shot Middlebury
+2014 D1-all on a domain it never trains on, within four points of the
+larger distillation-trained LiteAnyStereo.
+\item \emph{Edge deployment (objective 1).} An equivalence-proven
+inference-optimization pass cuts latency by a factor of 1.74 with no
+loss of accuracy and identifies the operators that block eight-bit
+deployment, so that the optimized eight-bit model runs in 36.3 ms, or
+27.5 frames per second, on the Jetson Orin Nano.
+\item \emph{Rectification tolerance (objective 2).} Under a controlled
+vertical misalignment sweep, end-point error rises only from 1.03 to
+1.53 px across the sub-pixel to one-pixel range a calibrated rig
+produces, and on the project's own rig the predicted disparity
+back-projects into metric colored point clouds on real indoor scenes.
 \end{itemize}
 
 \FloatBarrier
@@ -237,18 +308,22 @@ benches, and the measurement procedures.
 training dynamics, the ablation studies, the in-domain and zero-shot
 accuracy, the rectification robustness, the efficiency and deployment
 measurements, and the three-dimensional reconstruction.
-\item Chapter~\ref{ch:socio} considers the socio-economic impact of the
-work along with its environmental and sustainability aspects.
+\item Chapter~\ref{ch:socio} considers the societal, health, and cultural
+impact of the work, its safety and ethical dimensions, and its alignment
+with the Sustainable Development Goals, including its environmental and
+sustainability case.
 \item Chapter~\ref{ch:management} records how the thesis was managed, its
 time frame, its overall and component-level budget, its resource planning,
 and the division of work between the authors.
 \item Chapter~\ref{ch:conclusion} concludes the report, states its
 limitations, and outlines future work.
 \end{itemize}
-The appendices address the knowledge profiles, the complex engineering
-problems, and the complex engineering activities engaged by the thesis
-(Appendices A to C), followed by the technical specifications, the
-plagiarism report, and the AI writing report (Appendices D to F).
+The appendices open with the modern tools used in the work (Appendix A)
+and the program-outcome mapping (Appendix B), then address the knowledge
+profiles, the complex engineering problems, and the complex engineering
+activities engaged by the thesis (Appendices C to E), and close with the
+technical specifications, the plagiarism report, and the AI writing
+report (Appendices F to H).
 
 % SOURCES: old mainmatter/ch1.tex 1.1 Overview, 1.2 Background and
 %   Motivation (with nm{} nomenclature block + fig:edge_gap intact), 1.3

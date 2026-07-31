@@ -39,6 +39,7 @@
 \usepackage{setspace}               % single spacing is the default
 \usepackage{nomencl}
 \makenomenclature
+\newcounter{nmorder}
 
 \usepackage{booktabs}               % professional table rules
 \usepackage{multirow}
@@ -68,7 +69,16 @@
 \renewcommand{\bibname}{References}
 \renewcommand{\nomname}{List of Abbreviations}
 
-\newcommand{\nm}[2]{\nomenclature{#1}{#2}}
+% Nomenclature entries are numbered in the order \nm is called, i.e. the
+% order each term is introduced in the text, and that numeric key drives
+% the makeindex sort, so the printed List of Abbreviations comes out
+% chronologically (order of first appearance) rather than alphabetically.
+% \nomgroup is a no-op without the stdsubgroups package option, so the
+% group split this numbering introduces prints no visible heading.
+\newcommand{\nm}[2]{%
+  \stepcounter{nmorder}%
+  \edef\nmsortkey{\ifnum\value{nmorder}<10 0\fi\arabic{nmorder}}%
+  \nomenclature[\nmsortkey]{#1}{#2}}
 
 % TODO marker for the writing sessions; must be zero at submission:
 %   grep -rn "\\\\todo" thesis/book --include=*.tex
@@ -132,6 +142,8 @@
 \titleformat{\chapter}[display]
   {\centering\bfseries\fontsize{16}{19}\selectfont}
   {Appendix \thechapter}{6pt}{}
+\include{appendices2/app_tools}
+\include{appendices2/app_i}
 \include{appendices2/app_a}
 \include{appendices2/app_b}
 \include{appendices2/app_c}

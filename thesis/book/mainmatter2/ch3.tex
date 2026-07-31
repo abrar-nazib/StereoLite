@@ -281,9 +281,63 @@ OneCycle 60k schedule & training dynamics: validation floor reached before the b
 \section{Detailed Design}
 \label{sec:detailed_design}
 This section works through each pipeline block in the order data flows
-through it, together with the governing equations for each stage.
+through it, together with the governing equations for each stage. Read
+at a high level before the detail, the pipeline does five things in
+sequence. It first turns the two raw images into features a network can
+compare (Section~\ref{sec:detailed_design}.1). It then makes a coarse,
+low-resolution guess at the disparity of every image tile by testing a
+range of candidate horizontal shifts and keeping the one whose left and
+right features agree best (\ref{sec:detailed_design}.2). That guess is
+usually wrong in the details, so a recurrent loop repeatedly looks at how
+well the current guess lines up the two views and nudges it closer,
+scale by scale, carrying the estimate from coarse tiles to progressively
+finer ones as it goes (\ref{sec:detailed_design}.3-\ref{sec:detailed_design}.4).
+Because that loop only ever looks at a small neighborhood around each
+tile, a second, wider-reaching check is added purely to correct the
+tiles the loop is still struggling with, without disturbing the ones it
+has already resolved well (\ref{sec:detailed_design}.5). Finally the
+coarse tile grid is rendered and sharpened up to the full image
+resolution (\ref{sec:detailed_design}.6), and the resulting disparity map
+is converted into an actual three-dimensional point cloud
+(\ref{sec:detailed_design}.7). Figure~\ref{fig:architecture} already
+showed this same flow as a numbered block diagram; the subsections below
+give each block's mechanism and governing equations in turn.
+
+Figure~\ref{fig:progression} makes the same process concrete by running
+the trained network on a real stereo pair and showing the disparity map
+as it actually leaves each stage. The coarse initialization at one
+sixteenth resolution is blocky and only roughly right; each later stage
+sharpens it, until the full-resolution output resolves the motorcycle's
+wheels, frame, and background boxes cleanly. The panel labelled
+\emph{GEV proposal} and the fail-soft gate beside the inputs preview the
+correction step of Section~\ref{sec:detailed_design}.5, where a second,
+independent estimate is blended in only where the gate opens. Reading the
+subsections below alongside this figure shows both what each block does
+and what it contributes to the final disparity.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{fig_3_9_progression}
+\caption[Disparity as it leaves each stage of the pipeline, on a real
+Middlebury 2014 pair.]{Disparity as it leaves each stage of the trained
+network, run on a real Middlebury 2014 pair (Motorcycle
+\cite{scharstein2014middlebury}). Every panel is an actual model output,
+upsampled to full resolution and shown on one shared disparity scale;
+the estimate sharpens from the coarse one-sixteenth initialization to the
+full-resolution result. The gate $w$ (top right) shows where the GEV
+proposal is trusted.}
+\label{fig:progression}
+\end{figure}
 
 \subsection{Shared Feature Encoder and Context Encoder}
+Before the two views can be compared, each has to be turned into
+features a network can match, and the left view alone has to supply the
+running context the recurrent refinement in
+Section~\ref{sec:detailed_design}.3 will need. This subsection builds
+those two encoders: one shared between the left and right image so both
+are described in the same feature space, and one private to the left
+image alone.
+
 The matching network is a truncated YOLO26s backbone whose first seven
 blocks are retained, producing features at one quarter, one eighth, and
 one sixteenth resolution with 128, 256, and 256 channels. The choice of a
@@ -315,6 +369,14 @@ separation.
 \end{figure}
 
 \subsection{Tile Initialization and Cost Volume}
+This subsection produces the network's first, coarse guess at disparity.
+The idea is the same one every stereo method relies on: for a small
+patch of the left image, try a range of candidate horizontal shifts,
+compare each shifted patch of the right image against it, and keep the
+shift whose features agree best. Doing this once, cheaply, at a coarse
+resolution gives every tile a starting point that later stages only need
+to correct rather than discover from nothing.
+
 The tile initialization module builds a group-wise correlation volume,
 following GwcNet \cite{guo2019gwcnet}, at one sixteenth resolution. For
 each of eight feature groups and each
@@ -357,6 +419,17 @@ probability that serves as an initial confidence.
 \end{figure}
 
 \subsection{Recurrent Tile Refinement}
+The initial guess from Section~\ref{sec:detailed_design}.2 is coarse and
+often wrong in the details, so this subsection corrects it iteratively
+rather than in one shot. At each step, the network checks how well the
+current disparity estimate lines up the two views by warping one onto
+the other and looking at the local mismatch, then nudges the estimate,
+the local surface tilt, and its own confidence a little closer to
+correct. Repeating this update, and carrying a persistent memory of
+what has already been tried between repetitions, lets the network spend
+more computation on tiles that are hard to match and less on tiles it
+already got right, rather than paying the same fixed cost everywhere.
+
 Separate refinement modules refine the tile state at one sixteenth, one
 eighth, and one quarter resolution; their weights are not shared, because
 the matching-feature channel counts differ across scales. At each
@@ -408,6 +481,15 @@ element-wise product.
 \end{figure}
 
 \subsection{Plane-Aware Cross-Scale Propagation}
+Refinement at one resolution has to hand its result up to the next,
+finer resolution before refinement can continue there, and a generic
+upscaling would just blur the coarse tile boundaries across the new,
+smaller tiles. This subsection is the hand-over step, and it does
+better than plain upscaling because it also carries forward the local
+surface tilt each tile already estimated, so a slanted surface is placed
+correctly at the finer grid instead of being flattened and then
+re-discovered from scratch.
+
 Between adjacent scales, the propagation module resamples the disparity,
 slopes, hidden feature, and confidence to the finer grid. Disparity is
 multiplied by two because its pixel unit changes with resolution. Unlike
@@ -437,6 +519,17 @@ the finer grid.
 \end{figure}
 
 \subsection{Geometry Encoding Volume and Fail-Soft Fusion}
+The recurrent loop in Section~\ref{sec:detailed_design}.3 is a local
+process: every update only looks at a small neighborhood around the
+current estimate, so a tile whose initial guess started far from the
+truth can stay stuck near that bad guess no matter how many iterations
+run. This subsection adds a second, independent estimate with a wider
+reach, used only to pull those stuck tiles toward a better value. It is
+deliberately not allowed to overrule tiles the recurrent loop has
+already resolved well: a learned gate decides, tile by tile, how much
+weight this second opinion gets, and it learns to give it almost none
+where the recurrent estimate is already trustworthy.
+
 The geometry encoding volume adds an independent global proposal at one
 quarter resolution, in the spirit of IGEV-Stereo \cite{xu2023igev}. In
 the trained configuration it is narrow: rather than the full 64 disparity
@@ -494,6 +587,16 @@ confidence becomes the maximum of the two estimates.
 \end{figure}
 
 \subsection{Plane Rendering and Learned Convex Upsampling}
+Every stage so far has worked on a tile grid coarser than the final
+output, at one quarter of the image resolution at best, so the last step
+is to turn that coarse grid into a full-resolution disparity map. A
+naive upsampling would blur object edges across tile boundaries; this
+subsection instead uses the slanted-plane estimate each tile already
+carries to reconstruct a sharp surface within it, and a learned weighting
+scheme, rather than fixed bilinear interpolation, to combine neighboring
+tiles so that boundaries stay crisp where the scene actually has a depth
+discontinuity.
+
 The final one-quarter disparity is upsampled to full resolution in two
 learned two-times stages. The first stage predicts masks from the
 one-quarter left features and the second from the one-half left features.

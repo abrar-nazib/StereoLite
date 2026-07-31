@@ -344,6 +344,54 @@ output of the checkpoint evaluated throughout this chapter.
 \end{figure}
 
 \FloatBarrier
+\subsection{Comparison with LiDAR Point Clouds}
+\label{sec:lidar_comparison}
+It is worth placing these reconstructions next to the sensor they are
+usually measured against. LiDAR is the accuracy standard for depth: it
+measures range directly by timing a laser pulse, and its points are
+metrically exact to within a centimetre or two. But that accuracy comes
+one point at a time. A scanning unit samples the scene along a fixed
+handful of rotating beams, so its returns land on a small number of scan
+rings and the space between them is simply not measured.
+Figure~\ref{fig:lidar_compare} shows this directly: a raw Velodyne scan
+from KITTI \cite{geiger2012kitti}, on the left, is accurate everywhere it
+has a point, yet any single surface in it carries only a thin scatter of
+returns; our stereo cloud of the fire-extinguisher scene, on the right,
+covers the same kind of surface continuously, giving the full shape of
+each object and the layout of the scene rather than a sample of it.
+
+For a mobile robot, that difference in density is not a cosmetic one. A
+robot planning a path or building a map has to know the shape and extent
+of the obstacles around it, not just the range to a few isolated points
+on them, and a thin object such as a table edge, a chair leg, or the very
+extinguisher nozzles in Figure~\ref{fig:reconstruction} can fall between a
+LiDAR's scan lines entirely while a dense stereo surface still resolves
+it. Density, in other words, buys spatial understanding, and it is
+exactly what a passive stereo cloud provides where a low-cost LiDAR does
+not.
+
+Against this, the accuracy gap is a reasonable price. The reconstructions
+here are not centimetre-exact the way a LiDAR return is; their error
+grows with distance, as the inverse disparity-to-depth relation of
+Section~\ref{sec:reconstruction_method} requires, and their depth
+boundaries carry the flying points visible in the figure. What the trade
+buys is substantial: a passive stereo rig costs a small fraction of a
+scanning LiDAR, draws a few watts instead of tens, emits nothing into the
+scene, and returns a dense surface instead of a sparse one, all from two
+commodity image sensors. For the edge robots, drones, and assistive
+devices this thesis targets, where budget, power, and the shape of nearby
+obstacles matter more than millimetre-accurate ranging, trading a bounded
+loss of point accuracy for dense, low-cost, passive coverage is the right
+exchange, and it is the one the whole design is built around.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{fig_6_lidar_compare}
+\caption[Sparse LiDAR point cloud versus our dense stereo point cloud.]{A real sparse LiDAR scan (KITTI \cite{geiger2012kitti}, left) beside our dense stereo reconstruction of the fire-extinguisher scene (right). LiDAR is accurate but samples a surface along a few scan rings; the stereo cloud covers it densely, trading a bounded accuracy loss for dense, low-cost, passive coverage.}
+\label{fig:lidar_compare}
+\end{figure}
+
+\FloatBarrier
 \section{Validation}
 This section validates the design decisions behind the architecture of
 Chapter \ref{ch:design} through a sequence of controlled ablation
