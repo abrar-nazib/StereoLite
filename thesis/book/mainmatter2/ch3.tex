@@ -414,7 +414,7 @@ probability that serves as an initial confidence.
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.95\textwidth]{fig_3_3_tile_init_preview}
-\caption{Tile-state initialization: group-wise correlation volume regularized by 3-D CNN with soft-argmax outputs.}
+\caption{Tile-state initialization: group-wise correlation volume regularized by 3-D CNN with soft-argmax outputs. The 24 hypotheses at 1/16 scale cover roughly 0 to 368 full-resolution pixels.}
 \label{fig:tile_init}
 \end{figure}
 
@@ -514,7 +514,7 @@ the finer grid.
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=\textwidth]{fig_3_5_plane_prop_preview}
-\caption{Plane-aware cross-scale propagation using local slopes instead of bilinear interpolation.}
+\caption{Plane-aware cross-scale propagation using local slopes instead of bilinear interpolation. The slopes shift each child off the parent plane, and the factor of two rescales the disparity to the finer grid.}
 \label{fig:plane_prop}
 \end{figure}
 
@@ -616,7 +616,7 @@ prediction, so thin and distant structures remain a limitation.
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.92\textwidth]{fig_3_7_upsample_preview}
-\caption{Learned convex upsampling via softmax-weighted 3x3 neighborhoods to full resolution.}
+\caption{Learned convex upsampling via softmax-weighted 3x3 neighborhoods to full resolution. Two 2$\times$ stages (1/4 to 1/2 to full) each multiply disparity by two, with non-negative weights that sum to one.}
 \label{fig:upsample}
 \end{figure}
 

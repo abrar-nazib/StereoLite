@@ -287,9 +287,8 @@ def fig_3_3_tile_init():
                  "ctx16, c<sub>0</sub>)", fill=GREY_F, fs=14)
     d.edge(da, pill, exit_=(0, 0.5), entry=(1, 0.3))
     d.edge(ca, pill, exit_=(0, 0.5), entry=(1, 0.7))
-    d.text(30, 460, 660, 30,
-           "24 hypotheses at 1/16 scale cover roughly 0 to 368"
-           " full-resolution pixels", fs=13, align="left")
+    # Description sentence removed from the image per examiner feedback;
+    # moved into the LaTeX caption instead.
     URLS["fig_3_3_tile_init"] = d.save(OUT / "fig_3_3_tile_init.drawio")
 
 
@@ -368,10 +367,9 @@ def fig_3_5_plane_prop():
            "<font style='font-size:19px'>d<sub>child</sub> = "
            "2&#183;bilinear(d) + 2 s<sub>x</sub> &#916;x + "
            "2 s<sub>y</sub> &#916;y</font>", fs=19)
-    d.text(70, 500, 810, 44,
-           "<font style='font-size:15px'>the slopes shift each child off "
-           "the parent plane; the factor 2 rescales the disparity unit to "
-           "the finer grid</font>", fs=15, align="left")
+    # Description sentence removed from the image per examiner feedback;
+    # moved into the LaTeX caption instead. Equation above is kept as it is
+    # the core relation the figure illustrates, not descriptive prose.
     URLS["fig_3_5_plane_prop"] = d.save(OUT / "fig_3_5_plane_prop.drawio")
 
 
@@ -432,11 +430,8 @@ def fig_3_7_upsample():
     fine = d.box(640, 96, 120, 58, "<b>fine pixel</b><br>(convex comb.)",
                  fill=GREEN_F, stroke=GREEN_S, fs=10)
     d.edge(mix, fine, exit_=(1, 0.5), entry=(0, 0.5))
-    d.text(300, 250, 520, 56,
-           "two 2× stages: 1/4 → 1/2 (masks from f<sub>L4</sub>) → full"
-           " (masks from f<sub>L2</sub>);<br>disparity multiplied by 2 at"
-           " each stage; weights non-negative and sum to one", fs=9.5,
-           align="left")
+    # Description sentence removed from the image per examiner feedback;
+    # moved into the LaTeX caption instead.
     URLS["fig_3_7_upsample"] = d.save(OUT / "fig_3_7_upsample.drawio")
 
 
