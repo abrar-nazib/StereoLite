@@ -29,7 +29,7 @@ Last verified: 2026-04-28.
 | 5 | RAFT-Stereo              | 2021 | 11.23       | 0.61        | 1.82                  | 380          | `iterative/RAFT-Stereo_Lipson_3DV2021.pdf`                         |
 | 6 | IGEV-Stereo              | 2023 | 12.60       | 0.47        | 1.59                  | 180          | `iterative/IGEV-Stereo_Xu_CVPR2023.pdf`                            |
 | 7 | LightStereo-S            | 2025 | 3.44        | 0.73        | 2.30                  | 17           | `efficient/LightStereo_Guo_ICRA2025.pdf`                           |
-| 8 | FoundationStereo         | 2025 | ~340 total  | 0.34        | 1.46                  | 470          | `foundation_model/FoundationStereo_Wen_CVPR2025.pdf`              |
+| 8 | FoundationStereo         | 2025 | ~340 total  | 0.34        | 1.46                  | 700 (A100)   | `foundation_model/FoundationStereo_Wen_CVPR2025.pdf`              |
 | 9 | DEFOM-Stereo (ViT-L)     | 2025 | 47.3 train. | 0.42        | 1.55                  | 316          | `foundation_model/DEFOM-Stereo_Jiang_CVPR2025.pdf`                |
 | * | StereoLite (Ours, d1)    | 2026 | 0.874       | tbd         | tbd                   | 54           | `model/designs/d1_tile/stereolite_architecture_doc.tex`           |
 
@@ -98,7 +98,8 @@ when an examiner challenges a number.
   Total = ~335 M backbone + adapter + DT + ConvGRU = ~340 M (estimate).
 - SF EPE 0.34: **FoundationStereo Tab 3 p7** ("Ours 0.34"). Prose on same page says "previous best EPE 0.41 → 0.33" (table value 0.34 is correct).
 - KITTI D1-all 1.46: KITTI leaderboard at time of submission; not directly tabled in main paper
-- Latency 470 ms: estimate from RTX 4090 at KITTI resolution; paper does not benchmark single-image latency
+- Latency 700 ms: **FoundationStereo Limitations section** states "our model is not yet optimized for efficiency, which takes 0.7s on image size of 375x1242 on NVIDIA A100 GPU". The earlier 470 ms / RTX 4090 figure was an unsourced estimate and is retired (corrected 2026-08-23 during the paper reference check).
+- RAFT-Stereo latency landmine: 380 ms is IGEV-Stereo's reproduction on an RTX 3090 (IGEV Tab 5 p7); RAFT-Stereo's own paper reports 132 ms at 1248x384 on an RTX 6000 (RAFT-Stereo Tab 6 p8). Never pair 380 ms with "RTX 6000".
 
 #### DEFOM-Stereo (Jiang et al., CVPR 2025)
 - Variant: **ViT-L Full Model**. ViT-S variant: 18.51 M / 0.46 EPE / 0.255 s.

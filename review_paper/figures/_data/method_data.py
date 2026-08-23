@@ -37,8 +37,8 @@ METHODS = {
         # report a clean trainable-only figure.
         year=2025, family="foundation", iterative=True,
         kitti_d1=1.46, sf_epe=0.34, params_m=340.0,
-        latency_ms=470, hardware="RTX 4090, 1248x384",
-        source="FoundationStereo CVPR 2025 Tab. 3 p7 (Ours = 0.34 EPE); ~340 M total incl. frozen ViT-L (~335 M; tier1 summary)"),
+        latency_ms=700, hardware="A100, 375x1242",
+        source="FoundationStereo CVPR 2025 Tab. 3 p7 (Ours = 0.34 EPE); ~340 M total incl. frozen ViT-L (~335 M; tier1 summary); 0.7 s on A100 at 375x1242 from the paper's Limitations section"),
     "MonSter": dict(
         year=2025, family="foundation", iterative=True,
         kitti_d1=1.59, sf_epe=0.45, params_m=255.0,
