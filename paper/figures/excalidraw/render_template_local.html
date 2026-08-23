@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #ffffff; overflow: hidden; }
+    #root { display: inline-block; }
+    #root svg { display: block; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module">
+    const candidates = [
+      "https://esm.sh/@excalidraw/excalidraw@0.18.0?bundle",
+      "https://esm.sh/@excalidraw/excalidraw@0.18.1?bundle",
+      "https://esm.sh/@excalidraw/excalidraw@0.17.6?bundle",
+      "https://esm.sh/@excalidraw/excalidraw?bundle",
+      "https://cdn.jsdelivr.net/npm/@excalidraw/excalidraw@0.18.0/+esm",
+    ];
+    let mod = null;
+    window.__importLog = [];
+    for (const url of candidates) {
+      try {
+        mod = await import(url);
+        if (mod && mod.exportToSvg) { window.__importUsed = url; break; }
+        window.__importLog.push(url + ": no exportToSvg");
+        mod = null;
+      } catch (e) {
+        window.__importLog.push(url + ": " + e.message);
+      }
+    }
+    if (!mod) { window.__moduleError = window.__importLog.join(" | "); window.__moduleReady = true; }
+    else {
+      const { exportToSvg } = mod;
+      window.renderDiagram = async function(jsonData) {
+        try {
+          const data = typeof jsonData === "string" ? JSON.parse(jsonData) : jsonData;
+          const appState = data.appState || {};
+          appState.viewBackgroundColor = appState.viewBackgroundColor || "#ffffff";
+          appState.exportWithDarkMode = false;
+          const svg = await exportToSvg({
+            elements: data.elements || [],
+            appState: { ...appState, exportBackground: true },
+            files: data.files || {},
+          });
+          const root = document.getElementById("root");
+          root.innerHTML = "";
+          root.appendChild(svg);
+          window.__renderComplete = true;
+          return { success: true, width: svg.getAttribute("width"), height: svg.getAttribute("height"), used: window.__importUsed };
+        } catch (err) {
+          window.__renderComplete = true;
+          return { success: false, error: err.message };
+        }
+      };
+      window.__moduleReady = true;
+    }
+  </script>
+</body>
+</html>
