@@ -1,121 +1,173 @@
-\documentclass[conference]{IEEEtran}
+\documentclass[journal]{IEEEtran}
 \usepackage{cite}
 \usepackage{amsmath,amssymb,amsfonts}
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{array}
+\usepackage{multirow}
+\usepackage{placeins}
+\usepackage[caption=false,font=footnotesize]{subfig}
+\usepackage{url}
+\usepackage{xcolor}
 \graphicspath{{figures/}}
+
+\renewcommand{\topfraction}{0.90}
+\renewcommand{\bottomfraction}{0.70}
+\renewcommand{\textfraction}{0.10}
+\renewcommand{\floatpagefraction}{0.80}
+\setcounter{topnumber}{3}
+\setcounter{totalnumber}{5}
 
 \begin{document}
 
-\title{StereoLite: Real-Time Zero-Shot Stereo Matching on Embedded Hardware}
+\title{StereoLite: Real-Time Zero-Shot Stereo Matching\\at an Embedded Parameter Budget}
 
-\author{\IEEEauthorblockN{Nazib Abrar, Md Raihanul Haque Rahi, Md Zunaid Hossen}
-\IEEEauthorblockA{Department of Mechatronics Engineering\\
-Rajshahi University of Engineering \& Technology\\
-Rajshahi, Bangladesh}}
+\author{Nazib~Abrar,
+        Md~Raihanul~Haque~Rahi,
+        and~Md~Zunaid~Hossen%
+\thanks{The authors are with the Department of Mechatronics Engineering, Rajshahi University of Engineering \& Technology, Rajshahi 6204, Bangladesh (e-mail: abrarnazib@gmail.com).}%
+\thanks{Code, evaluation drivers, and the trained checkpoint are available at \texttt{github.com/abrar-nazib/StereoLite}.}}
+
+\markboth{Preprint, August 2026}{Abrar \MakeLowercase{\textit{et al.}}: StereoLite}
 
 \maketitle
 
 \begin{abstract}
-Dense depth from a stereo pair must be produced in real time on embedded accelerators for mobile robots, drones, and augmented reality rigs. However, the networks that generalize across domains are large iterative or foundation-scale models, while compact networks tend to collapse once the test domain departs from their training data. We present StereoLite, a 2.96 M parameter stereo network that composes known efficient mechanisms at an edge budget: a slanted tile-plane state, initialized from a single coarse group-wise cost volume and refined by a convolutional GRU over eight updates across three scales, is corrected by a narrow-band geometry encoding volume through a learned fail-soft gate. Trained only on SceneFlow, a single checkpoint evaluated under one fixed protocol attains 4.33, 3.93, 3.96, and 10.9 percent D1-all on the KITTI 2012, KITTI 2015, ETH3D, and Middlebury 2014 training sets without fine-tuning, alongside 0.78 px end-point error on the FlyingThings3D test set. A six-change graph optimization and INT8 TensorRT export run the model at 36.3 ms per frame (27.5 FPS) on a Jetson Orin Nano within roughly 0.15 GB of memory, and accuracy degrades gracefully under up to one pixel of vertical rectification error. These are training-split evaluations under our own protocol rather than official leaderboard submissions.
+Mobile robots, drones, and head-mounted displays need dense metric depth from a stereo pair in real time, and they must compute it on an embedded accelerator that shares its budget with the rest of the software stack. However, the stereo networks that transfer to unseen domains are large iterative or foundation-scale models, while compact networks are usually reported in domain and tend to degrade sharply once the test distribution departs from their training data. We present StereoLite, a 2.96~M parameter stereo network that composes three established mechanisms under an explicit edge envelope. A slanted tile-plane state, seeded from a single group-wise cost volume at one sixteenth resolution, is refined by a convolutional gated recurrent unit over eight updates across three scales, with plane-aware propagation between scales. A narrow-band geometry encoding volume at quarter resolution contributes an independent proposal that a learned fail-soft gate blends in only where it helps. Trained on synthetic SceneFlow data alone, one checkpoint evaluated under one fixed protocol reaches 4.33, 3.93, 3.96, and 10.9 percent D1-all on the KITTI 2012, KITTI 2015, ETH3D, and Middlebury 2014 training sets without any target-domain data, together with 0.78~px end-point error on the full FlyingThings3D test set. A six-change graph optimization and an eight-bit TensorRT export run the network at 36.3~ms per frame (27.5~FPS) at $384\times640$ on a Jetson Orin Nano within roughly 0.15~GB, and accuracy degrades gracefully under up to one pixel of vertical rectification error, which we confirm on 997 pairs from a 52~mm baseline consumer rig. The cross-domain numbers are training-split evaluations under our own protocol, not leaderboard submissions.
 \end{abstract}
 
 \begin{IEEEkeywords}
-stereo matching, disparity estimation, edge deployment, zero-shot generalization, recurrent refinement
+Stereo matching, disparity estimation, edge deployment, zero-shot generalization, recurrent refinement, tile hypotheses.
 \end{IEEEkeywords}
 
 \section{Introduction}
 \label{sec:intro}
-Stereo matching estimates a dense disparity map from a rectified image pair, from which metric depth follows as $Z = fB/d$ for focal length $f$ and baseline $B$. Because it recovers metric structure from two passive cameras, it is a natural depth source for platforms that cannot carry LiDAR or afford active sensing: mobile robots, drones, and embedded vision rigs. On such platforms the depth estimator must share an edge accelerator with the rest of the software stack, which imposes hard limits on parameters, latency, and memory.
+\IEEEPARstart{S}{tereo} matching recovers a dense disparity map from a rectified image pair, and metric depth then follows as $Z = fB/d$ for focal length $f$ and baseline $B$. Because two passive cameras suffice, stereo is the natural depth source for platforms that cannot carry a LiDAR or afford active illumination: mobile robots, small aerial vehicles, and embedded vision rigs. On such platforms the depth estimator shares a single edge accelerator with perception, planning, and control, which imposes hard limits on parameter count, latency, and memory at the same time.
 
-Deep stereo networks have moved far past classical pipelines \cite{scharstein2002taxonomy,hirschmuller2008sgm,zbontar2016mccnn} in accuracy, first through 3D cost-volume regularization \cite{kendall2017gcnet,chang2018psmnet,guo2019gwcnet,zhang2019ganet} and then through iterative recurrent refinement \cite{lipson2021raftstereo,li2022crestereo,xu2023igev,wang2024selective}. However, the models that transfer best to unseen domains are the largest ones: foundation-scale networks such as FoundationStereo \cite{wen2025foundationstereo} reach remarkable zero-shot accuracy with hundreds of millions of parameters, and even the strong iterative baselines run hundreds of milliseconds per frame on desktop GPUs. Efficient networks \cite{khamis2018stereonet,wang2019anynet,tonioni2019madnet,duggal2019deeppruner,xu2021bgnet,bangunharcana2021coex,tankovich2021hitnet,shamsafar2022mobilestereonet,guo2025lightstereo} meet the latency budget but are usually reported only in domain; when they are tested across domains, accuracy often degrades sharply. It is still difficult to obtain usable cross-domain accuracy, real-time embedded latency, and a quantization-clean operator set in one network.
+Deep stereo networks have moved far past the classical matching pipeline \cite{scharstein2002taxonomy,hirschmuller2008sgm,zbontar2016mccnn} in accuracy, first through regularization of a three-dimensional cost volume \cite{kendall2017gcnet,chang2018psmnet,guo2019gwcnet,zhang2019ganet} and then through recurrent refinement of a disparity field \cite{lipson2021raftstereo,li2022crestereo,xu2023igev,wang2024selective}. The most recent gains come from scale: foundation-model stereo networks such as FoundationStereo \cite{wen2025foundationstereo} reach remarkable zero-shot accuracy with hundreds of millions of parameters, and even the strong iterative baselines take hundreds of milliseconds per frame on a desktop GPU. Efficient networks \cite{khamis2018stereonet,wang2019anynet,tonioni2019madnet,duggal2019deeppruner,xu2021bgnet,bangunharcana2021coex,tankovich2021hitnet,shamsafar2022mobilestereonet,guo2025lightstereo,xu2025banet} meet the latency budget, but their published results are dominated by in-domain benchmarks, and where cross-domain numbers exist they often lag the large models by a wide margin. It is still difficult to obtain usable cross-domain accuracy, real-time embedded latency, and a quantization-clean operator set in one network.
 
-One major problem with current efficient designs is how to retain the mechanisms that carry generalization once the parameter budget shrinks. HITNet \cite{tankovich2021hitnet} showed that a slanted tile-plane state can replace a dense cost volume at under a million parameters, but its single pass per scale limits refinement. RAFT-Stereo \cite{lipson2021raftstereo} showed that a recurrent update operator concentrates capacity efficiently, but its all-pairs correlation and many-iteration schedule target desktop budgets. IGEV-Stereo \cite{xu2023igev} showed that a geometry encoding volume warm-starts the iterations, at the cost of a full-range 3D volume. Each mechanism is established; what the literature does not report is whether their combination, cut down to an embedded budget, preserves enough cross-domain accuracy to be useful in the field.
+One major problem with current efficient designs is how to retain the mechanisms that carry generalization once the parameter budget shrinks. HITNet \cite{tankovich2021hitnet} showed that a slanted tile-plane state can replace a dense cost volume at under one million parameters, but its single pass per scale limits how much refinement the state receives. RAFT-Stereo \cite{lipson2021raftstereo} showed that a recurrent update operator concentrates capacity efficiently, but its all-pairs correlation and long iteration schedule target a desktop budget. IGEV-Stereo \cite{xu2023igev} showed that a regularized geometry encoding volume warm-starts the recurrence, at the cost of a full-range three-dimensional volume. Each mechanism is established in isolation. What the literature does not report is whether their combination, cut down to an embedded budget, keeps enough cross-domain accuracy to be useful in the field, and what it costs to run on the intended device rather than on a desktop proxy.
 
-In this work, we present StereoLite, a 2.96 M parameter stereo network that composes these mechanisms under an explicit edge envelope. A truncated detection backbone and a separate left-image context encoder feed a group-wise cost volume \cite{guo2019gwcnet} at 1/16 resolution, which seeds a slanted tile-plane state in the manner of HITNet \cite{tankovich2021hitnet}. A convolutional GRU \cite{lipson2021raftstereo} refines the state with CREStereo-style local correlation \cite{li2022crestereo} over eight updates across three scales, with plane-aware propagation between scales. A narrow-band geometry encoding volume, in the spirit of IGEV-Stereo \cite{xu2023igev}, contributes an independent proposal that a learned fail-soft gate blends in only where it helps. We claim no novel block; the contribution is the composition, the edge-side engineering, and the measurement:
+In this work, we present StereoLite, a 2.96~M parameter stereo network that composes these mechanisms under an explicit edge envelope: under three million parameters, a working set under 200~MB, and an operator set that quantizes to eight-bit integer arithmetic. A truncated detection backbone and a separate left-image context encoder feed a group-wise cost volume \cite{guo2019gwcnet} at one sixteenth resolution, which seeds a slanted tile-plane state in the manner of HITNet \cite{tankovich2021hitnet}. A convolutional gated recurrent unit \cite{lipson2021raftstereo} refines the state with a local correlation lookup in the spirit of CREStereo \cite{li2022crestereo} over eight updates across three scales, and the state is propagated between scales along its plane hypotheses. A narrow-band geometry encoding volume, following IGEV-Stereo \cite{xu2023igev}, supplies an independent proposal at quarter resolution, and a learned fail-soft gate blends it in only where it helps. We claim no novel block. The contribution is the composition, the evidence-gated design process behind it, the edge-side engineering, and the measurement. Our main contributions are as follows.
 \begin{itemize}
-\item We assemble tile-plane state, recurrent refinement, local correlation, and a narrow-band geometry volume with learned fail-soft fusion into a 2.96 M parameter network whose every operator quantizes to INT8.
-\item We report a zero-shot quartet from one SceneFlow-trained checkpoint under one protocol: 4.33, 3.93, 3.96, and 10.9 percent D1-all on KITTI 2012, KITTI 2015, ETH3D, and Middlebury 2014, with 0.78 px end-point error in domain.
-\item We deploy the network on a Jetson Orin Nano at 36.3 ms per frame (27.5 FPS) via a six-change graph optimization (1.74$\times$ speedup at full precision) and a calibrated INT8 TensorRT engine.
-\item We characterize robustness to imperfect rectification, both under controlled vertical offsets and on 997 pairs from a physical 52 mm baseline rig, where the model agrees with a FoundationStereo reference to 1.45 px mean end-point error.
+\item We assemble tile-plane state, recurrent refinement with local correlation, plane-aware propagation, and a narrow-band geometry volume with learned fail-soft fusion into a 2.96~M parameter network whose every inference operator quantizes to eight-bit integers.
+\item We report a zero-shot quartet from one SceneFlow-trained checkpoint under one fixed protocol: 4.33, 3.93, 3.96, and 10.9 percent D1-all on KITTI 2012, KITTI 2015, ETH3D, and Middlebury 2014, with 0.78~px end-point error in domain, and we place the numbers against the published SceneFlow-only generalization results of efficient networks.
+\item We deploy the network on a Jetson Orin Nano at 36.3~ms per frame (27.5~FPS) at $384\times640$ through a six-change graph optimization, each change proven equivalent bitwise or through a matched comparison, that yields a $1.74\times$ speedup at full precision, followed by a calibrated eight-bit TensorRT engine.
+\item We characterize robustness to imperfect rectification, both under controlled vertical offsets on synthetic data and on 997 pairs from a physical 52~mm baseline rig, where the network agrees with a FoundationStereo reference to 1.45~px mean end-point error without any adaptation.
 \end{itemize}
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=0.96\columnwidth]{fig_1_3_edge_gap}
+\caption{\textbf{The edge-deployment gap.} Trainable parameter count (logarithmic) against reported SceneFlow end-point error for representative deep stereo networks, with the sub-three-million-parameter edge budget shaded. Published numbers follow each paper's own protocol and are listed with their sources in Table~\ref{tab:sceneflow}; StereoLite is marked at 2.96~M parameters and 0.78~px.}
+\label{fig:edgegap}
+\end{figure}
 
 \section{Related Work}
 \label{sec:related}
 
-\subsection{Efficient Stereo Networks}
-StereoNet \cite{khamis2018stereonet} established the coarse-volume-plus-refinement template for real-time stereo, and AnyNet \cite{wang2019anynet} made the accuracy-latency trade-off adjustable at inference time. MADNet \cite{tonioni2019madnet} paired a compact pyramid network with online adaptation, and DeepPruner \cite{duggal2019deeppruner} pruned the disparity search space with differentiable PatchMatch. BGNet \cite{xu2021bgnet} upsampled a low-resolution cost volume through a learned bilateral grid, and CoEx \cite{bangunharcana2021coex} excited cost-volume channels with image guidance. MobileStereoNet \cite{shamsafar2022mobilestereonet} transferred mobile-friendly convolutions to both 2D and 3D stereo networks, LightStereo \cite{guo2025lightstereo} boosted channel-wise 2D aggregation, and BANet \cite{xu2025banet} split aggregation into detail and smoothness branches for mobile GPUs. These networks meet embedded budgets, but their published results are dominated by in-domain benchmarks; cross-domain accuracy at the edge budget is far less documented.
+\textbf{Efficient stereo networks.} StereoNet \cite{khamis2018stereonet} established the coarse-volume-plus-refinement template for real-time stereo, and AnyNet \cite{wang2019anynet} made the accuracy-latency trade-off adjustable at inference time on a Jetson TX2. MADNet \cite{tonioni2019madnet} paired a compact pyramid network with online adaptation, and DeepPruner \cite{duggal2019deeppruner} pruned the disparity search space with differentiable PatchMatch. BGNet \cite{xu2021bgnet} upsampled a low-resolution cost volume through a learned bilateral grid, and CoEx \cite{bangunharcana2021coex} excited cost-volume channels under image guidance. MobileStereoNet \cite{shamsafar2022mobilestereonet} transferred mobile-friendly convolutions to two- and three-dimensional stereo networks, LightStereo \cite{guo2025lightstereo} boosted the channel dimension of two-dimensional cost aggregation, and BANet \cite{xu2025banet} split aggregation into detail and smoothness branches for mobile GPUs. These networks meet embedded budgets, but with few exceptions \cite{xu2021bgnet,guo2025lightstereo} their published results are in-domain, and where SceneFlow-only generalization is reported the errors are several times those of the large iterative models \cite{liu2026ggev}. StereoLite belongs to this family by budget; it differs in carrying a recurrent refinement loop and in being measured on the intended edge device.
 
-\subsection{Iterative Refinement}
-RAFT-Stereo \cite{lipson2021raftstereo} recast stereo as recurrent refinement of a disparity field by a convolutional GRU that indexes a precomputed correlation pyramid, with a separate context encoder conditioning the update. CREStereo \cite{li2022crestereo} replaced all-pairs correlation with an adaptive local search, which also confers tolerance to imperfect rectification. IGEV-Stereo \cite{xu2023igev} warm-started the recurrence from a regularized geometry encoding volume, cutting the iterations needed, and Selective-Stereo \cite{wang2024selective} routed frequency-specific information through parallel GRU branches. Pip-Stereo \cite{zheng2026pipstereo} prunes iterations progressively for efficiency. StereoLite borrows the recurrent operator and the warm-start idea but runs only eight updates at coarse scales, on a tile-plane state rather than a dense field.
+\textbf{Iterative refinement.} RAFT-Stereo \cite{lipson2021raftstereo} recast stereo as recurrent refinement of a disparity field by a convolutional gated recurrent unit that indexes a precomputed correlation pyramid, with a separate context encoder conditioning every update. CREStereo \cite{li2022crestereo} replaced all-pairs correlation with an adaptive local search, which also confers tolerance to imperfect rectification. IGEV-Stereo \cite{xu2023igev} warm-started the recurrence from a regularized geometry encoding volume and cut the iterations needed, IGEV++ \cite{xu2025igevpp} extended the volume to multiple disparity ranges and added a real-time variant, and Selective-Stereo \cite{wang2024selective} routed frequency-specific information through parallel recurrent branches. GGEV \cite{liu2026ggev} generalized the geometry volume with depth-foundation guidance for real-time zero-shot matching, and Pip-Stereo \cite{zheng2026pipstereo} pruned the iteration count progressively, arguing that iteration is an indispensable inductive bias for generalization. StereoLite borrows the recurrent operator and the warm-start idea, but runs only eight updates at coarse scales on a tile-plane state rather than a dense field, and we examine what that restricted schedule costs cross-domain.
 
-\subsection{Tile and Plane Representations}
-HITNet \cite{tankovich2021hitnet} represents disparity as a grid of slanted tiles, each carrying a disparity, two plane slopes, and a descriptor, and propagates these hypotheses coarse to fine without a dense cost volume; the result is real-time accuracy at under a million parameters. StereoLite keeps this state representation and its plane-aware cross-scale propagation, but replaces the single pass per scale with iterated GRU updates, a change our ablations show is load bearing.
+\textbf{Tile and plane representations.} HITNet \cite{tankovich2021hitnet} represents disparity as a grid of slanted tiles, each carrying a disparity, two plane slopes, and a descriptor, and propagates these hypotheses coarse to fine without a dense cost volume at fine scales; the result is real-time accuracy at under one million parameters. StereoLite keeps this state representation and its plane-aware cross-scale propagation, but replaces the single propagation pass per scale with iterated recurrent updates, a change our ablation in Section~\ref{sec:ablation} shows is load bearing.
 
-\subsection{Zero-Shot Generalization}
-DSMNet \cite{zhang2020dsmnet} introduced domain-invariant normalization for synthetic-to-real transfer, and HVT \cite{chang2023hvt} generalized through hierarchical visual transformations of the training data. The recent foundation-model era attacks the same problem with scale: FoundationStereo \cite{wen2025foundationstereo} trains on a million-pair corpus with a rich monocular prior, DEFOM-Stereo \cite{jiang2025defom} and MonSter \cite{cheng2025monster} integrate monocular depth foundation models, and Stereo Anywhere \cite{bartolomei2025stereoanywhere} fuses stereo and monocular cues for robustness. LiteAnyStereo \cite{jing2025liteanystereo} shows that a non-iterative 7.6 M network can inherit much of this robustness through a three-stage knowledge distillation pipeline. These results frame our question from the opposite side: how much zero-shot accuracy survives at 2.96 M parameters with supervised SceneFlow training alone.
+\textbf{Zero-shot generalization.} DSMNet \cite{zhang2020dsmnet} introduced domain-invariant normalization for synthetic-to-real transfer, and HVT \cite{chang2023hvt} generalized through hierarchical visual transformations of the training images. The foundation-model era attacks the same problem with scale: FoundationStereo \cite{wen2025foundationstereo} trains on a million-pair corpus with a rich monocular prior, DEFOM-Stereo \cite{jiang2025defom} and MonSter \cite{cheng2025monster} integrate monocular depth foundation models, Stereo Anywhere \cite{bartolomei2025stereoanywhere} fuses stereo and monocular cues for robustness, and Fast-FoundationStereo \cite{wen2026fastfoundationstereo} distills the foundation model into a 14.6~M parameter network that runs about ten times faster on a desktop GPU while keeping most of its zero-shot accuracy, with embedded deployment and quantization left as future work. LiteAnyStereo \cite{jing2025liteanystereo} shows that a non-iterative efficient network can inherit much of this robustness through a three-stage training pipeline on million-scale data, whereas the same network trained on SceneFlow alone lands in the error band of other efficient methods. These results frame our question from the opposite side: how much zero-shot accuracy survives at 2.96~M parameters when the training data is SceneFlow alone, and where exactly the remaining deficit sits.
 
 \section{Method}
 \label{sec:method}
 
 \subsection{Overview}
-Figure \ref{fig:arch} shows the pipeline. StereoLite is a coarse-to-fine tile-hypothesis network with light recurrent refinement. A shared encoder extracts matching features from both views and a separate context encoder processes the left image; a group-wise cost volume at 1/16 resolution initializes a slanted tile state; a convolutional GRU refines the state over two iterations at 1/16, three at 1/8, and three at 1/4 resolution, with plane-aware propagation between scales; a narrow-band geometry encoding volume at 1/4 resolution corrects the estimate through a learned fail-soft gate; and plane rendering with two learned convex upsampling stages recovers the full-resolution disparity. The full network holds 2.9631 M trainable parameters.
+Fig.~\ref{fig:arch} shows the pipeline. StereoLite is a coarse-to-fine tile-hypothesis network with light recurrent refinement. A shared encoder extracts matching features from both views and a separate context encoder processes the left image; a group-wise cost volume at one sixteenth resolution initializes a slanted tile state; a convolutional gated recurrent unit refines the state over two iterations at one sixteenth, three at one eighth, and three at one quarter resolution, with plane-aware propagation between scales; a narrow-band geometry encoding volume at quarter resolution corrects the estimate through a learned fail-soft gate; and plane rendering followed by two learned convex upsampling stages recovers the full-resolution disparity. Table~\ref{tab:scales} lists the tensor sizes at each scale for the default $384\times640$ input. The full network holds 2.9631~M trainable parameters.
 
-\begin{figure*}[!htbp]
+\begin{figure*}[!t]
 \centering
 \includegraphics[width=\textwidth]{fig_3_1_architecture_preview}
-\caption{\textbf{StereoLite architecture overview.} A shared truncated YOLO26s encoder and a separate left-image context encoder feed a 1/16-resolution group-wise cost volume that initializes a slanted tile state; a ConvGRU refines the state over eight updates across three scales with plane-aware propagation, a narrow-band geometry encoding volume is fused at 1/4 resolution through a learned fail-soft gate, and plane rendering with two learned convex upsampling stages produces the full-resolution disparity.}
+\caption{\textbf{StereoLite architecture.} (1) A shared truncated YOLO26s encoder processes both views and a separate 32-channel context encoder reads the left image alone. (2) A group-wise cost volume at one sixteenth resolution, regularized by a small three-dimensional CNN, seeds the tile state $T=(d,s_x,s_y,h,c)$ by soft-argmax. (3) Convolutional GRU updates refine the state over two, three, and three iterations at one sixteenth, one eighth, and one quarter resolution, with plane-aware propagation between scales. (4) A narrow-band geometry encoding volume at quarter resolution proposes an independent disparity that a learned fail-soft gate blends into the tile estimate. (5) Plane rendering and two learned convex upsampling stages produce the full-resolution disparity. Red dots mark the supervised outputs of the multi-scale objective.}
 \label{fig:arch}
 \end{figure*}
 
+\begin{table}[!t]
+\centering
+\caption{\textbf{Spatial size, channel count, and main operation at each pipeline scale} for a $384\times640$ input.}
+\label{tab:scales}
+\footnotesize
+\begin{tabular}{lccl}
+\toprule
+Scale & Spatial size & Channels & Main operation\\
+\midrule
+Full & $384\times640$ & 3 & input and output\\
+1/2 & $192\times320$ & 32 & convex-upsample guidance\\
+1/4 & $96\times160$ & 128 & GEV fusion and 3 refinements\\
+1/8 & $48\times80$ & 256 & 3 refinements\\
+1/16 & $24\times40$ & 256 & cost initialization and 2 refinements\\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \subsection{Feature and Context Encoders}
-The matching encoder is a YOLO26s backbone truncated after its first seven blocks, producing features at 1/4, 1/8, and 1/16 resolution with 128, 256, and 256 channels. Detection features are pretrained to localize objects across scales, which is close to what matching requires, and in our encoder ablation this backbone beat both a hand-built GhostConv stack and its smaller YOLO26n sibling on every accuracy metric at a 2 ms latency cost. The two views are concatenated along the batch dimension and pass through a single shared invocation. A separate context encoder processes the left image alone and projects it to a 32-channel quarter-resolution context map, pooled to the coarser scales. Matching evidence and recurrent context are kept in separate streams: if the matching features also served as context, the recurrent unit could not separate appearance from correspondence, and the RAFT-Stereo lineage \cite{lipson2021raftstereo} established that a dedicated context path improves refinement.
+The matching encoder is a YOLO26s backbone truncated after its first seven blocks, producing features at one quarter, one eighth, and one sixteenth resolution with 128, 256, and 256 channels; the detection neck and head above one sixteenth are removed at construction rather than left as dead weight. Detection features are pretrained to localize objects across scales, which is close to what matching requires, and in our encoder ablation (Section~\ref{sec:ablation}) this backbone beat both a hand-built GhostConv stack and its smaller YOLO26n sibling on every accuracy metric at a two millisecond latency cost. The two views are concatenated along the batch dimension and pass through a single shared invocation, so both receive identical weights. A separate context encoder processes the left image alone: a strided convolution followed by two GhostConv blocks with squeeze-and-excitation, projected to a 32-channel quarter-resolution context map that is pooled to the coarser scales. Matching evidence and recurrent context are kept in separate streams. If the matching features also served as context, the recurrent unit could not separate appearance from correspondence, and the RAFT-Stereo lineage \cite{lipson2021raftstereo} established that a dedicated context path improves refinement.
 
 \subsection{Cost-Volume Initialization}
-Tile initialization builds a group-wise correlation volume \cite{guo2019gwcnet} at 1/16 resolution. For each of $G=8$ feature groups and each integer disparity hypothesis, the matching score is
+Tile initialization builds a group-wise correlation volume \cite{guo2019gwcnet} at one sixteenth resolution. In order to retain more matching evidence than a single correlation channel at a fraction of the cost of a concatenation volume, we split the $C$ feature channels into $G=8$ groups and compute, for each group $g$ and each integer disparity hypothesis $d$,
 \begin{equation}
 C(g,d,y,x) = \frac{1}{C/G}\sum_{c=1}^{C/G}
   f_{L}^{\,g,c}(y,x)\, f_{R}^{\,g,c}(y,\,x-d),
 \label{eq:gwc}
 \end{equation}
-where $f_{L}^{\,g,c}$ and $f_{R}^{\,g,c}$ are the $c$-th channel of group $g$ of the left and right feature maps and $d \in \{0,\dots,23\}$ indexes 24 hypotheses, spanning roughly 0 to 368 full-resolution pixels. A small 3D CNN with an 8-16-16-1 channel schedule regularizes the volume, and a softmax along the disparity axis yields a distribution $p(d)$ from which the soft-argmin \cite{kendall2017gcnet} reads the initial state,
+where $f_{L}^{\,g,c}$ and $f_{R}^{\,g,c}$ are the $c$-th channel of group $g$ of the left and right feature maps and $d \in \{0,\dots,23\}$ indexes 24 hypotheses at one sixteenth resolution, spanning roughly 0 to 368 full-resolution pixels. A small three-dimensional CNN with an 8-16-16-1 channel schedule regularizes the volume, and a softmax along the disparity axis yields a distribution $p(d)$ from which the soft-argmin \cite{kendall2017gcnet} reads the initial state,
 \begin{equation}
 d_{0} = \sum_{d} p(d)\, d, \qquad
 c_{0} = \max_{d}\, p(d),
 \label{eq:init}
 \end{equation}
-where $d_0$ is the expected disparity and $c_0$ a confidence. Plane slopes start at zero and the hidden state starts from the coarsest context map. Restricting the volume to a single coarse scale keeps the peak activation memory inside the edge envelope.
+where $d_0$ is the expected disparity and $c_0$ the peak probability, which serves as an initial confidence. Plane slopes start at zero and the recurrent hidden state starts from the coarsest context map. Restricting the volume to a single coarse scale keeps the peak activation memory inside the edge envelope; no cost volume is rebuilt at any finer level.
 
 \subsection{Recurrent Tile Refinement}
-Separate refinement modules operate at 1/16, 1/8, and 1/4 resolution; weights are not shared because the feature channel counts differ. At each iteration the right features are warped by the current disparity, and a differentiable local correlation in the manner of CREStereo \cite{li2022crestereo} is evaluated over five offsets within $\pm 2$ px. The recurrent input assembles
+Separate refinement modules operate at one sixteenth, one eighth, and one quarter resolution; their weights are not shared because the feature channel counts differ. Fig.~\ref{fig:refine} shows one iteration. The right features are warped by the current disparity, and a differentiable local correlation in the manner of CREStereo \cite{li2022crestereo} is evaluated over five offsets within $\pm 2$~px of the current estimate. The recurrent input assembles
 \begin{equation}
 x = \bigl[\, f_{L},\ \mathcal{W}(f_{R};d),\ d,\ s_{x},\ s_{y},\
   c,\ \mathrm{corr},\ \mathrm{ctx} \,\bigr],
 \label{eq:gruinput}
 \end{equation}
-where $\mathcal{W}(f_{R};d)$ denotes the warped right features, $s_x, s_y$ the plane slopes, $\mathrm{corr}$ the local correlation, and $\mathrm{ctx}$ the scale-matched context. A convolutional GRU \cite{lipson2021raftstereo} with a 32-channel hidden state updates
+where $\mathcal{W}(f_{R};d)$ denotes the warped right features, $s_x$ and $s_y$ the plane slopes, $c$ the confidence, $\mathrm{corr}$ the five-offset local correlation, and $\mathrm{ctx}$ the scale-matched context map. A convolutional gated recurrent unit \cite{lipson2021raftstereo} with a 32-channel persistent hidden state $h$ then updates
 \begin{equation}
 \begin{aligned}
-z &= \sigma\!\bigl(\mathrm{Conv}([h,x])\bigr), \quad
-r = \sigma\!\bigl(\mathrm{Conv}([h,x])\bigr),\\
-q &= \tanh\!\bigl(\mathrm{Conv}([r \odot h,\,x])\bigr), \quad
-h' = (1-z) \odot h + z \odot q,
+z &= \sigma\!\bigl(\mathrm{Conv}([h,x])\bigr),\\
+r &= \sigma\!\bigl(\mathrm{Conv}([h,x])\bigr),\\
+q &= \tanh\!\bigl(\mathrm{Conv}([r \odot h,\,x])\bigr),\\
+h' &= (1-z) \odot h + z \odot q,
 \end{aligned}
 \label{eq:gru}
 \end{equation}
-where $\odot$ is the element-wise product. A two-layer head with 48 hidden channels predicts residuals for disparity, both slopes, and confidence, and a learned gate emits four sigmoid weights that scale each residual; a softplus keeps disparity non-negative. The schedule runs two iterations at 1/16, three at 1/8, and three at 1/4, for eight learned updates in total.
+where $z$ and $r$ are the update and reset gates, $q$ the candidate state, and $\odot$ the element-wise product. A two-layer head with 48 hidden channels predicts residuals for the disparity, both slopes, and the confidence, and a second learned gate emits four sigmoid weights that scale each residual independently; a softplus keeps the disparity non-negative. The schedule runs two iterations at one sixteenth, three at one eighth, and three at one quarter resolution, eight learned updates in total.
 
-Between scales, propagation carries the tile state to the finer grid along its slanted-surface hypothesis rather than by plain interpolation, following HITNet \cite{tankovich2021hitnet}:
+\begin{figure}[!t]
+\centering
+\includegraphics[width=0.96\columnwidth]{fig_3_4_refinement_preview}
+\caption{\textbf{One recurrent refinement iteration.} The right features are warped by the current disparity, a five-offset local correlation is evaluated around it, and the concatenated input of \eqref{eq:gruinput} drives the convolutional GRU of \eqref{eq:gru}; a gated head emits residuals for the disparity, the two plane slopes, and the confidence.}
+\label{fig:refine}
+\end{figure}
+
+Between scales, propagation carries the tile state to the finer grid along its slanted-surface hypothesis rather than by plain interpolation, following HITNet \cite{tankovich2021hitnet}. Each parent tile places its four children at
 \begin{equation}
 d_{\mathrm{child}} = 2\,\mathcal{B}(d_{\mathrm{parent}})
   + 2\,s_{x}\,\Delta x + 2\,s_{y}\,\Delta y,
 \label{eq:prop}
 \end{equation}
-where $\mathcal{B}$ is bilinear resampling, $\Delta x, \Delta y \in \{-0.25, +0.25\}$ are the child offsets, and the factor of two rescales disparity to the finer grid. Sub-pixel structure is retained without rebuilding a cost volume at any finer level.
+where $\mathcal{B}$ is bilinear resampling of the parent disparity, $\Delta x, \Delta y \in \{-0.25, +0.25\}$ are the child offsets, and the factor of two rescales disparity to the finer grid. The slopes, hidden state, and confidence are resampled alongside. Sub-pixel structure is thus retained across scales without any cost volume at the finer level.
 
 \subsection{Narrow-Band Geometry Volume and Fail-Soft Fusion}
-A geometry encoding volume in the spirit of IGEV-Stereo \cite{xu2023igev} adds an independent proposal at 1/4 resolution. Rather than spanning the full disparity range, it samples 33 hypotheses in a band of $\pm 16$ around the current tile disparity; since the coarse initialization has already localized the disparity, the band's job is correction, not search, and our efficiency ablation validates the narrowing as accuracy neutral while removing roughly a quarter of the model's multiply-accumulate operations. The volume is regularized by three 3D convolutions with 16 hidden channels, and its softmax distribution yields an expected disparity $d_{\mathrm{gev}}$, a confidence $c_{\mathrm{gev}}$, and a projected geometry feature $g_{\mathrm{gev}}$. The proposal is not substituted unconditionally. A learned gate produces a scalar blend weight,
+A geometry encoding volume in the spirit of IGEV-Stereo \cite{xu2023igev} adds an independent proposal at quarter resolution (Fig.~\ref{fig:gev}). Rather than spanning the full disparity range, it samples 33 hypotheses in a band of $\pm 16$ quarter-resolution disparities around the current tile estimate, about 64 full-resolution pixels on either side. Since the coarse initialization has already localized the disparity, the band's job is correction, not search, and our efficiency study validates the narrowing as accuracy neutral while removing roughly a quarter of the network's multiply-accumulate operations. The volume is regularized by three three-dimensional convolutions with 16 hidden channels, and its softmax distribution yields
+\begin{equation}
+\begin{aligned}
+d_{\mathrm{gev}} &= \sum_{d} p(d)\, d, \qquad
+c_{\mathrm{gev}} = \max_{d}\, p(d),\\
+g_{\mathrm{gev}} &= \phi\Bigl(\sum_{d} G(d)\, p(d)\Bigr),
+\end{aligned}
+\label{eq:gev}
+\end{equation}
+where $p(d)$ is the softmax over the regularized band, $G(d)$ the regularized three-dimensional geometry feature, and $\phi$ a projection to a 16-channel expected-geometry map. The proposal is not substituted unconditionally. A learned gate produces a scalar blend weight per tile,
 \begin{equation}
 \begin{aligned}
 w &= \sigma\!\Bigl(F\bigl([\mathrm{ctx}_{4},\, g_{\mathrm{gev}},\, c,\,
@@ -124,13 +176,20 @@ d_{\mathrm{fused}} &= \mathrm{softplus}\bigl(d + w\,(d_{\mathrm{gev}} - d)\bigr)
 \end{aligned}
 \label{eq:failsoft}
 \end{equation}
-where $F$ is the fusion network. We initialize the final-layer bias of $F$ to $-4$, so the initial weight is approximately 0.018 and training begins close to the stable recurrent baseline; the network then learns where the geometry proposal helps. This fail-soft design stops the global branch from corrupting regions the recurrent path already resolves well.
+where $F$ is the fusion network, $c$ and $c_{\mathrm{gev}}$ are the tile and geometry confidences, and $\mathrm{ctx}_4$ is the quarter-resolution context. We initialize the final-layer bias of $F$ to $-4$, so the initial weight is approximately 0.018 and training begins close to the stable recurrent baseline; the network then learns where the geometry proposal helps. The slopes are attenuated by $(1-w)$ and the confidence becomes the maximum of the two estimates. This fail-soft design stops the global branch from corrupting regions that the recurrent path already resolves well, and it is the single addition that most improved accuracy in our architecture study (Section~\ref{sec:ablation}).
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=\columnwidth]{fig_3_6_gev_fusion_preview}
+\caption{\textbf{Narrow-band geometry volume and fail-soft fusion.} Thirty-three hypotheses in a $\pm16$ band around the tile disparity are regularized and read out by \eqref{eq:gev}; the gate of \eqref{eq:failsoft} blends the proposal into the tile estimate with a weight that starts near zero.}
+\label{fig:gev}
+\end{figure}
 
 \subsection{Plane Rendering and Convex Upsampling}
-Before upsampling, a plane-rendering step reconstructs each tile from its disparity and slopes and applies an edge gate; in our boundary-sharpness ablation this step cut the bad-0.5 rate from 55.36 to 42.91 percent. The rendered 1/4 disparity is then upsampled to full resolution in two learned $2\times$ stages, each predicting a softmax over the $3\times 3$ coarse neighborhood of every output subpixel, so the upsampled disparity is a convex combination of nearby coarse values, as in RAFT-Stereo \cite{lipson2021raftstereo}.
+Before upsampling, a plane-rendering step reconstructs each quarter-resolution tile from its disparity and slopes and applies an edge gate; in our boundary-sharpness study this step cut the bad-0.5 rate from 55.36 to 42.91 percent and was also the fastest variant tested. The rendered quarter-resolution disparity is then upsampled to full resolution in two learned $2\times$ stages, guided by the quarter- and half-resolution left features respectively. Each stage predicts a softmax over the $3\times3$ coarse neighborhood of every output subpixel, so the upsampled disparity is a convex combination of nearby coarse values, as in RAFT-Stereo \cite{lipson2021raftstereo}. The upsampler can sharpen and recombine coarse disparities, but it cannot invent a hypothesis that is absent at quarter resolution; we return to this limit in Section~\ref{sec:limits}.
 
 \subsection{Training Objective}
-The network trains under an eleven-term multi-scale objective. A pixel is valid when its ground-truth disparity is finite and lies between 0 and 320 px; lower-scale predictions are resized to full resolution and rescaled before comparison. The objective is
+The network trains under an eleven-term multi-scale objective. A pixel is valid when its ground-truth disparity is finite and lies between 0 and 320~px; every lower-scale prediction is resized to full resolution and rescaled before comparison. The objective is
 \begin{equation}
 \begin{aligned}
 \mathcal{L} ={}& 1.0\,\mathcal{L}_{1}(d_{\mathrm{full}})
@@ -147,29 +206,50 @@ The network trains under an eleven-term multi-scale objective. A pixel is valid 
 \end{aligned}
 \label{eq:loss}
 \end{equation}
-where $\mathcal{L}_1$ is the masked mean absolute disparity error, $\mathcal{L}_{\mathrm{grad}}$ a Sobel gradient-consistency term, $\mathcal{L}_{\mathrm{thr}}$ a hinge stacked over the error thresholds $\{0.5, 1, 2, 3\}$ px, $\mathcal{L}_{\mathrm{D1}}$ a D1-relative hinge \cite{menze2015kitti}, $\mathcal{L}_{\mathrm{smooth}}$ an edge-aware smoothness term, and $\mathcal{L}_{\mathrm{slant}}$ a gated slant-supervision term that trains the plane slopes only where they are trustworthy. This composition was chosen by ablation: across nine formulations, the threshold stack combined with the D1 hinge was the only one to win end-point error and the outlier rates together.
+where $\mathcal{L}_1$ is the masked mean absolute disparity error, $\mathcal{L}_{\mathrm{grad}}$ a Sobel gradient-consistency term, $\mathcal{L}_{\mathrm{thr}}$ a hinge stacked over the error thresholds $\{0.5, 1, 2, 3\}$~px, $\mathcal{L}_{\mathrm{D1}}$ a hinge on the D1 outlier criterion of KITTI \cite{menze2015kitti}, $\mathcal{L}_{\mathrm{smooth}}$ an edge-aware smoothness term, and $\mathcal{L}_{\mathrm{slant}}$ a gated slant-supervision term that trains the plane slopes only where the tile is trustworthy. The composition was chosen by ablation: across nine formulations (Section~\ref{sec:ablation}), the threshold stack combined with the D1 hinge was the only one to win end-point error and the outlier rates together.
 
 \subsection{Training Protocol}
-We train on the full SceneFlow finalpass corpus \cite{mayer2016sceneflow}, 35{,}454 pairs, for 60{,}000 steps at batch 32 in bfloat16 mixed precision on a single A100 80 GB GPU, using AdamW with weight decay $10^{-5}$ and a OneCycle schedule peaking at $8\times 10^{-4}$. Training samples random $384\times 640$ co-located crops from the native $960\times 540$ frames, which preserves native disparity magnitudes; our input-protocol ablation shows this native-crop protocol substantially outperforms downscaling the frame before cropping. Three augmentations apply: asymmetric color jitter, right-image-only random erasing, and random scaling. The best checkpoint, selected on a fixed validation subset, occurs at step 53{,}000.
+We train on the full SceneFlow finalpass corpus \cite{mayer2016sceneflow}, 35,454 pairs from FlyingThings3D, Monkaa, and Driving, for 60,000 steps at batch 32 in bfloat16 mixed precision on a single A100 80~GB GPU, using AdamW with weight decay $10^{-5}$ and a one-cycle schedule peaking at $8\times10^{-4}$. Training samples random $384\times640$ crops, co-located in both views, from the native $960\times540$ frames, which preserves native disparity magnitudes; our input-protocol study shows that this native-crop protocol cuts the native-axis error by more than half relative to downscaling the frame before cropping. Three augmentations from the OpenStereo recipe \cite{guo2023openstereo} apply: asymmetric color jitter, right-image-only random erasing, and random scaling. Validation uses a fixed 400-pair FlyingThings3D subset every thousand steps; the best checkpoint occurs at step 53,000 and is used for every result below.
 
 \section{Experiments}
 \label{sec:exp}
 
 \subsection{Setup}
-We report end-point error (EPE), root-mean-square error, median absolute error, the bad-$t$ rates for $t \in \{0.5,1,2,3\}$ px, and D1-all \cite{menze2015kitti}, averaged per image over valid pixels. In-domain evaluation uses the full FlyingThings3D test set \cite{mayer2016sceneflow}, 4{,}370 pairs at native $960\times 540$ resolution. Zero-shot evaluation applies one fixed protocol to every dataset: images are resized to $384\times 640$, ground truth is scaled by $s_x = 640/W$, pixels that are invalid or exceed 192 px after resizing are masked, and metrics are computed over valid pixels. All zero-shot numbers are computed on the public training splits of KITTI 2012 \cite{geiger2012kitti}, KITTI 2015 \cite{menze2015kitti}, ETH3D \cite{schops2017eth3d}, and Middlebury 2014 \cite{scharstein2014middlebury} under our own protocol; they are not official leaderboard submissions, and we label them accordingly. Latency is measured at batch 1 and $384\times 640$ with 10 warm-up and 100 timed passes.
+\label{sec:setup}
+\textbf{Metrics.} For a set $V$ of valid pixels with prediction $\hat d$ and ground truth $d^*$ we report
+\begin{equation}
+\begin{aligned}
+\mathrm{EPE} &= \frac{1}{\lvert V \rvert} \sum_{p \in V}
+  \bigl\lvert \hat{d}(p) - d^{*}(p) \bigr\rvert, \\
+\mathrm{bad}\text{-}t &= \frac{100}{\lvert V \rvert}\,
+  \Bigl\lvert \bigl\{ p \in V :
+  \lvert \hat{d}(p) - d^{*}(p) \rvert > t \bigr\} \Bigr\rvert,\\
+\mathrm{D1} &= \frac{100}{\lvert V \rvert}\, \Bigl\lvert \bigl\{ p \in V :
+  e(p) > 3 \;\wedge\;
+  e(p) > 0.05\, d^{*}(p) \bigr\} \Bigr\rvert,
+\end{aligned}
+\label{eq:metrics}
+\end{equation}
+where $e(p)=\lvert \hat{d}(p) - d^{*}(p) \rvert$, $t \in \{0.5,1,2,3\}$~px, and D1 follows the KITTI definition \cite{menze2015kitti}. We also report the root-mean-square and median absolute errors. Every metric is averaged per image and then over images.
+
+\textbf{In-domain evaluation} uses the full FlyingThings3D test split \cite{mayer2016sceneflow}, 4,370 pairs at native $960\times540$ resolution; four frames with no valid pixel after the disparity cutoff are excluded from the macro-average.
+
+\textbf{Zero-shot evaluation} applies one fixed protocol to every dataset: the images are resized to $384\times640$, the ground truth is scaled by $s_x = 640/W$ for native width $W$, pixels that are invalid or exceed 192~px after resizing are masked, and the metrics are computed over the remaining pixels. The protocol is applied to the public training splits of KITTI 2012 \cite{geiger2012kitti} (194 pairs), KITTI 2015 \cite{menze2015kitti} (200 pairs), ETH3D \cite{schops2017eth3d} (27 pairs), and the 23 perfect-rectification scenes of Middlebury 2014 \cite{scharstein2014middlebury}, none of which contribute a single pixel to training. These are evaluations under our own protocol on training splits, not official leaderboard submissions, and we label them as such throughout. Because the protocol resizes, the per-dataset thresholds of the standard generalization tables \cite{lipson2021raftstereo,xu2023igev,liu2026ggev} are only approximately comparable; Section~\ref{sec:context} states the correspondence explicitly.
+
+\textbf{Latency} is measured at batch one and $384\times640$ with 10 warm-up and 100 timed passes, and every number states its device and precision. The local benchmark runs in eager PyTorch on an RTX 3050 laptop GPU; the deployment number is measured on a Jetson Orin Nano \cite{nvidia_orin_nano} with a TensorRT engine.
 
 \subsection{In-Domain Accuracy}
-Table \ref{tab:indomain} reports the full FlyingThings3D test-set result. The model reaches 0.781 px EPE and 3.40 percent D1-all. The metric spread is informative: the median of 0.130 px is six times smaller than the mean, and the RMSE of 3.64 is nearly five times larger, so most pixels are highly accurate while a small population of large outliers sets the average. Errors above half a pixel affect 15.32 percent of pixels but above three pixels only 4.00 percent; failures concentrate at occlusion boundaries and thin structures, consistent with recurrent reasoning at quarter resolution and an upsampler that recombines disparity but cannot invent it. Figure \ref{fig:curves} shows the training trajectory: validation EPE bottoms out near step 53{,}000 and holds flat thereafter, so we take the best checkpoint there.
+Table~\ref{tab:indomain} reports the full FlyingThings3D test-set result. The network reaches 0.781~px end-point error and 3.40 percent D1-all. The spread across metrics is informative: the median error of 0.130~px is six times smaller than the mean, and the root-mean-square error of 3.64~px is nearly five times larger, so most pixels are accurate to a small fraction of a pixel while a small population of large outliers sets the average. Errors above half a pixel affect 15.32 percent of pixels but errors above three pixels only 4.00 percent. Fig.~\ref{fig:qual} shows where the outliers live: they concentrate at occlusion boundaries and on thin structures, which is consistent with recurrent reasoning at quarter resolution and an upsampler that recombines disparity but cannot invent it. Fig.~\ref{fig:curves} shows the training trajectory. Validation error bottoms out near step 53,000 and holds flat for the remaining steps, so we take the best checkpoint there rather than at the end of the schedule.
 
-\begin{table}[!htbp]
+\begin{table}[!t]
 \centering
-\caption{\textbf{In-domain accuracy on the full FlyingThings3D test set} (4{,}370 pairs, native $960\times 540$).}
+\caption{\textbf{In-domain accuracy on the full FlyingThings3D test set} (4,370 pairs, native $960\times540$, best checkpoint at step 53,000).}
 \label{tab:indomain}
 \footnotesize
-\setlength{\tabcolsep}{3.6pt}
+\setlength{\tabcolsep}{3.4pt}
 \begin{tabular}{cccccccc}
 \toprule
-EPE & RMSE & Med. & bad-0.5 & bad-1 & bad-2 & bad-3 & D1-all\\
+EPE & RMSE & Median & bad-0.5 & bad-1 & bad-2 & bad-3 & D1-all\\
 (px) & (px) & (px) & (\%) & (\%) & (\%) & (\%) & (\%)\\
 \midrule
 0.781 & 3.64 & 0.130 & 15.32 & 8.92 & 5.34 & 4.00 & 3.40\\
@@ -177,64 +257,160 @@ EPE & RMSE & Med. & bad-0.5 & bad-1 & bad-2 & bad-3 & D1-all\\
 \end{tabular}
 \end{table}
 
-\begin{figure}[!htbp]
+\begin{figure}[!t]
 \centering
 \includegraphics[width=\columnwidth]{fig_4_1_training_curves}
-\caption{\textbf{Training loss and validation accuracy over the 60k-step run.} Validation EPE reaches its floor near step 53{,}000, where the reported checkpoint is taken.}
+\caption{\textbf{Training loss and validation end-point error over the 60,000-step run.} Validation error on the fixed 400-pair subset reaches its floor near step 53,000, where the reported checkpoint is taken.}
 \label{fig:curves}
 \end{figure}
 
-\subsection{Zero-Shot Generalization}
-Table \ref{tab:zeroshot} is the paper's central result: one checkpoint, trained only on synthetic SceneFlow, evaluated on four real benchmarks under one protocol. On the driving scenes of KITTI 2012 and 2015 the model attains 4.33 and 3.93 percent D1-all at 0.823 px EPE; on the indoor and outdoor scenes of ETH3D it attains 3.96 percent D1-all at 0.930 px. Middlebury 2014, whose high-resolution indoor scenes contain thin repeated structures and disparities near the evaluation cap, is the hardest of the four at 1.71 px EPE and 10.9 percent D1-all. The per-domain spread is narrow outside Middlebury, indicating that the synthetic-to-real gap, not any single domain, sets the operating level.
-
-\begin{table}[!htbp]
+\begin{figure*}[!t]
 \centering
-\caption{\textbf{Zero-shot quartet from a single SceneFlow-trained checkpoint.} Evaluation on public training splits under our fixed protocol (resize to $384\times 640$, ground truth scaled by $s_x$, disparities above 192 px masked); not leaderboard submissions.}
+\includegraphics[width=0.92\textwidth]{fig_4_3_sceneflow_qualitative}
+\caption{\textbf{Qualitative in-domain results on held-out FlyingThings3D scenes.} Left image, ground truth, prediction, and absolute error map. Large errors concentrate at occlusion boundaries and thin structures; planar and textured surfaces are recovered to sub-pixel accuracy.}
+\label{fig:qual}
+\end{figure*}
+
+\subsection{Zero-Shot Generalization}
+\label{sec:zeroshot}
+Table~\ref{tab:zeroshot} and Fig.~\ref{fig:quartet} present the central result: one checkpoint, trained only on synthetic SceneFlow, evaluated on four real benchmarks under one protocol. On the driving scenes of KITTI 2012 and 2015 the network attains 4.33 and 3.93 percent D1-all at 0.82~px end-point error; on the indoor and outdoor scenes of ETH3D it attains 3.96 percent D1-all at 0.93~px. Three of the four real domains therefore land within one point of the in-domain outlier rate of 3.40 percent. Middlebury 2014, whose high-resolution indoor scenes contain thin repeated structures and disparities near the evaluation cap, is the hardest of the four at 1.71~px and 10.9 percent D1-all. The sub-pixel metrics tell the same story from the other end: bad-1 rises from 8.9 percent in domain to 15 to 18 percent on KITTI and ETH3D and to 24 percent on Middlebury, so the synthetic-to-real gap shows first in fine accuracy and only on Middlebury in the outlier rate.
+
+\begin{table}[!t]
+\centering
+\caption{\textbf{Zero-shot quartet from a single SceneFlow-trained checkpoint.} Evaluation on the public training splits under our fixed protocol (resize to $384\times640$, ground truth scaled by $s_x$, disparities above 192~px masked, per-image macro-average). These are not leaderboard submissions. ETH3D's bad-3 and D1-all coincide because no valid pixel there has a disparity below 60~px.}
 \label{tab:zeroshot}
 \footnotesize
-\setlength{\tabcolsep}{2.6pt}
-\begin{tabular}{lccccc}
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lcccccc}
 \toprule
-Dataset & Pairs & EPE (px) & bad-1 (\%) & bad-2 (\%) & D1-all (\%)\\
+Dataset & Pairs & EPE & bad-1 & bad-2 & bad-3 & D1-all\\
+ & & (px) & (\%) & (\%) & (\%) & (\%)\\
 \midrule
-KITTI 2012 \cite{geiger2012kitti} & 194 & 0.823 & 16.53 & 6.96 & 4.33\\
-KITTI 2015 \cite{menze2015kitti} & 200 & 0.823 & 17.99 & 6.42 & 3.93\\
-ETH3D \cite{schops2017eth3d} & 27 & 0.930 & 15.18 & 6.47 & 3.96\\
-Middlebury 2014 \cite{scharstein2014middlebury} & 23 & 1.71 & 23.9 & 14.5 & 10.9\\
+KITTI 2012 \cite{geiger2012kitti} & 194 & 0.823 & 16.53 & 6.96 & 4.34 & 4.33\\
+KITTI 2015 \cite{menze2015kitti} & 200 & 0.823 & 17.99 & 6.42 & 3.93 & 3.93\\
+ETH3D \cite{schops2017eth3d} & 27 & 0.930 & 15.18 & 6.47 & 3.96 & 3.96\\
+Middlebury 2014 \cite{scharstein2014middlebury} & 23 & 1.714 & 23.91 & 14.47 & 11.19 & 10.86\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-On Middlebury 2014 we further compare against two public checkpoints re-evaluated under the identical protocol (Table \ref{tab:mb14}). StereoLite is the smallest model in the comparison at 2.96 M parameters and the fastest of the three on device-class hardware after optimization. A gap remains to LiteAnyStereo \cite{jing2025liteanystereo} at 6.9 percent and 16-iteration IGEV-Stereo \cite{xu2023igev} at 5.0 percent D1-all; both are substantially larger, and LiteAnyStereo additionally benefits from a three-stage knowledge distillation pipeline that our supervised-only recipe does not use. Figure \ref{fig:pareto} places the three models on the accuracy-versus-parameters front.
-
-\begin{table}[!htbp]
+\begin{figure}[!t]
 \centering
-\caption{\textbf{Zero-shot Middlebury 2014 comparison} (23 perfect-set scenes; identical protocol for all models; our re-evaluation of public checkpoints; T4 fp32 eager latency).}
+\includegraphics[width=\columnwidth]{fig_zero_shot_quartet}
+\caption{\textbf{In-domain and zero-shot accuracy of one checkpoint.} End-point error, bad-2, and D1-all on the FlyingThings3D test set (grey) and on the four real training splits (blue) under the protocol of Table~\ref{tab:zeroshot}. KITTI and ETH3D sit close to the in-domain level; Middlebury 2014 is the weak axis.}
+\label{fig:quartet}
+\end{figure}
+
+Fig.~\ref{fig:perscene} resolves the Middlebury number per scene, and Table~\ref{tab:perscene} lists every scene. Sixteen of the 23 scenes fall below 10 percent D1-all; ordinary furnished rooms such as Adirondack, Recycle, and Storage score 2.4, 2.9, and 4.2 percent, inside the band of the KITTI and ETH3D results. The mean is set by four scenes: Jadeplant at 34.9 percent, Flowers at 30.3, Mask at 24.7, and Pipes at 17.9. All four combine dense thin repeated structure with disparities near the 192~px cap of the protocol, which is the regime where quarter-resolution reasoning with a bounded search performs worst. Fig.~\ref{fig:mb14qual} contrasts the easiest and hardest scenes. The deficit is therefore localized to an identifiable scene type rather than diffuse, a distinction that matters for how to close it.
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=\columnwidth]{fig_4_4_mb14_perscene}
+\caption{\textbf{Per-scene zero-shot D1-all on Middlebury 2014, sorted by error.} Sixteen of the 23 scenes fall below 10 percent; four scenes with dense thin repeated structure and near-cap disparities raise the mean to 10.9 percent.}
+\label{fig:perscene}
+\end{figure}
+
+\begin{table}[!t]
+\centering
+\caption{\textbf{Per-scene zero-shot results on Middlebury 2014} under the protocol of Table~\ref{tab:zeroshot}.}
+\label{tab:perscene}
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lcccc|lcccc}
+\toprule
+Scene & EPE & bad-1 & bad-2 & D1 & Scene & EPE & bad-1 & bad-2 & D1\\
+\midrule
+Adirondack & 0.59 & 11.4 & 4.0 & 2.38 & Piano & 0.92 & 20.2 & 10.8 & 7.25\\
+Backpack & 0.92 & 13.1 & 8.5 & 6.35 & Pipes & 2.26 & 30.0 & 21.7 & 17.90\\
+Bicycle1 & 1.64 & 24.4 & 16.3 & 12.55 & Playroom & 1.51 & 31.3 & 17.8 & 12.62\\
+Cable & 0.92 & 16.0 & 8.4 & 5.83 & Playtable & 0.85 & 21.3 & 8.0 & 4.36\\
+Classroom1 & 1.08 & 21.5 & 12.2 & 7.56 & Recycle & 0.59 & 12.1 & 4.3 & 2.90\\
+Couch & 1.86 & 25.4 & 14.5 & 8.79 & Shelves & 0.94 & 25.2 & 11.0 & 6.34\\
+Flowers & 3.10 & 39.5 & 33.1 & 30.30 & Shopvac & 1.93 & 22.9 & 12.2 & 7.71\\
+Jadeplant & 9.25 & 57.2 & 44.1 & 34.85 & Sticks & 0.95 & 18.8 & 8.3 & 5.77\\
+Mask & 3.14 & 37.4 & 28.4 & 24.68 & Storage & 0.83 & 10.8 & 5.6 & 4.17\\
+Motorcycle & 1.04 & 14.4 & 8.2 & 6.33 & Sword1 & 0.94 & 16.5 & 9.0 & 6.46\\
+Sword2 & 1.42 & 17.9 & 12.1 & 9.55 & Umbrella & 1.15 & 28.8 & 12.6 & 9.08\\
+Vintage & 1.61 & 33.7 & 21.7 & 15.96 & \textbf{Mean} & \textbf{1.71} & \textbf{23.9} & \textbf{14.5} & \textbf{10.86}\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=0.9\columnwidth]{fig_4_5_mb14_qualitative}
+\caption{\textbf{Easiest and hardest Middlebury 2014 scenes.} Left image, ground truth, and zero-shot prediction. Furnished rooms are recovered cleanly; the thin repeated leaves of Jadeplant and Flowers, at disparities near the protocol cap, account for most of the aggregate error.}
+\label{fig:mb14qual}
+\end{figure}
+
+\subsection{Comparison Under an Identical Protocol}
+\label{sec:mb14}
+Published generalization numbers are rarely protocol identical, so on Middlebury 2014 we re-evaluated two public checkpoints under exactly the protocol of Section~\ref{sec:setup}: LiteAnyStereo \cite{jing2025liteanystereo}, an efficient non-iterative network trained with a three-stage distillation pipeline on million-scale data, and IGEV-Stereo \cite{xu2023igev} at 16 iterations, trained on SceneFlow. Table~\ref{tab:mb14} reports the result and Fig.~\ref{fig:pareto} places the three networks on the accuracy-versus-parameters front. StereoLite is the smallest network in the comparison at 2.96~M parameters, 2.6 times smaller than LiteAnyStereo and 4.3 times smaller than IGEV-Stereo. A gap remains: LiteAnyStereo reaches 6.9 percent D1-all and IGEV-Stereo 5.0 percent against our 10.9. The gap to LiteAnyStereo is almost entirely attributable to its training recipe rather than to its architecture, since the same network trained on SceneFlow alone reports 13.1 percent bad-2 on Middlebury under its authors' protocol \cite{jing2025liteanystereo}, close to our 14.5 percent under ours. The gap to IGEV-Stereo is the price of a full-range three-dimensional volume and a 16-step recurrence that costs 3.5 times our latency on the same T4 GPU.
+
+\begin{table}[!t]
+\centering
+\caption{\textbf{Zero-shot Middlebury 2014 comparison under one identical protocol} (23 perfect-set scenes; our re-evaluation of the public checkpoints; T4 fp32 eager latency at $384\times640$).}
 \label{tab:mb14}
-\footnotesize
-\setlength{\tabcolsep}{3.4pt}
-\begin{tabular}{lcccc}
+\scriptsize
+\setlength{\tabcolsep}{2.4pt}
+\begin{tabular}{lcccccccc}
 \toprule
-Model & Params (M) & T4 (ms) & EPE (px) & D1-all (\%)\\
+Model & Params & T4 & EPE & bad-0.5 & bad-1 & bad-2 & bad-3 & D1-all\\
+ & (M) & (ms) & (px) & (\%) & (\%) & (\%) & (\%) & (\%)\\
 \midrule
-StereoLite (ours) & \textbf{2.96} & 86 & 1.71 & 10.9\\
-LiteAnyStereo \cite{jing2025liteanystereo} & 7.60 & 64 & 1.17 & 6.9\\
-IGEV-Stereo (16 it.) \cite{xu2023igev} & 12.60 & 305 & \textbf{0.86} & \textbf{5.0}\\
+StereoLite (ours) & \textbf{2.96} & 86 & 1.71 & 39.6 & 23.9 & 14.5 & 11.2 & 10.9\\
+LiteAnyStereo \cite{jing2025liteanystereo} & 7.60 & \textbf{64} & 1.17 & 35.1 & 19.7 & 10.5 & 7.4 & 6.9\\
+IGEV-Stereo, 16 it.\ \cite{xu2023igev} & 12.60 & 305 & \textbf{0.86} & \textbf{22.2} & \textbf{12.4} & \textbf{7.2} & \textbf{5.2} & \textbf{5.0}\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\begin{figure}[!htbp]
+\begin{figure}[!t]
 \centering
-\includegraphics[width=0.9\columnwidth]{fig_4_8_pareto_ours}
-\caption{\textbf{Zero-shot Middlebury 2014 D1-all against trainable parameters.} StereoLite occupies the low-parameter end of the front below the larger distillation-trained and iterative references.}
+\includegraphics[width=0.84\columnwidth]{fig_4_8_pareto_ours}
+\caption{\textbf{Zero-shot Middlebury 2014 D1-all against trainable parameters} for the three networks of Table~\ref{tab:mb14}. StereoLite occupies the low-parameter end of the front, below the distillation-trained and the iterative references.}
 \label{fig:pareto}
 \end{figure}
 
-\subsection{Comparison with Published Methods on SceneFlow}
-Table \ref{tab:sceneflow} places our in-domain accuracy alongside published methods. The comparison is not protocol identical: each published EPE follows its own paper's SceneFlow protocol and its own hardware, while our value comes from the full test set at native resolution on a laptop GPU. Within that caveat, StereoLite falls between the efficient and iterative families: more accurate than PSMNet \cite{chang2018psmnet}, close to LightStereo-S \cite{guo2025lightstereo}, and a fraction of the parameters of the iterative and foundation-scale systems.
+\subsection{Context: Published SceneFlow-Only Generalization}
+\label{sec:context}
+Table~\ref{tab:context} places the quartet against the SceneFlow-only generalization numbers that efficient and iterative networks report under the standard protocol, which evaluates KITTI at 3~px, Middlebury 2014 at 2~px on the quarter-resolution images, and ETH3D at 1~px on the native images \cite{lipson2021raftstereo,xu2023igev,liu2026ggev}. Our protocol resizes every image to 640~px width, so the closest-equivalent entries are the bad-3 rates on KITTI, the bad-2 rate on Middlebury, where 640~px is close to the quarter-resolution width, and the bad-1 rate on ETH3D, where 640~px is about two thirds of the native width and the threshold is therefore applied to a coarser disparity axis. The comparison is indicative, not protocol identical, and the published rows are reproduced as printed in their sources.
 
-\begin{table}[!htbp]
+\begin{table}[!t]
+\centering
+\caption{\textbf{SceneFlow-only zero-shot generalization as published} (standard thresholds: KITTI 3~px, Middlebury 2014 quarter resolution 2~px, ETH3D 1~px; percent of valid pixels). Rows marked $^{\dagger}$ are reproduced from the compilation in GGEV \cite{liu2026ggev}; the LightStereo-S Middlebury entry is at half resolution. The StereoLite row is the closest-equivalent metric under our $384\times640$ protocol (bad-3, bad-2, bad-1) and is not protocol identical.}
+\label{tab:context}
+\footnotesize
+\setlength{\tabcolsep}{2.2pt}
+\begin{tabular}{lcccc}
+\toprule
+Method & KITTI 12 & KITTI 15 & Middlebury & ETH3D\\
+\midrule
+\multicolumn{5}{l}{\textit{Iterative}}\\
+RAFT-Stereo$^{\dagger}$ \cite{lipson2021raftstereo} & 4.5 & 5.7 & 9.3 & 3.2\\
+IGEV-Stereo \cite{xu2023igev} & n/a & n/a & 6.2 & 3.6\\
+RT-IGEV$^{\dagger}$ \cite{xu2025igevpp} & 5.8 & 6.6 & 7.8 & 5.8\\
+GGEV \cite{liu2026ggev} & 4.1 & 5.5 & 6.5 & 2.8\\
+\midrule
+\multicolumn{5}{l}{\textit{Efficient}}\\
+DeepPruner-Fast$^{\dagger}$ \cite{duggal2019deeppruner} & 16.8 & 15.9 & 18.3 & 11.0\\
+CoEx$^{\dagger}$ \cite{bangunharcana2021coex} & 13.5 & 10.6 & 14.5 & 9.0\\
+BGNet+$^{\dagger}$ \cite{xu2021bgnet} & 5.3 & 6.6 & 11.2 & 10.3\\
+HITNet \cite{tankovich2021hitnet} & 6.4 & 6.5 & n/a & n/a\\
+LightStereo-S \cite{guo2025lightstereo} & 11.6 & 9.0 & 19.6 & n/a\\
+LiteAnyStereo, SF only \cite{jing2025liteanystereo} & 5.5 & 6.5 & 13.1 & 15.4\\
+\midrule
+StereoLite (ours, own protocol) & 4.3 & 3.9 & 14.5 & 15.2\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Within that caveat, the quartet sorts into three observations. On KITTI the network sits at the accurate end of the efficient group and in the band of the iterative networks, below the 3~px errors that RAFT-Stereo, RT-IGEV, and BGNet+ report. On Middlebury it sits inside the efficient group, between CoEx and BGNet+, and well above the iterative networks, which is where the quarter-resolution search and the absence of real training data show. On ETH3D the network is in the same band as LiteAnyStereo trained on SceneFlow alone, and the same network moves to 3.5 percent once its three-stage distillation on real data is applied \cite{jing2025liteanystereo}; since ETH3D is the dataset whose images we shrink most, part of the ETH3D figure is protocol and part is a genuine fine-accuracy deficit that we do not claim to have closed. Taken together with Table~\ref{tab:mb14}, the evidence points to the training data, not the iteration count, as the dominant lever: a network with eight coarse recurrent updates already reaches the KITTI error band of networks that run 16 to 32 full-resolution updates, while the scene types that remain hard are the ones that real-domain distillation is reported to fix.
+
+\subsection{Accuracy and Efficiency of Published Methods on SceneFlow}
+Table~\ref{tab:sceneflow} places the in-domain accuracy alongside published SceneFlow results. The comparison is not protocol identical: each published error follows its paper's own SceneFlow protocol and hardware, while our value comes from the full test set at native resolution on a laptop GPU. Within that caveat, StereoLite falls between the efficient and the iterative families: more accurate than PSMNet \cite{chang2018psmnet}, close to LightStereo-S \cite{guo2025lightstereo}, and between one quarter and one hundredth of the parameters of the iterative and foundation-scale systems.
+
+\begin{table}[!t]
 \centering
 \caption{\textbf{SceneFlow accuracy and efficiency of published methods.} Each row follows its own paper's protocol and hardware; the comparison is indicative, not protocol identical.}
 \label{tab:sceneflow}
@@ -245,8 +421,8 @@ Table \ref{tab:sceneflow} places our in-domain accuracy alongside published meth
 Method & Params (M) & EPE (px) & Latency (ms) & Hardware\\
 \midrule
 PSMNet \cite{chang2018psmnet} & 5.2 & 1.09 & 410 & Titan Xp\\
-HITNet (L) \cite{tankovich2021hitnet} & 0.97 & 0.43 & 54 & Titan V\\
-CoEx \cite{bangunharcana2021coex} & 2.72 & 0.69 & 27 & RTX 2080Ti\\
+HITNet L \cite{tankovich2021hitnet} & 0.97 & 0.43 & 54 & Titan V\\
+CoEx \cite{bangunharcana2021coex} & 2.72 & 0.69 & 27 & RTX 2080 Ti\\
 RAFT-Stereo \cite{lipson2021raftstereo} & 11.23 & 0.61 & 380 & RTX 6000\\
 IGEV-Stereo \cite{xu2023igev} & 12.60 & 0.47 & 180 & RTX 3090\\
 LightStereo-S \cite{guo2025lightstereo} & 3.44 & 0.73 & 17 & RTX 3090\\
@@ -258,11 +434,12 @@ StereoLite (ours) & 2.96 & 0.78 & 49.8 (fp16) & RTX 3050 laptop\\
 \end{table}
 
 \subsection{Robustness to Imperfect Rectification}
-Deployed rigs rarely hold perfect rectification, so we measured accuracy under controlled vertical misalignment: on a 400-pair FlyingThings3D subset, the right image is shifted vertically by a fixed offset with ground truth unchanged. Table \ref{tab:rect} and Figure \ref{fig:rect} report the result; the zero-offset baseline of 1.03 px is measured on this 400-pair subset, not the full test set, and the quantity of interest is the rise under misalignment. Accuracy degrades gracefully across the practical range: at 0.5 px offset, EPE rises only from 1.03 to 1.22 px and D1-all from 4.29 to 4.60 percent, and at 1.0 px the error stays at 1.53 px with 6.19 percent D1-all. A calibrated rig typically holds residual vertical error below one pixel, so accuracy survives this range; the tolerance comes from the local correlation lookup, which checks a neighborhood around each match instead of assuming an exact epipolar line. Beyond this range degradation is steep, reaching 15.83 percent D1-all at 2 px and 41.17 percent at 4 px, since the network lacks explicit vertical search. This is measured tolerance to small misalignment, not immunity to arbitrary de-rectification.
+\label{sec:rect}
+Deployed rigs rarely hold perfect rectification, so we measured accuracy under controlled vertical misalignment. On a fixed 400-pair FlyingThings3D subset at the native axis, the right image is shifted vertically by a fixed offset while the ground truth stays unchanged. Table~\ref{tab:rect} and Fig.~\ref{fig:rect} report the result. The zero-offset baseline of 1.03~px is measured on this 400-pair subset, not the full test set, and the quantity of interest is the rise under misalignment. Accuracy degrades gracefully across the practical range: at a half-pixel offset, end-point error rises only from 1.03 to 1.22~px and D1-all from 4.29 to 4.60 percent, and at one pixel the error stays at 1.53~px with 6.19 percent D1-all. A calibrated rig typically holds residual vertical error below one pixel, so accuracy survives this range. The tolerance comes from the local correlation lookup, which checks a neighborhood around each match instead of assuming an exact epipolar line. Beyond this range degradation is steep, reaching 15.83 percent D1-all at 2~px and 41.17 percent at 4~px, since the network carries no explicit vertical search. This is measured tolerance to small misalignment, not immunity to arbitrary de-rectification.
 
-\begin{table}[!htbp]
+\begin{table}[!t]
 \centering
-\caption{\textbf{Accuracy under simulated vertical rectification offset} (400-pair FlyingThings3D subset).}
+\caption{\textbf{Accuracy under simulated vertical rectification offset} (400-pair FlyingThings3D subset, native axis, ground truth unchanged).}
 \label{tab:rect}
 \footnotesize
 \begin{tabular}{ccccc}
@@ -278,22 +455,54 @@ Offset (px) & EPE (px) & bad-1 (\%) & bad-2 (\%) & D1-all (\%)\\
 \end{tabular}
 \end{table}
 
-\begin{figure}[!htbp]
+\begin{figure}[!t]
 \centering
-\includegraphics[width=0.85\columnwidth]{fig_4_9_rectification}
-\caption{\textbf{End-point error and D1-all against vertical rectification offset.} Degradation is graceful up to one pixel and steep beyond.}
+\includegraphics[width=0.8\columnwidth]{fig_4_9_rectification}
+\caption{\textbf{End-point error and D1-all against vertical rectification offset.} Degradation is graceful up to one pixel and steep beyond two.}
 \label{fig:rect}
 \end{figure}
 
-\subsection{Real-Rig Agreement}
-To confirm this tolerance on physical data, we ran the checkpoint on 997 rectified pairs from a low-cost 52 mm baseline stereo rig (AR0144 sensors, focal length approximately 1005 px at the native 1280 px width) whose factory rectification leaves residual vertical misalignment, and compared it against FoundationStereo \cite{wen2025foundationstereo} pseudo-ground-truth on the same pairs. Mean EPE is 1.45 px and D1-all is 11.1 percent. Since both models see the same imperfect input, this figure measures agreement with a strong reference rather than absolute error; it corroborates, but does not replace, the controlled sweep.
+\textbf{Real-rig agreement.} To confirm this tolerance on physical data, we ran the checkpoint on 997 rectified pairs from a low-cost Waveshare AR0144 stereo module \cite{waveshare_ar0144} with a 52~mm baseline and a calibrated focal length of approximately 1005~px at its native 1280~px width, whose factory rectification leaves a residual vertical misalignment between a fraction of a pixel and about one pixel. No frame from this rig was used for training or fine-tuning. Since the rig provides no ground truth, we compared the prediction against a FoundationStereo \cite{wen2025foundationstereo} reference computed once on the same pairs. Mean end-point error is 1.45~px and D1-all is 11.1 percent. Because both networks see the same imperfect input, this figure measures agreement with a strong reference rather than absolute error; it corroborates, but does not replace, the controlled sweep. Fig.~\ref{fig:camera} shows four indoor pairs from the rig with their disparity maps and three scenes back-projected through the calibrated geometry into metric point clouds. The reconstructions are metrically plausible: fire extinguishers stand proud of the wall and door, a corridor recovers a smooth depth gradient to its far end, and a cabinet sits at its correct standoff. Flying points along depth boundaries are the three-dimensional footprint of the same occlusion-edge error visible in Fig.~\ref{fig:qual}.
+
+\begin{figure*}[!t]
+\centering
+\subfloat[Left image and predicted disparity for four indoor pairs from the rig.]{\includegraphics[width=0.98\textwidth]{fig_4_6_camera}\label{fig:camera_a}}\\
+\subfloat[Left image and metric point cloud from three viewpoints for three scenes.]{\includegraphics[width=0.72\textwidth]{fig_4_10_reconstruction}\label{fig:camera_b}}
+\caption{\textbf{Zero-shot transfer to a physical 52~mm baseline rig.} The SceneFlow-trained checkpoint is applied without adaptation to pairs whose factory rectification is imperfect; disparity back-projects through the calibrated focal length and baseline into metric colored point clouds, filtered by a statistical outlier rule and voxel downsampling.}
+\label{fig:camera}
+\end{figure*}
 
 \subsection{Deployment and Latency}
-Reaching the embedded latency target required optimizing the inference graph, not just training the network. Six changes, each proven equivalent bitwise or through a matched A/B comparison, cut full-precision latency on the RTX 3050 from 106.7 to 61.4 ms, a 1.74$\times$ speedup: zero-copy padded views in the cost-volume loops, batched correlation lookups with cached sampling grids, hoisting the static recurrent-input channels to run once per scale, fusing the gate convolutions and output heads, removing dead inference-path code, and narrowing the geometry volume to its $\pm 16$ band. Three further operator swaps cleared the blocks to eight-bit deployment (the unfold in convex upsampling, group normalization, and 3D convolution on some toolchains), after which the graph was exported and calibrated to an INT8 TensorRT engine. Table \ref{tab:latency} reports the measured result: 36.3 ms per frame, or 27.5 FPS, on the Jetson Orin Nano within roughly 0.15 GB, near the 30 FPS real-time target on the intended device rather than a desktop proxy.
+\label{sec:deploy}
+Reaching the embedded latency target required optimizing the inference graph, not only training the network. Table~\ref{tab:opt} lists the six changes. Each was proven equivalent before adoption, either bitwise or, for the one change that alters the computation, through a matched comparison reported in Section~\ref{sec:ablation}: the cost-volume loops were rewritten over zero-copy padded views instead of allocating a shifted feature map per disparity bin; the 48 per-iteration grid-sample calls were batched into eight with cached sampling grids; the static channels of the recurrent input, which were re-convolved at every iteration, were hoisted to run once per scale following the precomputed-context trick of RAFT-Stereo \cite{lipson2021raftstereo}; the gate convolutions and the four output heads, which share inputs, were fused; dead inference-path code was removed; and the geometry volume was narrowed to its $\pm16$ band. Together the changes cut full-precision latency on the RTX 3050 from 106.7 to 61.4~ms, a $1.74\times$ speedup, with the output unchanged.
 
-\begin{table}[!htbp]
+\begin{table}[!t]
 \centering
-\caption{\textbf{Measured latency and memory at batch 1, $384\times 640$} (10 warm-up, 100 timed passes; Jetson memory is estimated).}
+\caption{\textbf{Inference-graph optimizations and their equivalence status}, measured at $384\times640$ on the RTX 3050 in fp32.}
+\label{tab:opt}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{p{4.1cm}p{2.4cm}l}
+\toprule
+Optimization & Saving & Equivalence\\
+\midrule
+Zero-copy padded views in cost-volume loops & 5 to 15\% latency & bitwise\\
+Batched correlation lookups, cached grids & 3 to 8\% latency & identical math\\
+Static GRU input channels hoisted per scale & 8 to 10\% of MACs & exact\\
+Fused gate convolutions and output heads & 1 to 3\% latency & bitwise\\
+Dead inference-path code removed & memory, launches & exact\\
+Narrow GEV band ($\pm16$ around tile $d$) & 25 to 30\% of MACs & matched A/B\\
+\midrule
+Combined & 106.7 to 61.4~ms ($1.74\times$) & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Three operators then blocked eight-bit export on the target toolchain: the unfold used by convex upsampling, group normalization, and three-dimensional convolution on some neural processing units. Each was replaced by a quantization-friendly equivalent, after which the graph was exported and calibrated to an INT8 TensorRT engine for the Jetson Orin Nano. Table~\ref{tab:latency} reports the measured result: 36.3~ms per frame, or 27.5~FPS, at batch one and $384\times640$, within roughly 0.15~GB of memory. This is near the 30~FPS real-time target on the intended device rather than on a desktop proxy, and the working set is an order of magnitude below the 200~MB envelope.
+
+\begin{table}[!t]
+\centering
+\caption{\textbf{Measured latency and memory at batch 1, $384\times640$} (10 warm-up, 100 timed passes; Jetson memory is estimated from the engine's reported working set).}
 \label{tab:latency}
 \footnotesize
 \setlength{\tabcolsep}{3.4pt}
@@ -301,41 +510,145 @@ Reaching the embedded latency target required optimizing the inference graph, no
 \toprule
 Configuration & Latency (ms) & FPS & Memory (GB)\\
 \midrule
-RTX 3050 laptop, fp32 & 61.4 & 16.3 & 0.35\\
-RTX 3050 laptop, fp16 & 49.8 & 20.1 & 0.26\\
-Orin Nano, INT8 TensorRT & 36.3 & 27.5 & ${\sim}0.15$\\
+RTX 3050 laptop, fp32, eager & 61.4 & 16.3 & 0.35\\
+RTX 3050 laptop, fp16, eager & 49.8 & 20.1 & 0.26\\
+Jetson Orin Nano, INT8 TensorRT & 36.3 & 27.5 & ${\sim}0.15$\\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \subsection{Ablation Studies}
-Table \ref{tab:ablations} summarizes the four controlled studies behind the production configuration; each varied a single factor on a matched harness. The training recipe, not any architectural block, was the largest single accuracy lever: the augmentation triplet lowered the best validation EPE from 2.778 to 1.921 px in a matched comparison, a 31 percent reduction. The inference-efficiency pass held accuracy while cutting harness latency from 46.6 to 30.2 ms, with EPE unchanged within noise (2.908 to 2.906 px); the narrow geometry band, the only accuracy-relevant change in the pass, was validated separately as neutral. In the boundary-sharpness study, plane rendering cut the bad-0.5 rate from 55.36 to 42.91 percent and was also the fastest variant; composing it with a bimodal head or top-k initialization worsened results (44.40 and 46.58 percent), so we adopted plane rendering alone. The input-protocol study showed that training on native-resolution crops cut the native-axis EPE from 6.672 to 2.869 px versus the legacy global-resize protocol (2.967 for native full frames), at no cost on the resized axis (1.783 px for both), and the native-crop protocol was adopted for the production run. Earlier campaigns on a smaller tile chassis selected the remaining components: the YOLO26s encoder over GhostConv and YOLO26n, iterated coarse-to-fine refinement over single-pass propagation (which collapsed EPE from 0.578 to 0.844 px), and the threshold-stack-plus-D1 objective over eight alternatives.
+\label{sec:ablation}
+Every architectural and training decision was admitted only after it won a controlled comparison in which competing variants shared the training pairs, the random seed, deterministic convolution kernels, and the step budget, so that a measured difference is attributable to the change alone. Two harness sizes were used: a matched 20-pair SceneFlow harness for the early design-space studies on a smaller tile chassis, and a 100-pair harness at 9,000 steps for the studies on the final network. Each harness reports the full metric set of \eqref{eq:metrics} together with latency at $384\times640$ on the RTX 3050.
 
-\begin{table}[!htbp]
+\textbf{Encoder and refinement scheme.} Table~\ref{tab:abl_chassis} reports the two decisions that fixed the chassis. Among three encoders, the truncated YOLO26s won every accuracy metric, 0.528~px end-point error against 0.625 for a GhostConv stack and 0.712 for the smaller YOLO26n, at a two millisecond latency cost. Among refinement schemes, extending refinement to half resolution gained almost nothing (0.573 against 0.578~px) at 37 percent more latency, while HITNet-style single-pass-per-scale propagation collapsed the error to 0.844~px. Iterated refinement at the coarse scales is therefore the load-bearing choice.
+
+\begin{table}[!t]
 \centering
-\caption{\textbf{Controlled ablation summary.} Each study varies one factor on a matched harness; metrics differ per study and are stated per row.}
-\label{tab:ablations}
+\caption{\textbf{Encoder and refinement-scheme ablations on the tile chassis} (matched 20-pair harness; latency at $384\times640$ on the RTX 3050).}
+\label{tab:abl_chassis}
 \footnotesize
-\setlength{\tabcolsep}{4pt}
-\begin{tabular}{llcc}
+\setlength{\tabcolsep}{2.6pt}
+\begin{tabular}{lccccc}
 \toprule
-Study & Metric & Baseline & Adopted\\
+Variant & Params (M) & EPE & bad-1 (\%) & D1-all (\%) & ms\\
 \midrule
-Augmentation triplet & val EPE (px) & 2.778 & \textbf{1.921}\\
-Efficiency pass & latency (ms) / EPE & 46.6 / 2.908 & \textbf{30.2} / 2.906\\
-Plane rendering & bad-0.5 (\%) & 55.36 & \textbf{42.91}\\
-Native-crop input & native-axis EPE (px) & 6.672 & \textbf{2.869}\\
+\multicolumn{6}{l}{\textit{Encoder}}\\
+GhostConv stack & 0.538 & 0.625 & 13.31 & 3.54 & 23.5\\
+YOLO26n, truncated & 0.808 & 0.712 & 18.07 & 2.90 & 24.1\\
+\textbf{YOLO26s, truncated} & 2.061 & \textbf{0.528} & \textbf{10.88} & \textbf{2.50} & 25.8\\
+\midrule
+\multicolumn{6}{l}{\textit{Refinement scheme}}\\
+\textbf{Iterated coarse-to-fine} & 0.538 & \textbf{0.578} & \textbf{10.72} & 3.44 & \textbf{23.8}\\
+Plus refinement at 1/2 & 0.576 & 0.573 & 11.12 & \textbf{3.25} & 32.5\\
+Single pass per scale & 0.487 & 0.844 & 19.30 & 4.79 & 25.2\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Objective.} Table~\ref{tab:abl_loss} compares nine objectives on the same harness. The threshold stack combined with the D1 hinge won end-point error, bad-2, and D1-all together and is the ancestor of \eqref{eq:loss}; plain L1 with a gradient term won the sub-pixel bad-0.5 rate alone. The clearest negative result is the sequence-weighted multi-scale L1, which was the worst of the nine at 1.005~px: weighting the scales as if they were recurrent iterations does not reproduce a sequence loss.
+
+\begin{table}[!t]
+\centering
+\caption{\textbf{Objective ablation across nine formulations} (matched 20-pair harness).}
+\label{tab:abl_loss}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lcccc}
+\toprule
+Objective & EPE & bad-0.5 (\%) & bad-2 (\%) & D1-all (\%)\\
+\midrule
+Plain L1 & 0.663 & 27.6 & 6.09 & 3.99\\
+Seq.-weighted multi-scale L1 & 1.005 & 53.5 & 13.25 & 4.04\\
+L1 + gradient & 0.618 & \textbf{23.9} & 5.93 & 3.92\\
+L1 + bad-1 hinge & 0.763 & 45.8 & 6.21 & 3.65\\
+L1 + grad.\ + bad-1 hinge & 0.692 & 40.0 & 6.12 & 3.68\\
+L1 + grad.\ + bad-0.5 hinge & 0.676 & 38.3 & 6.21 & 3.50\\
+Threshold stack & 0.672 & 38.0 & 5.97 & 3.45\\
+\textbf{Threshold stack + D1 hinge} & \textbf{0.591} & 31.5 & \textbf{5.64} & \textbf{3.35}\\
+Charbonnier & 0.631 & 31.0 & 5.78 & 3.58\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Recurrent family.} Table~\ref{tab:abl_family} records the campaign that produced the final network from a base design with a recurrent context stream. A learned update gate together with the YOLO26s encoder brought the error from 0.424 to 0.319~px. Three additions were rejected on evidence: a selective recurrent unit (0.474~px), a fresh quarter-resolution initialization (0.455~px), and a high-resolution refinement stage that added latency for no gain. The decisive addition was the quarter-resolution geometry volume with fail-soft fusion, which reached 0.261~px, the campaign best, at 0.041~M added parameters. Step and batch budgets differ slightly across these runs, so the table is an engineering record rather than a single controlled comparison; the subsequent studies on the final network are controlled.
+
+\begin{table}[!t]
+\centering
+\caption{\textbf{Architecture record of the recurrent family} that produced the final network (20-pair harness; budgets differ slightly across rows).}
+\label{tab:abl_family}
+\footnotesize
+\setlength{\tabcolsep}{2.4pt}
+\begin{tabular}{lccccc}
+\toprule
+Variant & Params (M) & EPE & Median & bad-1 (\%) & ms\\
+\midrule
+Recurrent context (base) & 2.831 & 0.424 & 0.167 & 7.62 & 10.7\\
++ geometry-guided state & 2.919 & 0.459 & 0.218 & 8.16 & 36.7\\
++ update gate & 2.921 & 0.473 & 0.246 & 7.75 & 12.2\\
+Gate, YOLO26n encoder & 1.410 & 0.387 & 0.182 & 5.98 & 10.9\\
+Gate, YOLO26s encoder & 2.921 & 0.319 & 0.127 & 5.24 & 11.9\\
++ sharp tail & 2.950 & 0.322 & 0.136 & \textbf{5.21} & 14.6\\
++ high-resolution refine & 3.106 & 0.351 & 0.186 & 5.18 & 16.1\\
++ selective recurrent unit & 3.398 & 0.474 & 0.255 & 8.20 & 14.8\\
++ raw 1/4 initialization & 2.948 & 0.455 & 0.195 & 10.64 & 20.7\\
+\textbf{+ GEV and fail-soft fusion} & 2.962 & \textbf{0.261} & \textbf{0.059} & 5.25 & 24.6\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Training recipe, boundaries, and efficiency.} Fig.~\ref{fig:abl} and Table~\ref{tab:abl_recipe} summarize the controlled studies on the final network. The training recipe, not any block, was the largest single accuracy lever: in a matched comparison the augmentation triplet lowered the best validation error from 2.778 to 1.921~px, a 31 percent reduction well above the harness noise floor. The inference-efficiency pass held accuracy while cutting harness latency from 46.6 to 30.2~ms, with end-point error unchanged within noise (2.908 to 2.906~px); the exact-equivalence changes are bitwise or mathematically identical, so their accuracy deltas are noise by construction, and the narrow geometry band, the one accuracy-relevant change, was validated separately as neutral. In the boundary-sharpness study on a 500-pair split, plane rendering cut the bad-0.5 rate from 55.36 to 42.91 percent and was also the fastest variant; composing it with a bimodal auxiliary head or a top-$k$ initialization worsened the rate to 44.40 and 46.58 percent, so the fixes anti-synergize and only plane rendering was adopted. The input-protocol study on 50 validation frames showed that training on native-resolution crops cut the native-axis error from 6.672 to 2.869~px relative to the legacy global-resize protocol, at no cost on the resized axis (1.783~px for both), and the native-crop protocol was adopted for the production run.
+
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=0.95\textwidth]{fig_4_7_ablations}
+\caption{\textbf{Controlled studies on the final network.} (a) Augmentation triplet, best validation end-point error. (b) Inference-efficiency pass, end-point error and latency for the base graph, the exact-equivalence changes, and the narrow geometry band. (c) Boundary-sharpness fixes and their compositions, bad-0.5 rate; plane rendering (orange) was adopted alone. (d) Input protocol, native-axis end-point error for global resize, native crop (adopted), and native full frame.}
+\label{fig:abl}
+\end{figure*}
+
+\begin{table}[!t]
+\centering
+\caption{\textbf{Efficiency, boundary-sharpness, and input-protocol studies on the final network.} Efficiency: 100-pair harness, 9,000 steps. Boundary fixes: 500-pair windowed split. Input protocol: 50 validation frames, native $960\times540$ axis and resized $640\times384$ axis.}
+\label{tab:abl_recipe}
+\footnotesize
+\setlength{\tabcolsep}{2.6pt}
+\begin{tabular}{lcccc}
+\toprule
+Variant & EPE & bad-1 (\%) & D1-all (\%) & ms\\
+\midrule
+\multicolumn{5}{l}{\textit{Efficiency pass}}\\
+Base graph & 2.908 & 30.32 & 16.31 & 46.6\\
++ exact-equivalence changes & 3.021 & 32.09 & 17.79 & 35.8\\
+\textbf{+ narrow GEV band} & 2.906 & 32.29 & 16.88 & \textbf{30.2}\\
+\midrule
+ & EPE & bad-0.5 (\%) & D1-all (\%) & ms\\
+\midrule
+\multicolumn{5}{l}{\textit{Boundary sharpness}}\\
+Control (narrow band) & 2.006 & 55.36 & 12.57 & 22.2\\
++ top-$k$ initialization & 1.982 & 49.95 & 12.14 & 21.9\\
++ bimodal auxiliary head & 1.779 & 43.26 & 11.53 & 25.2\\
+\textbf{+ plane rendering (adopted)} & 1.826 & \textbf{42.91} & 12.19 & \textbf{15.0}\\
+Plane + bimodal & 1.847 & 44.40 & 11.62 & 25.5\\
+Plane + bimodal + top-$k$ & 1.853 & 46.58 & 11.93 & 17.2\\
+\midrule
+ & \multicolumn{2}{c}{Native axis} & \multicolumn{2}{c}{Resized axis}\\
+ & EPE & D1-all (\%) & EPE & D1-all (\%)\\
+\midrule
+\multicolumn{5}{l}{\textit{Input protocol}}\\
+Global resize (legacy) & 6.672 & 35.81 & 1.783 & 11.44\\
+\textbf{Native crop (adopted)} & \textbf{2.869} & \textbf{16.47} & 1.783 & \textbf{10.71}\\
+Native full frame & 2.967 & 16.74 & 2.557 & 16.36\\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \section{Limitations}
 \label{sec:limits}
-Several limits bound these conclusions. First, all zero-shot numbers are computed on public training splits under our own protocol; the model has not been submitted to any official leaderboard, and the 192 px disparity cap of our protocol removes the largest disparities of Middlebury 2014. Second, a clear gap remains to the distillation-trained and iterative references on Middlebury, concentrated in scenes with dense thin repeated structures and near-cap disparities, exactly where quarter-resolution reasoning with a bounded search performs worst; the convex upsampler can recombine coarse disparities but cannot invent hypotheses absent at 1/4 resolution. Third, rectification tolerance holds only across the sub-pixel to one-pixel range that a calibrated rig produces; beyond two pixels of vertical offset, accuracy collapses. Fourth, the real-rig figure measures agreement with a FoundationStereo reference, not absolute error against ground truth. Finally, the results come from a single training run, so run-to-run variance is unknown, and the model performs no explicit occlusion reasoning or left-right consistency checking.
+Several limits bound these conclusions. First, all cross-domain numbers are computed on public training splits under our own resized protocol; the network has not been submitted to any leaderboard, the 192~px cap removes the largest disparities of Middlebury 2014, and the standard-protocol rows of Table~\ref{tab:context} are only approximately comparable. Second, a gap remains to the distillation-trained and iterative references. On Middlebury it is concentrated in scenes with dense thin repeated structure and near-cap disparities, exactly where quarter-resolution reasoning with a bounded search performs worst, and the convex upsampler cannot recover a hypothesis absent at quarter resolution. On ETH3D the bad-1 rate of 15.2 percent is in the band of efficient networks trained on SceneFlow alone and far from the iterative networks; the root cause is the absence of any real training data, since the same deficit is reported to close under real-domain distillation \cite{jing2025liteanystereo}. Third, rectification tolerance holds only across the sub-pixel to one-pixel range a calibrated rig produces; beyond two pixels of vertical offset accuracy collapses. Fourth, the real-rig figure measures agreement with a FoundationStereo reference rather than error against ground truth. Finally, the results come from a single training run, so run-to-run variance is unknown, and the network performs no explicit occlusion reasoning or left-right consistency check.
 
 \section{Conclusion}
 \label{sec:conclusion}
-We presented StereoLite, a 2.96 M parameter stereo network that composes a slanted tile-plane state, recurrent GRU refinement with local correlation, a narrow-band geometry encoding volume with learned fail-soft fusion, and plane rendering with convex upsampling, all inside an INT8-clean operator set. Trained on SceneFlow alone, a single checkpoint reaches 4.33, 3.93, 3.96, and 10.9 percent D1-all zero-shot on KITTI 2012, KITTI 2015, ETH3D, and Middlebury 2014 under one fixed protocol, runs at 36.3 ms per frame on a Jetson Orin Nano after graph optimization and TensorRT calibration, and tolerates up to one pixel of vertical rectification error. The remaining gap to larger distillation-trained models is localized to an identifiable scene type rather than diffuse, which makes knowledge distillation from foundation-scale teachers the natural next step for closing it at this parameter budget.
+We presented StereoLite, a 2.96~M parameter stereo network that composes a slanted tile-plane state, recurrent refinement with local correlation, plane-aware propagation, a narrow-band geometry encoding volume with learned fail-soft fusion, and plane rendering with convex upsampling inside an eight-bit-clean operator set. Trained on SceneFlow alone, one checkpoint reaches 4.33, 3.93, 3.96, and 10.9 percent D1-all zero-shot on KITTI 2012, KITTI 2015, ETH3D, and Middlebury 2014 under one fixed protocol, runs at 36.3~ms per frame on a Jetson Orin Nano after graph optimization and TensorRT calibration, and tolerates up to one pixel of vertical rectification error on synthetic data and on a physical consumer rig. Eight coarse recurrent updates on a tile state were sufficient to reach the KITTI error band of networks that run many more iterations at a higher resolution, and the remaining deficit is localized to thin repeated structures at large disparity and to fine accuracy on ETH3D rather than spread across domains. That localization, together with the published effect of real-domain distillation on an efficient network of comparable size, makes distillation from a foundation-scale teacher the natural next step for closing the gap at this parameter budget, and we believe the network will be useful as an off-the-shelf depth component for embedded platforms in the meantime.
 
 \bibliographystyle{IEEEtran}
 \bibliography{refs}
