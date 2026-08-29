@@ -82,7 +82,7 @@ Fig.~\ref{fig:arch} shows the pipeline. StereoLite is a coarse-to-fine tile-hypo
 
 \begin{figure*}[!t]
 \centering
-\includegraphics[width=\textwidth]{fig_3_1_architecture_preview}
+\includegraphics[width=\textwidth]{fig_ex_architecture}
 \caption{\textbf{StereoLite architecture.} (1) A shared truncated YOLO26s encoder processes both views and a separate 32-channel context encoder reads the left image alone. (2) A group-wise cost volume at one sixteenth resolution, regularized by a small three-dimensional CNN, seeds the tile state $T=(d,s_x,s_y,h,c)$ by soft-argmax. (3) Convolutional GRU updates refine the state over two, three, and three iterations at one sixteenth, one eighth, and one quarter resolution, with plane-aware propagation between scales. (4) A narrow-band geometry encoding volume at quarter resolution proposes an independent disparity that a learned fail-soft gate blends into the tile estimate. (5) Plane rendering and two learned convex upsampling stages produce the full-resolution disparity. Red dots mark the supervised outputs of the multi-scale objective.}
 \label{fig:arch}
 \end{figure*}
@@ -144,7 +144,7 @@ where $z$ and $r$ are the update and reset gates, $q$ the candidate state, and $
 
 \begin{figure}[!t]
 \centering
-\includegraphics[width=0.96\columnwidth]{fig_3_4_refinement_preview}
+\includegraphics[width=0.96\columnwidth]{fig_ex_refinement}
 \caption{\textbf{One recurrent refinement iteration.} The right features are warped by the current disparity, a five-offset local correlation is evaluated around it, and the concatenated input of \eqref{eq:gruinput} drives the convolutional GRU of \eqref{eq:gru}; a gated head emits residuals for the disparity, the two plane slopes, and the confidence.}
 \label{fig:refine}
 \end{figure}
@@ -180,7 +180,7 @@ where $F$ is the fusion network, $c$ and $c_{\mathrm{gev}}$ are the tile and geo
 
 \begin{figure}[!t]
 \centering
-\includegraphics[width=\columnwidth]{fig_3_6_gev_fusion_preview}
+\includegraphics[width=\columnwidth]{fig_ex_gev_fusion}
 \caption{\textbf{Narrow-band geometry volume and fail-soft fusion.} Thirty-three hypotheses in a $\pm16$ band around the tile disparity are regularized and read out by \eqref{eq:gev}; the gate of \eqref{eq:failsoft} blends the proposal into the tile estimate with a weight that starts near zero.}
 \label{fig:gev}
 \end{figure}
