@@ -33,7 +33,7 @@ def fig_1_1_geometry():
     Px, Py = 360, 65
     for x, name in ((oLx, "O<sub>L</sub>"), (oRx, "O<sub>R</sub>")):
         d.box(x - 40, ybox, 80, 48, "", fill="#e9ecef", stroke=EDGE)
-        d.text(x - 20, ybox + 52, 40, 20, name, fs=12)
+        d.text(x - 25, ybox + 52, 50, 24, name, fs=22)
     # image planes
     for x in (oLx, oRx):
         d.line(x - 70, 250, x + 70, 250, width=2.6)
@@ -43,29 +43,29 @@ def fig_1_1_geometry():
     # scene point
     d.node(Px - 7, Py - 7, 14, 14, "",
            f"ellipse;html=1;fillColor={VERM};strokeColor=#8a3000;")
-    d.text(Px + 8, Py - 12, 30, 20, "P", fs=13, bold=True, color=VERM)
+    d.text(Px + 8, Py - 12, 36, 24, "P", fs=20, bold=True, color=VERM)
     # projections (ray/plane intersections)
     t = (250 - ybox) / (Py - ybox)
     for x, lbl, dx in ((oLx, "x<sub>L</sub>", 10), (oRx, "x<sub>R</sub>", 10)):
         xi = x + t * (Px - x)
         d.node(xi - 5, 245, 10, 10, "",
                f"ellipse;html=1;fillColor={BLUE};strokeColor=#1a4a7a;")
-        d.text(xi + dx, 222, 34, 18, lbl, fs=11, color=BLUE)
+        d.text(xi + dx, 219, 48, 24, lbl, fs=21, color=BLUE)
     # f, B, Z annotations
     d.line(105, 250, 105, ybox, color=GREY, arrow="classic", width=1.0)
     d.line(105, ybox, 105, 250, color=GREY, arrow="classic", width=1.0)
-    d.text(66, 272, 30, 20, "f", fs=12, color=GREY)
+    d.text(62, 268, 38, 24, "f", fs=22, color=GREY)
     d.line(oLx, 402, oRx, 402, color=GREY, arrow="classic", width=1.0)
     d.line(oRx, 402, oLx, 402, color=GREY, arrow="classic", width=1.0)
-    d.text(345, 408, 110, 20, "baseline B", fs=11, color=GREY)
+    d.text(305, 405, 190, 28, "baseline B", fs=21, color=GREY)
     d.line(Px, Py + 10, Px, ybox, color=VERM, dashed=True,
            arrow="classic", width=1.0)
-    d.text(Px - 40, 190, 30, 20, "Z", fs=13, color=VERM)
+    d.text(Px - 48, 186, 40, 26, "Z", fs=24, color=VERM)
     # relation panel
-    d.text(720, 120, 190, 26, "d = x<sub>L</sub> − x<sub>R</sub>", fs=14)
-    d.text(720, 165, 190, 34, "Z = f·B / d", fs=16, bold=True)
+    d.text(690, 112, 240, 34, "d = x<sub>L</sub> − x<sub>R</sub>", fs=25)
+    d.text(690, 158, 240, 42, "Z = f·B / d", fs=28, bold=True)
     d.text(715, 215, 200, 40,
-           "near object → large d<br>far object → small d", fs=9,
+           "near object → large d<br>far object → small d", fs=21,
            color=GREY)
     URLS["fig_1_1_stereo_geometry"] = d.save(
         OUT / "fig_1_1_stereo_geometry.drawio")
@@ -214,42 +214,42 @@ def fig_2_5_taxonomy():
 def fig_3_2_encoders():
     d = D("encoders", 1150, 470)
     inp = d.box(30, 90, 150, 64, "<b>Left · Right</b><br>(B, 3, H, W)",
-                fill=GREY_F, fs=11)
+                fill=GREY_F, fs=21)
     bars = d.bars(260, 130, [150, 122, 96, 74], GREY_F, GREY_S, w=16, gap=10)
-    d.text(210, 220, 220, 36,
+    d.text(190, 214, 260, 58,
            "<b>Shared encoder</b><br>YOLO26s layers 0-6 (pretrained)",
-           fs=10.5)
+           fs=20)
     d.edge(inp, bars[0], exit_=(1, 0.5), entry=(0, 0.5))
     outs = [("f4 · H/4 · 128 ch", 82), ("f8 · H/8 · 256 ch", 128),
             ("f16 · H/16 · 256 ch", 174)]
     for lbl, y in outs:
-        b = d.box(510, y - 16, 170, 34, lbl, fill=BLUE_F, stroke=BLUE_S,
-                  fs=10)
+        b = d.box(500, y - 19, 190, 40, lbl, fill=BLUE_F, stroke=BLUE_S,
+                  fs=20)
         d.edge(bars[3], b, points=[(455, y)], exit_=(1, 0.5),
                entry=(0, 0.5), width=1.2)
-    d.text(700, 112, 260, 60,
+    d.text(715, 102, 360, 82,
            "to cost volume + warp (1/16)<br>to refinement (1/8, 1/4)<br>"
-           "to GEV + upsample masks (1/4)", fs=9, align="left")
+           "to GEV + upsample masks (1/4)", fs=18, align="left")
 
-    inp2 = d.box(30, 330, 150, 56, "<b>Left only</b><br>(B, 3, H, W)",
-                 fill=GREY_F, fs=11)
+    inp2 = d.box(30, 330, 150, 62, "<b>Left only</b><br>(B, 3, H, W)",
+                 fill=GREY_F, fs=21)
     cb = d.bars(260, 358, [96, 74, 56], LAV_F, LAV_S, w=14, gap=9)
-    d.text(210, 412, 220, 34,
+    d.text(185, 408, 270, 54,
            "<b>Context encoder</b><br>GhostConv + SE, GroupNorm/SiLU",
-           fs=10.5)
+           fs=19)
     d.edge(inp2, cb[0], exit_=(1, 0.5), entry=(0, 0.5))
-    c4 = d.box(430, 340, 150, 36, "ctx4 · H/4 · 32 ch", fill=LAV_F,
-               stroke=LAV_S, fs=10)
+    c4 = d.box(420, 336, 180, 44, "ctx4 · H/4 · 32 ch", fill=LAV_F,
+               stroke=LAV_S, fs=20)
     d.edge(cb[2], c4, exit_=(1, 0.5), entry=(0, 0.5))
-    c8 = d.box(640, 300, 170, 34, "ctx8 (avg-pool of ctx4)", fill=LAV_F,
-               stroke=LAV_S, fs=9.5)
-    c16 = d.box(640, 382, 170, 34, "ctx16 (avg-pool of ctx4)", fill=LAV_F,
-                stroke=LAV_S, fs=9.5)
+    c8 = d.box(640, 292, 220, 46, "ctx8 (avg-pool of ctx4)", fill=LAV_F,
+               stroke=LAV_S, fs=18)
+    c16 = d.box(640, 382, 220, 46, "ctx16 (avg-pool of ctx4)", fill=LAV_F,
+                stroke=LAV_S, fs=18)
     d.edge(c4, c8, exit_=(1, 0.5), entry=(0, 0.5), width=1.1)
     d.edge(c4, c16, exit_=(1, 0.5), entry=(0, 0.5), width=1.1)
-    d.text(830, 330, 290, 54,
-           "feeds every ConvGRU update;<br>ctx16 also initializes the"
-           " hidden state h", fs=9.5, align="left")
+    d.text(875, 310, 260, 96,
+           "feeds every ConvGRU<br>update; ctx16 initializes<br>"
+           "the hidden state h", fs=18, align="left")
     URLS["fig_3_2_encoders"] = d.save(OUT / "fig_3_2_encoders.drawio")
 
 

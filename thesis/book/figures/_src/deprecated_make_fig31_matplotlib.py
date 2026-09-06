@@ -30,7 +30,7 @@ import numpy as np
 from matplotlib.patches import Circle, Rectangle
 from PIL import Image
 
-ROOT = Path("/home/abrar/Research/stero_research_claude")
+ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(ROOT / ".claude/skills/diagram-drawer/helpers"))
 from diag_helpers import (  # noqa: E402
     C_CV, C_CV_EDGE, C_ENC, C_ENC_EDGE, C_GREY, C_GREY_EDGE, C_REF,

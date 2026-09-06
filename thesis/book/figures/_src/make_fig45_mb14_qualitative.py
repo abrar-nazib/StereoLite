@@ -13,12 +13,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
 
-ROOT = Path("/home/abrar/Research/stero_research_claude")
+ROOT = Path(__file__).resolve().parents[4]
 VIZ = ROOT / "model/benchmarks/viz_20260704_fullsf_gev4onp_nc"
 RUN = ROOT / "model/benchmarks/20260704_fullsf_gev4onp_nc"
 OUT = ROOT / "thesis/book/figures"
 
-plt.rcParams.update({"font.family": "DejaVu Serif"})
+plt.rcParams.update({"font.family": "serif", "font.serif": ["Times New Roman", "Times", "TeX Gyre Termes", "DejaVu Serif"]})
 
 
 def main():

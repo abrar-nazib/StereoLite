@@ -131,7 +131,7 @@ graph optimizations act on the full-precision model before export,
 while the three operator swaps prepare the graph for eight-bit
 calibration.
 
-\begin{figure}[!htbp]
+\begin{figure}[H]
 \centering
 \includegraphics[width=\textwidth]{fig_4_5_export_preview}
 \caption{Export pipeline from trained checkpoint to INT8 TensorRT engine.}
@@ -224,7 +224,7 @@ $\{0.5, 1, 2, 3\}$ pixels, $\mathcal{L}_{\mathrm{D1}}$ the D1-relative
 hinge, $\mathcal{L}_{\mathrm{smooth}}$ an edge-aware smoothness term, and
 $\mathcal{L}_{\mathrm{slant}}$ the gated slant supervision.
 
-\begin{figure}[!htbp]
+\begin{figure}[H]
 \centering
 \includegraphics[width=\textwidth]{fig_3_8_supervision_preview}
 \caption{Six disparity scales supervised with L1, gradient consistency, and threshold terms.}
@@ -301,6 +301,13 @@ epipolar correspondence: shifting the crops relative to each other would
 silently offset every disparity by the shift, so the window is always
 identical in the two images.
 
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{fig_3_10_input_protocol}
+\caption{Native-crop sampling (left) vs downscale-then-crop (right) training protocols.}
+\label{fig:input_protocol}
+\end{figure}
+
 \paragraph{Augmentation.}
 Three augmentations, drawn from the OpenStereo recipe, are applied to the
 training crop only; Figure~\ref{fig:augmentation} shows each acting on a
@@ -330,18 +337,11 @@ which is why the disparity target is multiplied by the same horizontal
 factor. Evaluation applies none of these, so every reported number
 measures the network on unperturbed data.
 
-\begin{figure}[!htbp]
+\begin{figure}[H]
 \centering
 \includegraphics[width=\textwidth]{fig_4_3_augmentation}
 \caption[Training augmentations applied to a native co-located crop.]{Training augmentations applied to a native $384\times 640$ co-located crop of a real rectified pair (Middlebury 2014 Motorcycle \cite{scharstein2014middlebury}): asymmetric color jitter, right-only random erasing (boxes outlined), and random scale with horizontal stretch. The eraser and the two views' color jitter act independently on the right image; scaling rescales the disparity target by the horizontal factor.}
 \label{fig:augmentation}
-\end{figure}
-
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=\textwidth]{fig_3_10_input_protocol}
-\caption{Native-crop sampling (left) vs downscale-then-crop (right) training protocols.}
-\label{fig:input_protocol}
 \end{figure}
 
 \FloatBarrier

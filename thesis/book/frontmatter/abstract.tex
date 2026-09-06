@@ -2,8 +2,8 @@
 % Written 2026-07-05 per research-linguistics-expert (7-move structure).
 % Expanded 2026-07-29 per external examiner feedback: the abstract read
 % as a compressed results table; it now states the problem, why stereo,
-% what StereoLite actually does in plain terms, and then the results,
-% in separate paragraphs so each move is easy to follow independently.
+% what StereoLite actually does in plain terms, and then the results in
+% one continuous paragraph.
 % Number sources: run meta.json final_metrics_all (EPE 0.7807, D1 3.40,
 % 4,370 pairs), mb14_zero_shot.json (D1 10.86), THESIS_PLAN A2 (49.8 ms
 % fp16 RTX 3050), measured Orin Nano INT8 figure (36.3 ms / 27.5 FPS),
@@ -20,9 +20,7 @@ that gap is the central problem this thesis addresses, together with a
 practical second constraint: the compact stereo rigs these platforms
 carry are rarely perfectly rectified, so a network built for them must
 also tolerate small camera misalignments rather than assume the ideal
-geometry lab benchmarks provide.
-
-This thesis presents StereoLite, a 2.96 million parameter stereo
+geometry lab benchmarks provide. This thesis presents StereoLite, a 2.96 million parameter stereo
 matching network designed to meet both constraints. Rather than
 searching a full four-dimensional cost volume the way heavier, more
 accurate networks do, StereoLite estimates disparity for each small
@@ -36,9 +34,7 @@ refine every tile across three resolutions; a narrow-band geometry
 encoding volume adds a long-range correction through a learned gate
 that acts only where it helps; and plane-equation rendering with
 learned convex upsampling recovers a sharp, full-resolution disparity
-map from the coarse tile grid.
-
-Trained only on synthetic SceneFlow data, the network reaches 0.78 px
+map from the coarse tile grid. Trained only on synthetic SceneFlow data, the network reaches 0.78 px
 end-point error and 3.40 percent D1-all on the full FlyingThings3D test
 set of 4,370 pairs. Without ever training on real images, it scores
 10.9 percent D1-all zero-shot on the unseen Middlebury 2014 benchmark,

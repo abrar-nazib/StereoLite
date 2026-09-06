@@ -21,7 +21,7 @@ import numpy as np
 import torch
 from PIL import Image
 
-ROOT = Path("/home/abrar/Research/stero_research_claude")
+ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(ROOT / "model/scripts"))
 sys.path.insert(0, str(ROOT / "model/designs"))
 import os

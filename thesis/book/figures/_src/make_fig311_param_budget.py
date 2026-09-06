@@ -9,8 +9,8 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-OUT = Path("/home/abrar/Research/stero_research_claude/thesis/book/figures")
-plt.rcParams.update({"font.family": "DejaVu Serif"})
+OUT = Path(__file__).resolve().parents[4] / "thesis/book/figures"
+plt.rcParams.update({"font.family": "serif", "font.serif": ["Times New Roman", "Times", "TeX Gyre Termes", "DejaVu Serif"]})
 
 # from best.pth state dict (see commit message / this script's provenance)
 SPLIT = [

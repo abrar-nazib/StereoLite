@@ -188,44 +188,44 @@ def fig_5_2_rig():
     # chapter prose already states the epipolar and Z = f B / d relations.
     d = D("rig", 860, 500)
     # band 1: capture and split
-    d.text(30, 12, 320, 24, "Capture and split", fs=14, bold=True,
+    d.text(30, 12, 320, 24, "Capture and split", fs=19, bold=True,
            align="left")
     rig = d.box(30, 80, 150, 96, "Binocular rig<br>(single sensor<br>stream)",
-                fill=GREY_F, stroke=GREY_S, fs=14)
+                fill=GREY_F, stroke=GREY_S, fs=19)
     sbs = d.box(225, 84, 270, 88, "", fill="#ffffff", stroke=EDGE, rounded=0)
     d.edge(rig, sbs)
     d.line(360, 84, 360, 172, width=1.3, dashed=True)
-    d.text(228, 90, 128, 22, "left half", fs=13)
-    d.text(364, 90, 128, 22, "right half", fs=13)
-    d.text(225, 178, 270, 22, "2560 x 720 side-by-side frame", fs=13)
+    d.text(228, 90, 128, 22, "left half", fs=18)
+    d.text(364, 90, 128, 22, "right half", fs=18)
+    d.text(225, 178, 270, 22, "2560 x 720 side-by-side frame", fs=18)
     L = d.box(600, 60, 230, 66, "Left image<br>1280 x 720 (rectified)",
-              fill=BLUE_F, stroke=BLUE_S, fs=14)
+              fill=BLUE_F, stroke=BLUE_S, fs=19)
     R = d.box(600, 148, 230, 66, "Right image<br>1280 x 720 (rectified)",
-              fill=GREEN_F, stroke=GREEN_S, fs=14)
+              fill=GREEN_F, stroke=GREEN_S, fs=19)
     d.edge(sbs, L)
     d.edge(sbs, R)
-    d.text(495, 192, 112, 40, "split and<br>rectify", fs=13)
+    d.text(495, 192, 112, 40, "split and<br>rectify", fs=18)
     # band 2: rig geometry, centred under band 1; the focal-length note is
     # tied to the optical axis by a short leader so it cannot read as a
     # free-floating label
-    d.text(30, 268, 320, 24, "Rig geometry", fs=14, bold=True, align="left")
+    d.text(30, 268, 320, 24, "Rig geometry", fs=19, bold=True, align="left")
     cLx, cRx, cy = 300, 620, 396
     for x, name in ((cLx, "camera L"), (cRx, "camera R")):
         d.box(x - 38, cy, 76, 48, "", fill="#e9ecef", stroke=EDGE)
-        d.text(x - 60, cy + 52, 120, 22, name, fs=13)
+        d.text(x - 60, cy + 52, 120, 22, name, fs=18)
     d.line(cLx, cy + 24, cRx, cy + 24, width=2)
-    d.text(360, cy - 34, 200, 24, "baseline B = 52 mm", fs=14, bold=True)
+    d.text(360, cy - 34, 200, 24, "baseline B = 52 mm", fs=19, bold=True)
     # image planes give the focal length a referent: f is the measured
     # gap between each optical centre and its rectified image plane
     d.line(cLx - 50, 330, cRx + 50, 330, width=1.3, dashed=True)
     d.text(cLx - 50, 300, (cRx - cLx) + 100, 22, "rectified image planes",
-           fs=13)
+           fs=18)
     d.line(cLx, 330, cLx, cy, width=1.2, dashed=True)
     d.line(cRx, 330, cRx, cy, width=1.2, dashed=True)
     d.line(232, 363, 232, 330, width=1.4, arrow="classic")
     d.line(232, 363, 232, cy, width=1.4, arrow="classic")
     d.text(34, 340, 188, 48,
-           "focal length f &#8776; 1005 px<br>at 1280 px width", fs=13)
+           "focal length f &#8776; 1005 px<br>at 1280 px width", fs=18)
     URLS["fig_5_2_rig"] = d.save(OUT / "fig_5_2_rig.drawio")
 
 

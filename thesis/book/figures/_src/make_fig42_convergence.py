@@ -11,14 +11,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
 
-ROOT = Path("/home/abrar/Research/stero_research_claude")
+ROOT = Path(__file__).resolve().parents[4]
 RUN = ROOT / "model/benchmarks/20260704_fullsf_gev4onp_nc/images"
 OUT = ROOT / "thesis/book/figures"
 
 SCENES = ["val_00", "val_12"]
 STEPS = [1000, 5000, 15000, 30000, 53000]
 
-plt.rcParams.update({"font.family": "DejaVu Serif"})
+plt.rcParams.update({"font.family": "serif", "font.serif": ["Times New Roman", "Times", "TeX Gyre Termes", "DejaVu Serif"]})
 
 
 def _load(p: Path) -> np.ndarray:

@@ -1,28 +1,22 @@
-"""Combined thesis Gantt chart (4th year odd + even semesters, 11 tasks).
-
-Corrected version based on the user-supplied schedule
-(/home/abrar/Downloads/Telegram Desktop/test_code.py). Only the output
-paths/format, the x-axis label text, and the title text were changed;
-colors, bar height, layout, and the month locator are unchanged.
-"""
+"""Combined thesis Gantt chart for the seventh and eighth semesters."""
 from datetime import datetime
 from pathlib import Path
 
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 
-OUT = Path("/home/abrar/Research/stero_research_claude/thesis/book/figures")
+OUT = Path(__file__).resolve().parents[4] / "thesis/book/figures"
 
 # -----------------------------
 # Combined Thesis Gantt Chart Data
 # -----------------------------
 tasks = [
-    # 4th Year Odd Semester
+    # Fourth-year odd semester (seventh semester)
     ("Topic Selection", "2025-07-22", "2025-07-31"),
     ("Literature Review", "2025-08-01", "2025-09-15"),
     ("Thesis Proposal", "2025-09-15", "2025-10-15"),
     ("Dataset Collection & Processing", "2025-10-15", "2025-11-28"),
-    # 4th Year Even Semester
+    # Main experimental period: December 2025 to July 2026
     ("Model selection and setup", "2025-12-01", "2026-01-20"),
     ("Pre-training and fine-tuning", "2025-12-15", "2026-03-15"),
     ("Real-data capture", "2026-01-15", "2026-03-25"),
@@ -36,6 +30,7 @@ colors = [
     "#8DA0CB",  # Muted slate blue
     "#66C2A5",  # Mint green
     "#FC8D62",  # Salmon orange
+    "#0B9E77",  # Deep green
     "#0B9E77",  # Deep Green
     "#0B7FAB",  # deep blue
     "#56B1DD",  # light blue
@@ -47,72 +42,56 @@ colors = [
 ]
 
 # -----------------------------
-# Convert dates
-# -----------------------------
-starts = [datetime.strptime(t[1], "%Y-%m-%d") for t in tasks]
-ends = [datetime.strptime(t[2], "%Y-%m-%d") for t in tasks]
-durations = [(end - start).days for start, end in zip(starts, ends)]
-labels = [t[0] for t in tasks]
-
-# -----------------------------
 # Plot Setup
 # -----------------------------
 plt.rcParams["font.family"] = "serif"
-plt.rcParams["font.size"] = 11
+plt.rcParams["font.serif"] = ["Times New Roman", "Times", "TeX Gyre Termes", "DejaVu Serif"]
+plt.rcParams["font.size"] = 10.5
 
-# DESIGN CHOICE: Reduced figsize height (from 7.0 to 5.5) to compact the vertical layout
-fig, ax = plt.subplots(figsize=(12, 5.5))
-
-y_pos = range(len(tasks))
-
-for i, (start, duration) in enumerate(zip(starts, durations)):
-    ax.barh(
-        i,
-        duration,
-        left=start,
-        height=0.75,  # DESIGN CHOICE: Increased bar thickness from 0.55 to 0.75 to close gaps
-        color=colors[i],
-        edgecolor="#333333",
-        linewidth=0.7,
-    )
-
-# -----------------------------
-# Axis formatting
-# -----------------------------
-ax.set_yticks(y_pos)
-ax.set_yticklabels(labels)
-ax.invert_yaxis()
-
-ax.set_xlim(datetime(2025, 7, 1), datetime(2026, 7, 20))
-
-ax.xaxis.set_major_locator(mdates.MonthLocator())
-ax.xaxis.set_major_formatter(mdates.DateFormatter("%b"))
-
-ax.grid(axis="x", color="#e6e6e6", linewidth=1)
-ax.set_axisbelow(True)
-
-ax.set_xlabel("Timeline (2025 to 2026)", fontsize=12, labelpad=12)
-
-# Remove unnecessary borders
-ax.spines["top"].set_visible(False)
-ax.spines["right"].set_visible(False)
-ax.spines["left"].set_visible(False)
-
-ax.tick_params(axis="y", length=0)
-ax.tick_params(axis="x", length=6, width=1)
-
-# -----------------------------
-# Title style
-# -----------------------------
-ax.set_title(
-    "Complete Thesis Timeline (4th Year Odd and Even Semesters)",
-    fontsize=14,
-    fontweight="bold",
-    pad=20,
+# Draw at the thesis text width so the type is not reduced again when
+# LaTeX includes the figure at \textwidth.
+fig, axes = plt.subplots(
+    2, 1, figsize=(6.3, 6.0),
+    gridspec_kw={"height_ratios": [0.82, 1.18], "hspace": 0.52},
 )
 
-# Readjust margins tightly around the newly condensed structure
-plt.subplots_adjust(left=0.28, right=0.96, top=0.88, bottom=0.18)
+
+def draw_panel(ax, panel_tasks, panel_colors, start, end, title):
+    starts = [datetime.strptime(t[1], "%Y-%m-%d") for t in panel_tasks]
+    ends = [datetime.strptime(t[2], "%Y-%m-%d") for t in panel_tasks]
+    durations = [(finish - begin).days for begin, finish in zip(starts, ends)]
+
+    for i, (begin, duration) in enumerate(zip(starts, durations)):
+        ax.barh(i, duration, left=begin, height=0.62,
+                color=panel_colors[i], edgecolor="#333333", linewidth=0.7)
+
+    ax.set_yticks(range(len(panel_tasks)))
+    ax.set_yticklabels([t[0] for t in panel_tasks], fontsize=10.5)
+    ax.invert_yaxis()
+    ax.set_xlim(start, end)
+    ax.xaxis.set_major_locator(mdates.MonthLocator())
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%b"))
+    ax.tick_params(axis="x", labelsize=10)
+    ax.tick_params(axis="y", length=0)
+    ax.grid(axis="x", color="#e6e6e6", linewidth=1)
+    ax.set_axisbelow(True)
+    ax.spines[["top", "right", "left"]].set_visible(False)
+    ax.set_title(title, fontsize=11, fontweight="bold", pad=9)
+
+
+draw_panel(
+    axes[0], tasks[:4], colors[:4],
+    datetime(2025, 7, 1), datetime(2025, 12, 1),
+    "Seventh semester: preparatory work (July–November 2025)",
+)
+draw_panel(
+    axes[1], tasks[4:], colors[4:],
+    datetime(2025, 12, 1), datetime(2026, 8, 1),
+    "Main experimental period (December 2025–July 2026)",
+)
+
+fig.suptitle("Complete Thesis Timeline", fontsize=12, fontweight="bold", y=0.985)
+fig.subplots_adjust(left=0.40, right=0.98, top=0.91, bottom=0.07)
 
 # -----------------------------
 # Export

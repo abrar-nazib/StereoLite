@@ -10,13 +10,13 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.patches import FancyArrowPatch, Rectangle
 
-OUT = Path("/home/abrar/Research/stero_research_claude/thesis/book/figures")
+OUT = Path(__file__).resolve().parents[4] / "thesis/book/figures"
 INK = "#1a1a1a"
 BLUE = "#0072B2"
 VERM = "#D55E00"
 GREY = "#888888"
 
-plt.rcParams.update({"font.family": "DejaVu Serif", "mathtext.fontset": "dejavuserif"})
+plt.rcParams.update({"font.family": "serif", "font.serif": ["Times New Roman", "Times", "TeX Gyre Termes", "DejaVu Serif"], "mathtext.fontset": "dejavuserif"})
 
 
 def main():

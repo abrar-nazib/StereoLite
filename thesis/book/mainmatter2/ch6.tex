@@ -72,14 +72,14 @@ high-rate phase is the schedule working as designed, not instability,
 and the flat validation tail confirms that 60,000 steps was about
 right for this model and dataset.
 
-\begin{figure}[!htbp]
+\begin{figure}[H]
 \centering
 \includegraphics[width=\textwidth]{fig_4_1_training_curves}
 \caption{Training loss and validation accuracy curves over the training run.}
 \label{fig:training_curves}
 \end{figure}
 
-\begin{figure}[!htbp]
+\begin{figure}[H]
 \centering
 \includegraphics[width=\textwidth]{fig_4_2_convergence}
 \caption{Predicted disparity across training checkpoints for two FlyingThings3D scenes.}
@@ -119,7 +119,7 @@ EPE (px) & RMSE & Median & bad-0.5 (\%) & bad-1 (\%) & bad-2 (\%) & bad-3 (\%) &
 \end{tabular}
 \end{table}
 
-\begin{figure}[!htbp]
+\begin{figure}[H]
 \centering
 \includegraphics[width=\textwidth]{fig_4_3_sceneflow_qualitative}
 \caption{Left image, ground truth, prediction, and error map for held-out FlyingThings3D scenes.}
@@ -139,11 +139,14 @@ families: more accurate than the classical 3D-cost-volume baseline
 PSMNet, close to the efficient LightStereo-S, and a fraction of the
 parameters of the iterative and foundation-scale systems.
 
-\begin{table}[!htbp]
+\enlargethispage{3cm}
+\vspace{-0.5cm}
+\begin{table}[H]
 \centering
 \caption{Comparison with published SceneFlow methods (protocol not directly comparable to ours).}
 \label{tab:sceneflow_comparison}
 \small
+\renewcommand{\arraystretch}{0.9}
 \begin{tabular}{lcccc}
 \toprule
 Method & Params (M) & SF EPE (px) & Latency (ms) & Hardware\\
@@ -162,6 +165,7 @@ StereoLite (ours) & 2.96 & 0.78 & 49.8 (fp16) & RTX 3050 laptop\\
 \end{table}
 
 \FloatBarrier
+\newpage
 \subsection{Zero-Shot Cross-Domain: Middlebury 2014}
 Cross-domain accuracy is the real test for an edge model: one accurate
 only on its training domain has little field use. We evaluated the
@@ -176,18 +180,6 @@ knowledge-distillation pipeline that our supervised-only recipe
 skips. Figure \ref{fig:mb14_perscene} shows sixteen of the 23 scenes
 within the reference band, with the aggregate dragged up by a few hard
 scenes; Table \ref{tab:mb14_perscene_full} lists the per-scene split.
-The easiest scenes are ordinary furnished rooms: Adirondack at 2.4
-percent D1-all, Recycle at 2.9, and Storage at 4.2, comparable to the
-reference models. The hardest four alone raise the mean by several
-points: Jadeplant at 34.9 percent, Flowers at 30.3, Mask at 24.7, and
-Pipes at 17.9. These scenes share dense thin repeated structures such
-as leaves and rods, plus true disparities near or beyond the
-192-pixel evaluation cap, exactly where a quarter-resolution,
-bounded-search prediction performs worst. Figure
-\ref{fig:mb14_qualitative} shows both ends of that spectrum. The
-model's cross-domain failure is not diffuse: it is localized to an
-identifiable scene type, which a future distillation direction could
-target directly.
 
 \begin{table}[!htbp]
 \centering
@@ -213,9 +205,22 @@ IGEV-Stereo (16 it.) \cite{xu2023igev} & 12.60 & 305 & 0.86 & 22.2 & 12.4 & 7.2 
 \label{fig:mb14_perscene}
 \end{figure}
 
+The easiest scenes are ordinary furnished rooms: Adirondack at 2.4
+percent D1-all, Recycle at 2.9, and Storage at 4.2, comparable to the
+reference models. The hardest four alone raise the mean by several
+points: Jadeplant at 34.9 percent, Flowers at 30.3, Mask at 24.7, and
+Pipes at 17.9. These scenes share dense thin repeated structures such
+as leaves and rods, plus true disparities near or beyond the
+192-pixel evaluation cap, exactly where a quarter-resolution,
+bounded-search prediction performs worst. Figure
+\ref{fig:mb14_qualitative} shows both ends of that spectrum. The
+model's cross-domain failure is not diffuse: it is localized to an
+identifiable scene type, which a future distillation direction could
+target directly.
+
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.9\textwidth]{fig_4_5_mb14_qualitative}
+\includegraphics[width=0.8\textwidth]{fig_4_5_mb14_qualitative}
 \caption{Left image, ground truth, and prediction for the easiest and hardest Middlebury 2014 scenes.}
 \label{fig:mb14_qualitative}
 \end{figure}
@@ -457,7 +462,8 @@ single pass per scale & 0.487 & 0.844 & 19.30 & 4.79 & 25.2\\
 \end{tabular}
 \end{table}
 
-\begin{table}[!htbp]
+\vspace{-0.5cm}
+\begin{table}[H]
 \centering
 \caption{Loss-formulation ablation across nine objectives on the tile chassis.}
 \label{tab:ablation_loss}
@@ -585,6 +591,13 @@ plane + bimodal + bundle1 & 1.853 & 46.58 & 11.93 & 17.2\\
 \end{tabular}
 \end{table}
 
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{fig_4_7_ablations}
+\caption{Ablation results for augmentation, inference optimization, boundary blur fixes, and input protocol.}
+\label{fig:ablations}
+\end{figure}
+
 \begin{table}[!htbp]
 \centering
 \caption{Input-protocol ablation on the dual-axis evaluation (50 validation frames).}
@@ -602,13 +615,6 @@ native full frame & 2.967 & 38.68 & 16.74 & 2.557 & 36.45 & 16.36\\
 \bottomrule
 \end{tabular}
 \end{table}
-
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=\textwidth]{fig_4_7_ablations}
-\caption{Ablation results for augmentation, inference optimization, boundary blur fixes, and input protocol.}
-\label{fig:ablations}
-\end{figure}
 
 \FloatBarrier
 \section{Performance Evaluation}

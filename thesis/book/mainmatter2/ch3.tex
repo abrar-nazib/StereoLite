@@ -150,7 +150,7 @@ learned convex upsampling recovers the full-resolution disparity.
 % INTERIM: viewer render of figures/fig_3_1_architecture.drawio. Once
 % hand-adjustments in draw.io are done, export a cropped PDF over
 % fig_3_1_architecture.pdf and swap the filename below.
-\includegraphics[width=\textwidth]{fig_3_1_architecture_preview}
+\includegraphics[width=\textheight]{fig_3_1_architecture_preview}
 \caption{StereoLite architecture: five numbered stages with supervised outputs marked by red dots.}
 \label{fig:architecture}
 \end{sidewaysfigure}
@@ -250,12 +250,12 @@ so the design can be audited decision by decision; it is the record of
 preliminary designs, including the rejected ones, that shaped the final
 system.
 
-\begin{table}[!htbp]
+\begin{table}[H]
 \centering
 \caption{Architectural and training decisions with their supporting evidence.}
 \label{tab:design_evidence}
 \small
-\begin{tabular}{p{4.6cm}p{7.6cm}}
+\begin{tabular}{p{5.2cm}p{9.0cm}}
 \toprule
 Decision & Evidence\\
 \midrule
@@ -363,7 +363,7 @@ separation.
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.95\textwidth]{fig_3_2_encoders_preview}
+\includegraphics[width=\textwidth]{fig_3_2_encoders_preview}
 \caption{Shared YOLO26s matching encoder and separate left-image context encoder.}
 \label{fig:encoders}
 \end{figure}

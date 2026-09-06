@@ -101,7 +101,7 @@ examining directly.
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.52\textwidth]{fig_2_rectification}
+\includegraphics[width=0.30\textwidth]{fig_2_rectification}
 \caption{Stereo rectification reprojecting tilted image planes onto a common plane (Fei-Fei Li, CS231A).}
 \label{fig:rectify_geom}
 \end{figure}
@@ -114,6 +114,14 @@ relation \cite{scharstein2002taxonomy}
 Z = \frac{f\,B}{d}
 \label{eq:depth_from_disparity}
 \end{equation}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{fig_1_1_stereo_geometry_preview}
+\caption{Two-view stereo geometry relating disparity to depth.}
+\label{fig:stereo_geometry}
+\end{figure}
+
 where $Z$ is the depth of a scene point, $f$ the camera focal length in
 pixels, $B$ the baseline separating the two cameras, and $d$ the
 disparity, the horizontal shift of the point between the two rectified
@@ -122,13 +130,6 @@ disparity resolution matters most for distant surfaces: a fixed sub-pixel
 error in disparity corresponds to an increasingly large depth interval as
 the scene recedes, and this is why the field reports accuracy in fractions
 of a pixel.
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.66\textwidth]{fig_1_1_stereo_geometry_preview}
-\caption{Two-view stereo geometry relating disparity to depth.}
-\label{fig:stereo_geometry}
-\end{figure}
 
 \paragraph{The matching cost.}
 To decide which candidate along the scanline is the true match, a stereo
@@ -183,16 +184,9 @@ still $C(x, y, d)$.
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.80\textwidth]{fig_2_costvolume}
+\includegraphics[width=0.60\textwidth]{fig_2_costvolume_times}
 \caption{The disparity space image, or cost volume, for stereo matching.}
 \label{fig:costvolume}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.92\textwidth]{fig_2_1_classical_preview}
-\caption[The four-step classical stereo matching pipeline.]{The four-step classical stereo matching pipeline \cite{scharstein2002taxonomy}.}
-\label{fig:classical_pipeline}
 \end{figure}
 
 \paragraph{The four-step pipeline.}
@@ -205,6 +199,13 @@ disparity at each pixel; and disparity refinement, which post-processes the
 result. The rest of the chapter follows this decomposition, because deep
 learning progressively replaced each of the four steps with a learned
 module while keeping the overall structure intact.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.82\textwidth]{fig_2_1_classical_preview}
+\caption[The four-step classical stereo matching pipeline.]{The four-step classical stereo matching pipeline \cite{scharstein2002taxonomy}.}
+\label{fig:classical_pipeline}
+\end{figure}
 
 \paragraph{Local and global methods.}
 Classical algorithms split into two families by where they place their
@@ -462,6 +463,21 @@ and budgets that edge deployment demands, which is why we draw on the
 recurrent family instead.
 
 \FloatBarrier
+
+% The timeline is intentionally a full-page rotated figure so that its labels
+% remain readable at print size.  Placing it at the section transition avoids
+% leaving the lower half of the preceding page empty.
+% Keep the established numbering: the foundation architecture remains Fig. 2.9
+% and this timeline remains Fig. 2.10, even though the timeline is typeset first.
+\setcounter{figure}{9}
+\begin{sidewaysfigure}
+\centering
+\includegraphics[width=\textheight]{fig_2_2_timeline_preview}
+\caption{Evolution of deep stereo matching, 2016 to 2026.}
+\label{fig:timeline}
+\end{sidewaysfigure}
+\setcounter{figure}{8}
+
 \subsection{Foundation-Model Era}
 
 \begin{figure}[H]
@@ -470,6 +486,7 @@ recurrent family instead.
 \caption[FoundationStereo architecture, representing the foundation-model-era paradigm.]{FoundationStereo architecture, representing the foundation-model-era paradigm \cite{wen2025foundationstereo}.}
 \label{fig:foundation_arch}
 \end{figure}
+\setcounter{figure}{10}
 
 The most recent and most accurate systems follow a similar approach: they
 graft a frozen monocular vision foundation model onto an iterative stereo
@@ -502,13 +519,6 @@ hundreds of milliseconds of latency, a cost that motivates the edge
 problem we address rather than solving it. Figure
 \ref{fig:timeline} traces this progression across the six paradigm eras
 and marks where the present work sits.
-
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=\textwidth]{fig_2_2_timeline_preview}
-\caption{Evolution of deep stereo matching, 2016 to 2026.}
-\label{fig:timeline}
-\end{figure}
 
 \FloatBarrier
 \subsection{Requirements of Edge-Deployable Stereo Matching}
@@ -561,9 +571,9 @@ platform can be skipped without loss.
 \label{fig:reqmap}
 \end{figure}
 
-\begin{figure}[!htbp]
+\begin{figure}[!t]
 \centering
-\includegraphics[width=\textwidth]{fig_2_5_taxonomy_preview}
+\includegraphics[width=0.82\textwidth]{fig_2_5_taxonomy_preview}
 \caption{Taxonomy of compression techniques for deep stereo matching.}
 \label{fig:taxonomy}
 \end{figure}
@@ -841,6 +851,22 @@ D1-all rates count outlier pixels and expose exactly the boundary and
 textureless failures that end-point error averages away. For this
 reason, we report both families of metric together.
 
+% Place the two-part Pareto figure before the comparison table so the open
+% space on the page is used by the figures rather than left below the table.
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.94\textwidth]{fig_2_6a_param_pareto}
+\caption{Accuracy against parameters and latency for the surveyed methods: (a) accuracy against trainable parameters.}
+\label{fig:pareto}
+\end{figure}
+
+\begin{figure}[H]
+\ContinuedFloat
+\centering
+\includegraphics[width=0.94\textwidth]{fig_2_6b_latency_pareto}
+\caption[]{Accuracy against parameters and latency for the surveyed methods (continued): (b) KITTI 2015 D1-all against reported latency.}
+\end{figure}
+
 \begin{table}[!htbp]
 \centering
 \caption{Stereo benchmark datasets with train/test splits, resolutions, and ground-truth types.}
@@ -919,22 +945,6 @@ StereoLite (ours) & 2026 & 2.96 & 0.78 & n/a & 49.8\\
 \bottomrule
 \end{tabular}
 \end{table}
-
-\begin{figure}[!htbp]
-\centering
-\begin{subfigure}{\textwidth}
-\centering
-\includegraphics[width=0.94\textwidth]{fig_2_6a_param_pareto}
-\caption{Accuracy against trainable parameters.}
-\end{subfigure}\\[6pt]
-\begin{subfigure}{\textwidth}
-\centering
-\includegraphics[width=0.94\textwidth]{fig_2_6b_latency_pareto}
-\caption{KITTI 2015 D1-all against reported latency.}
-\end{subfigure}
-\caption{Accuracy against parameters and latency for the surveyed methods.}
-\label{fig:pareto}
-\end{figure}
 
 \FloatBarrier
 \section{Summary}
