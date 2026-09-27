@@ -8,8 +8,8 @@ import matplotlib.pyplot as plt, matplotlib as mpl
 
 mpl.rcParams.update({
     "font.family": "DejaVu Serif",
-    "font.size": 9, "axes.labelsize": 11, "axes.titlesize": 12,
-    "xtick.labelsize": 9, "ytick.labelsize": 9,
+    "font.size": 11, "axes.labelsize": 13, "axes.titlesize": 14,
+    "xtick.labelsize": 11, "ytick.labelsize": 11,
     "axes.spines.top": False, "axes.spines.right": False,
     "axes.grid": True, "grid.alpha": 0.3, "grid.linestyle": ":",
     "axes.axisbelow": True, "figure.dpi": 150,
@@ -17,7 +17,7 @@ mpl.rcParams.update({
 
 colors = per_method_colors()
 
-fig = plt.figure(figsize=(11.0, 8.8))
+fig = plt.figure(figsize=(14.0, 9.6))
 gs = fig.add_gridspec(2, 1, height_ratios=[2.1, 1.0], hspace=0.30)
 ax = fig.add_subplot(gs[0, 0])
 lax = fig.add_subplot(gs[1, 0]); lax.axis('off')
@@ -35,7 +35,7 @@ ax.set_ylabel('KITTI 2015 D1-all (\\%, lower is better)')
 ax.set_xlim(0.3, 600)
 ax.set_ylim(1.2, 7.0)
 ax.set_title('Model size vs. accuracy across deep stereo methods (2017--2026)',
-             fontsize=11.5, pad=8)
+             fontsize=13.5, pad=8)
 
 family_order = ["foundation", "iterative", "3dcv", "efficient", "efficient_iter"]
 lax.set_xlim(0, 1); lax.set_ylim(0, 1)
@@ -58,14 +58,14 @@ for ci, fam in enumerate(family_order):
                 edgecolor='black', linewidth=0.6, clip_on=False, zorder=5)
     lax.text(x_left + 0.04, HEADER_Y - 0.02,
              FAMILIES[fam]["label"],
-             fontsize=8.8, fontweight='bold', color=fam_color, va='center')
+             fontsize=10.5, fontweight='bold', color=fam_color, va='center')
     for j, n in enumerate(members):
         y = HEADER_Y - 0.11 - j * LINE_H
         lax.scatter(x_left + 0.018, y - 0.005,
-                    s=(90 if marker == '*' else (70 if marker == 'D' else 60)),
+                    s=(110 if marker == '*' else (90 if marker == 'D' else 80)),
                     c=colors[n], marker=marker,
                     edgecolor='black', linewidth=0.5, clip_on=False, zorder=5)
-        lax.text(x_left + 0.048, y - 0.005, n, fontsize=7.6, va='center')
+        lax.text(x_left + 0.048, y - 0.005, n, fontsize=9.5, va='center')
 
 for ci in range(1, n_cols):
     lax.axvline(ci * COL_WIDTH, color='gray', alpha=0.25, linewidth=0.5)

@@ -1,0 +1,98 @@
+% =====================================================================
+% APPENDIX B: Addressing Complex Engineering Problems
+% (RESTRUCTURE_PLAN_V2, appx-kp owner)
+% Ported from old mainmatter/ch5.tex Section 5.2 (Addressing Complex
+% Engineering Problems), with the K3/K4/K5/K8 knowledge-profile
+% argument moved out to app_a.tex (\ref{app:kp}) and old Section 5.1's
+% framing sentences folded into this appendix's opening paragraph.
+% Table \ref{tab:cep_attributes} and its full P1-P7 content carried
+% over intact; only the chapter cross-references were updated from the
+% old hard-coded numbers to the new 9-chapter labels.
+% =====================================================================
+\chapter{Addressing Complex Engineering Problems}
+\label{app:cep}
+
+The Washington Accord's accreditation framework, adopted by the BAETE
+program-outcome system, distinguishes routine engineering work from
+work that addresses a Complex Engineering Problem (CEP). A problem is
+complex when it cannot be resolved without in-depth engineering
+knowledge. This complexity is captured by a set of P attributes, the
+first of which, depth of knowledge, is mandatory. This appendix maps
+each P attribute to the concrete parts of this thesis that exhibit it.
+
+Designing the network at the center of this thesis is a complex
+engineering problem in the formal sense: it cannot be solved by
+natural science or mathematics alone. It required in-depth engineering
+knowledge of the stereo pipeline, specialist knowledge of the
+deep-stereo literature and its building blocks, the design of a novel
+architecture under hard resource constraints, and grounding in a large
+body of research literature to select and combine the right
+mechanisms. Appendix~\ref{app:kp} maps these four demands onto the
+Washington Accord's K3, K4, K5, and K8 knowledge profiles and shows
+where we exercised each one.
+
+Table~\ref{tab:cep_attributes} maps the P attributes of the Washington
+Accord definition to the parts of this thesis that satisfy them.
+Attribute P1 is mandatory and is carried by the knowledge profile
+detailed in Appendix~\ref{app:kp}; the remaining rows record where the
+thesis exhibits the other characteristics of a complex problem.
+
+\begin{table}[!htbp]
+\centering
+\caption{Complex Engineering Problem attributes mapped to thesis sections.}
+\label{tab:cep_attributes}
+\small
+\begin{tabular}{lp{4.2cm}p{7.2cm}}
+\toprule
+Attribute & Definition & Evidence in this thesis\\
+\midrule
+P1 & Depth of knowledge required & Cannot be solved without in-depth engineering knowledge (Appendix~\ref{app:kp}): K3 stereo fundamentals (Chapters~\ref{ch:lit}, \ref{ch:design}), K4 specialist deep-stereo knowledge (Chapter~\ref{ch:design}), K5 design under hard constraints (Chapters~\ref{ch:design}, \ref{ch:implementation}), K8 research-literature grounding (Chapter~\ref{ch:lit}).\\
+P2 & Range of conflicting requirements & Accuracy, latency, memory, and parameter count pull against one another; the design criteria of Chapter~\ref{ch:design} demand balance across all of them jointly, and the studies of Chapter~\ref{ch:results} resolve the conflicts by measurement.\\
+P3 & Depth of analysis required & No obvious correct architecture exists; we analyzed candidates through controlled ablation (Chapter~\ref{ch:results}) rather than selecting them by inspection, and rejected several plausible additions on evidence.\\
+P4 & Familiarity of issues & The problem involves infrequently encountered issues: cross-domain generalization failure, surfaced through the test protocol of Chapter~\ref{ch:experimental} and documented in Chapter~\ref{ch:results}, and edge-inference optimization, both beyond routine practice (Chapter~\ref{ch:implementation}).\\
+P5 & Extent of applicable codes & The work operates outside prescriptive engineering codes; community benchmark protocols and metric definitions (Chapter~\ref{ch:design}) are the closest standards, and we had to apply and match them carefully rather than follow them mechanically.\\
+P6 & Extent of stakeholder involvement & The design serves stakeholders with differing needs: platform builders needing real-time latency, end users needing privacy and safety, and cost-sensitive deployments, needs examined in this thesis's socio-economic impact analysis.\\
+P7 & Interdependence & The system is composed of interacting sub-parts, encoder, initialization, recurrent refinement, geometry volume, and upsampling, whose interactions the ablations of Chapter~\ref{ch:results} show are not separable.\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The attributes in the table are not asserted abstractly; each points
+to a concrete artifact. The conflicting requirements of P2 are the
+hard design envelope stated in Chapter~\ref{ch:design} and verified by
+the efficiency measurements of Chapter~\ref{ch:results}. The depth of
+analysis of P3 is the ablation record of Chapter~\ref{ch:results}, in
+which we added candidate mechanisms one at a time under a matched
+protocol and rejected several because they degraded accuracy. The
+interdependence of P7 is visible in the same record: the value of one
+block depends on which others are present, which is why we proceeded
+by controlled composition rather than independent selection.
+
+This appendix has shown that the thesis addresses a complex
+engineering problem in the Washington Accord sense. The mandatory
+attribute P1 is satisfied through the knowledge profile of
+Appendix~\ref{app:kp}, and Table~\ref{tab:cep_attributes} grounds the
+remaining P attributes in concrete parts of the thesis: the
+conflicting requirements of the edge envelope, the ablation-driven
+depth of analysis, and the interdependence of the architectural
+blocks. Appendix~\ref{app:cea} turns to the activities we carried out
+to reach this design and shows that they, too, meet the Washington
+Accord's threshold for complexity.
+
+% SOURCES: old mainmatter/ch5.tex Section 5.1 (Introduction, framing
+% sentences folded into this appendix's opening two paragraphs),
+% Section 5.2 (Addressing Complex Engineering Problems, CEP framing
+% prose and Table tab:cep_attributes carried over intact with all
+% seven P rows), and part of Section 5.4 (Summary, the P1/table
+% grounding sentences folded into this appendix's closing paragraph).
+% DROPPED: the K3/K4/K5/K8 detailed per-profile sentences that used to
+% sit inside this section's opening paragraph; that material now lives
+% in app_a.tex and is referenced here via \ref{app:kp} instead of
+% repeated.
+% MOVED-AWAY: none beyond what is logged above; the CEA material (old
+% Section 5.3) is in app_c.tex, also owned by this agent. Old
+% hard-coded "Chapter 2/3/7/8" numbers were replaced with \ref to the
+% new chapter labels; the P6 row's old reference to the socio-economic
+% chapter is phrased descriptively rather than as a numbered
+% cross-reference because that chapter's label was not yet assigned
+% when this appendix was written.

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import base64
 import io
+import re
 import zlib
 from pathlib import Path
 from urllib.parse import quote
@@ -30,7 +31,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
 
-ROOT = Path("/home/abrar/Research/stero_research_claude")
+ROOT = Path(__file__).resolve().parents[4]
 ASSETS = ROOT / "model/benchmarks/thesis_assets"
 RUN = ROOT / "model/benchmarks/20260704_fullsf_gev4onp_nc"
 OUT = ROOT / "thesis/book/figures"
@@ -44,6 +45,8 @@ GREEN_F, GREEN_S = "#d5e8d4", "#82b366"
 LAV_F, LAV_S = "#e1d5e7", "#9673a6"
 SUP = "#c1121f"
 EDGE = "#333333"
+FONT = "Times New Roman"
+FONT_SCALE = 1.25
 
 
 def _jpeg_b64(img: Image.Image, width: int = 320) -> str:
@@ -76,6 +79,8 @@ class D:
 
     def node(self, x, y, w, h, value="", style="") -> str:
         i = self._id()
+        if "fontFamily=" not in style:
+            style = style + f"fontFamily={FONT};"
         self.cells.append(
             f'<mxCell id="{i}" value="{escape(value, {chr(34): "&quot;"})}" '
             f'style="{style}" vertex="1" parent="1">'
@@ -88,7 +93,7 @@ class D:
         i = self._id()
         style = ("edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;"
                  f"jettySize=auto;strokeColor={color};strokeWidth={width};"
-                 "fontSize=10;")
+                 f"fontSize=11;fontFamily={FONT};")
         if dashed:
             style += "dashed=1;"
         if exit_:
@@ -106,6 +111,11 @@ class D:
 
     def xml(self) -> str:
         body = "".join(self.cells)
+        body = re.sub(
+            r"fontSize=(\d+)",
+            lambda match: f"fontSize={round(int(match.group(1)) * FONT_SCALE)}",
+            body,
+        )
         return ('<mxfile host="app.diagrams.net"><diagram id="fig31" '
                 'name="Fig 3.1"><mxGraphModel dx="1200" dy="800" grid="0" '
                 'gridSize="10" guides="1" tooltips="1" connect="1" '
@@ -121,7 +131,7 @@ def _bars(d: D, x, y_base, heights, fill, stroke, w=16, gap=10):
     for i, h in enumerate(heights):
         ids.append(d.node(x + i * (w + gap), y_base - h / 2, w, h, "",
                           f"rounded=1;arcSize=30;html=1;fillColor={fill};"
-                          f"strokeColor={stroke};"))
+                          f"strokeColor={stroke};fontFamily={FONT};"))
     return ids
 
 
@@ -130,7 +140,8 @@ def _text(d: D, x, y, w, h, value, size=11, bold=False, color="#000000",
     fs = f"fontStyle=1;" if bold else ""
     return d.node(x, y, w, h, value,
                   f"text;html=1;align={align};verticalAlign=middle;"
-                  f"fontSize={size};{fs}fontColor={color};")
+                  f"fontSize={size};{fs}fontColor={color};"
+                  f"fontFamily={FONT};")
 
 
 def _stage(d: D, x, y, n):
@@ -255,12 +266,12 @@ def main():
     d.edge(gev, gate, exit_=(1, 0.5), entry=(0, 0.5))
     # gate output into the fusion node
     d.edge(gate, plus, points=[(1135, 418), (922, 418)],
-           value="d ← d + w·(d<sub>gev</sub> − d)",
+           value="gated correction",
            dashed=True, exit_=(0.5, 1), entry=(0.5, 0))
     # narrow-band center tap: current tile d into the GEV (left face,
     # so the arrow does not pierce the cube caption below it)
     d.edge(gru8, gev, points=[(770, 400), (870, 400), (870, 336)],
-           value="d", dashed=True, exit_=(0.5, 0), entry=(0, 0.7))
+           dashed=True, exit_=(0.5, 0), entry=(0, 0.7))
 
     # ------- context stream -------
     ctx = _bars(d, 60, 592, [64, 48, 36], LAV_F, LAV_S, w=14, gap=8)

@@ -81,6 +81,7 @@ thesis/**/*.synctex.gz
 thesis/**/*.nls
 thesis/**/*.ilg
 thesis/book/Thesis.pdf
+thesis/book/Cover_Page.pdf
 thesis/**/*.fdb_latexmk
 thesis/**/*.fls
 .playwright-mcp/

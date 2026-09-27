@@ -16,7 +16,7 @@ import numpy as np
 import torch
 from PIL import Image
 
-ROOT = Path("/home/abrar/Research/stero_research_claude")
+ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(ROOT / "model/scripts"))
 sys.path.insert(0, str(ROOT / "model/designs"))
 import os
@@ -29,7 +29,7 @@ OUT = ROOT / "thesis/book/figures"
 PAIRS = ["00038", "01077", "01282", "00195"]
 H, W = 384, 640
 
-plt.rcParams.update({"font.family": "DejaVu Serif"})
+plt.rcParams.update({"font.family": "serif", "font.serif": ["Times New Roman", "Times", "TeX Gyre Termes", "DejaVu Serif"]})
 
 
 def main():

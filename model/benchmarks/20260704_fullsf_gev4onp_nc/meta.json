@@ -1,0 +1,479 @@
+{
+ "args": {
+  "shards_dir": "/shards/v1",
+  "out_dir": "/results/fulltrain/20260704_fullsf_gev4onp_nc",
+  "arch": "gev4_opt_narrow_plane",
+  "slant_w": 0.3,
+  "trunc_A": 0.0,
+  "init_ce_w": 0.0,
+  "bimodal_w": 0.0,
+  "aug": 1,
+  "input_mode": "native_crop",
+  "yjitter": 0,
+  "steps": 60000,
+  "batch": 32,
+  "lr": "auto",
+  "amp": "bf16",
+  "workers": 10,
+  "eval_every": 1000,
+  "ckpt_every": 1000,
+  "track_train": 50,
+  "track_val": 50,
+  "val_manifest": "/workspace/model/configs/sceneflow_split_v1.json.gz",
+  "val_bs": 0,
+  "seed": 42,
+  "resume": 1,
+  "probe": null,
+  "final_full_eval": 1,
+  "auto_extend": 0,
+  "extend_leg": 5000,
+  "extend_cap": 20000,
+  "extend_lr": 0.0001
+ },
+ "arch": "gev4_opt_narrow_plane",
+ "lr_peak": 0.0008,
+ "params_train_M": 2.9631,
+ "input_mode": "native_crop",
+ "yjitter": 0,
+ "crop_hw": [
+  384,
+  640
+ ],
+ "val_axis": "native_960x540_pad16",
+ "disp_png_encoding": "uint16 = disparity_px * 256",
+ "tracked_train_keys": [
+  [
+   "TRAIN/A/0011",
+   10
+  ],
+  [
+   "TRAIN/A/0002",
+   11
+  ],
+  [
+   "TRAIN/A/0029",
+   7
+  ],
+  [
+   "TRAIN/A/0026",
+   6
+  ],
+  [
+   "TRAIN/A/0023",
+   14
+  ],
+  [
+   "TRAIN/A/0014",
+   8
+  ],
+  [
+   "TRAIN/A/0010",
+   10
+  ],
+  [
+   "TRAIN/A/0008",
+   15
+  ],
+  [
+   "TRAIN/A/0044",
+   8
+  ],
+  [
+   "TRAIN/A/0003",
+   8
+  ],
+  [
+   "TRAIN/A/0003",
+   6
+  ],
+  [
+   "TRAIN/A/0009",
+   11
+  ],
+  [
+   "TRAIN/A/0023",
+   9
+  ],
+  [
+   "TRAIN/A/0024",
+   14
+  ],
+  [
+   "TRAIN/A/0052",
+   13
+  ],
+  [
+   "TRAIN/A/0002",
+   13
+  ],
+  [
+   "TRAIN/A/0021",
+   9
+  ],
+  [
+   "eating_naked_camera2_x2",
+   55
+  ],
+  [
+   "eating_naked_camera2_x2",
+   2
+  ],
+  [
+   "eating_camera2_x2",
+   88
+  ],
+  [
+   "a_rain_of_stones_x2",
+   112
+  ],
+  [
+   "eating_camera2_x2",
+   103
+  ],
+  [
+   "eating_naked_camera2_x2",
+   24
+  ],
+  [
+   "eating_camera2_x2",
+   16
+  ],
+  [
+   "a_rain_of_stones_x2",
+   3
+  ],
+  [
+   "a_rain_of_stones_x2",
+   81
+  ],
+  [
+   "eating_camera2_x2",
+   90
+  ],
+  [
+   "eating_camera2_x2",
+   48
+  ],
+  [
+   "a_rain_of_stones_x2",
+   79
+  ],
+  [
+   "a_rain_of_stones_x2",
+   110
+  ],
+  [
+   "eating_camera2_x2",
+   46
+  ],
+  [
+   "a_rain_of_stones_x2",
+   52
+  ],
+  [
+   "a_rain_of_stones_x2",
+   47
+  ],
+  [
+   "eating_camera2_x2",
+   68
+  ],
+  [
+   "15mm_focallength/scene_backwards/fast",
+   100
+  ],
+  [
+   "15mm_focallength/scene_backwards/slow",
+   68
+  ],
+  [
+   "15mm_focallength/scene_backwards/slow",
+   53
+  ],
+  [
+   "15mm_focallength/scene_backwards/slow",
+   319
+  ],
+  [
+   "15mm_focallength/scene_backwards/fast",
+   271
+  ],
+  [
+   "15mm_focallength/scene_backwards/fast",
+   45
+  ],
+  [
+   "15mm_focallength/scene_backwards/slow",
+   171
+  ],
+  [
+   "15mm_focallength/scene_backwards/slow",
+   250
+  ],
+  [
+   "15mm_focallength/scene_backwards/fast",
+   128
+  ],
+  [
+   "15mm_focallength/scene_backwards/slow",
+   88
+  ],
+  [
+   "15mm_focallength/scene_backwards/fast",
+   81
+  ],
+  [
+   "15mm_focallength/scene_backwards/slow",
+   266
+  ],
+  [
+   "15mm_focallength/scene_backwards/slow",
+   1
+  ],
+  [
+   "15mm_focallength/scene_backwards/slow",
+   344
+  ],
+  [
+   "15mm_focallength/scene_backwards/slow",
+   334
+  ],
+  [
+   "15mm_focallength/scene_backwards/slow",
+   71
+  ]
+ ],
+ "tracked_val_keys": [
+  [
+   "TEST/A/0000",
+   9
+  ],
+  [
+   "TEST/A/0000",
+   10
+  ],
+  [
+   "TEST/A/0001",
+   9
+  ],
+  [
+   "TEST/A/0001",
+   13
+  ],
+  [
+   "TEST/A/0002",
+   12
+  ],
+  [
+   "TEST/A/0002",
+   15
+  ],
+  [
+   "TEST/A/0006",
+   9
+  ],
+  [
+   "TEST/A/0006",
+   14
+  ],
+  [
+   "TEST/A/0007",
+   10
+  ],
+  [
+   "TEST/A/0008",
+   12
+  ],
+  [
+   "TEST/A/0008",
+   15
+  ],
+  [
+   "TEST/A/0010",
+   10
+  ],
+  [
+   "TEST/A/0013",
+   6
+  ],
+  [
+   "TEST/A/0016",
+   15
+  ],
+  [
+   "TEST/A/0018",
+   8
+  ],
+  [
+   "TEST/A/0020",
+   9
+  ],
+  [
+   "TEST/A/0021",
+   9
+  ],
+  [
+   "TEST/A/0021",
+   10
+  ],
+  [
+   "TEST/A/0022",
+   13
+  ],
+  [
+   "TEST/A/0023",
+   12
+  ],
+  [
+   "TEST/A/0025",
+   10
+  ],
+  [
+   "TEST/A/0026",
+   13
+  ],
+  [
+   "TEST/A/0027",
+   6
+  ],
+  [
+   "TEST/A/0027",
+   8
+  ],
+  [
+   "TEST/A/0030",
+   11
+  ],
+  [
+   "TEST/A/0032",
+   9
+  ],
+  [
+   "TEST/A/0032",
+   13
+  ],
+  [
+   "TEST/A/0033",
+   11
+  ],
+  [
+   "TEST/A/0033",
+   12
+  ],
+  [
+   "TEST/A/0035",
+   8
+  ],
+  [
+   "TEST/A/0036",
+   11
+  ],
+  [
+   "TEST/A/0037",
+   7
+  ],
+  [
+   "TEST/A/0037",
+   9
+  ],
+  [
+   "TEST/A/0038",
+   11
+  ],
+  [
+   "TEST/A/0039",
+   11
+  ],
+  [
+   "TEST/A/0042",
+   6
+  ],
+  [
+   "TEST/A/0042",
+   10
+  ],
+  [
+   "TEST/A/0042",
+   12
+  ],
+  [
+   "TEST/A/0045",
+   9
+  ],
+  [
+   "TEST/A/0046",
+   14
+  ],
+  [
+   "TEST/A/0047",
+   11
+  ],
+  [
+   "TEST/A/0047",
+   14
+  ],
+  [
+   "TEST/A/0048",
+   10
+  ],
+  [
+   "TEST/A/0048",
+   15
+  ],
+  [
+   "TEST/A/0049",
+   6
+  ],
+  [
+   "TEST/A/0049",
+   8
+  ],
+  [
+   "TEST/A/0050",
+   12
+  ],
+  [
+   "TEST/A/0050",
+   15
+  ],
+  [
+   "TEST/A/0053",
+   6
+  ],
+  [
+   "TEST/A/0053",
+   10
+  ]
+ ],
+ "split": "sceneflow_split_v1 (train 35454 / test 4370)",
+ "n_train_shards": 70,
+ "started_at": "2026-07-04T15:19:03",
+ "gpu": "NVIDIA A100-SXM4-80GB",
+ "best_val_epe": 0.789589726626873,
+ "last_step": 60000,
+ "phase": "main",
+ "extend_used": 0,
+ "final_metrics_all": {
+  "epe": 0.7806881745365088,
+  "rmse": 3.637812899385523,
+  "median_ae": 0.13006772279084083,
+  "bad_0.5": 15.315413077166061,
+  "bad_1.0": 8.920002910037633,
+  "bad_2.0": 5.341837182191073,
+  "bad_3.0": 4.004683094816028,
+  "d1_all": 3.39944445198909
+ },
+ "final_axis": "native_960x540_pad16",
+ "final_best_step": 53000,
+ "final_n_pairs": 4370,
+ "final_source": "eval_full_testset.py (streaming; in-run eval OOM'd)",
+ "final_degenerate_frames": {
+  "epe": 4,
+  "rmse": 4,
+  "median_ae": 4,
+  "bad_0.5": 4,
+  "bad_1.0": 4,
+  "bad_2.0": 4,
+  "bad_3.0": 4
+ }
+}

@@ -17,8 +17,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 
-ROOT = Path("/home/abrar/Research/stero_research_claude")
+ROOT = Path(__file__).resolve().parents[4]
 RUN = ROOT / "model/benchmarks/20260704_fullsf_gev4onp_nc"
+FALLBACK_CSV = ROOT / "model/checkpoints/yolo_ctx_gev4_full_retry_es/train.csv"
 OUT = ROOT / "thesis/book/figures"
 BEST_STEP = 53000
 
@@ -28,12 +29,20 @@ C_LR = "#999999"
 C_EPE = "#0072B2"
 C_BAD1 = "#D55E00"
 
+plt.rcParams.update({
+    "font.family": "serif",
+    "font.serif": ["Times New Roman", "Times", "TeX Gyre Termes"],
+})
+
 
 def main():
-    df = pd.read_csv(RUN / "train.csv")
+    csv_path = RUN / "train.csv"
+    if not csv_path.exists():
+        csv_path = FALLBACK_CSV
+    df = pd.read_csv(csv_path)
     df = df.drop_duplicates(subset="step", keep="last").sort_values("step")
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(6.3, 2.5))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(6.3, 3.0))
 
     # (a) loss + LR
     ax1.plot(df["step"] / 1000, df["loss"], color=C_LOSS, lw=0.7,
@@ -42,39 +51,39 @@ def main():
     ax1.plot(df["step"] / 1000, smooth, color=C_LOSS, lw=1.4,
              label="training loss")
     ax1.set_yscale("log")
-    ax1.set_xlabel("step (thousands)", fontsize=8)
-    ax1.set_ylabel("training loss", fontsize=8, color=C_LOSS)
-    ax1.tick_params(labelsize=7)
+    ax1.set_xlabel("step (thousands)", fontsize=10)
+    ax1.set_ylabel("training loss", fontsize=10, color=C_LOSS)
+    ax1.tick_params(labelsize=9)
     ax1b = ax1.twinx()
     ax1b.plot(df["step"] / 1000, df["lr"], color=C_LR, lw=1.1, ls="--",
               label="learning rate")
-    ax1b.set_ylabel("learning rate", fontsize=8, color="#666")
-    ax1b.tick_params(labelsize=7)
+    ax1b.set_ylabel("learning rate", fontsize=10, color="#666")
+    ax1b.tick_params(labelsize=9)
     ax1b.ticklabel_format(axis="y", style="sci", scilimits=(0, 0))
-    ax1b.yaxis.get_offset_text().set_fontsize(6)
-    ax1.set_title("(a) loss and OneCycle schedule", fontsize=8.5)
+    ax1b.yaxis.get_offset_text().set_fontsize(8)
+    ax1.set_title("(a) loss and OneCycle schedule", fontsize=10)
 
     # (b) validation metrics
     v = df.dropna(subset=["val_epe"])
     ax2.plot(v["step"] / 1000, v["val_epe"], color=C_EPE, lw=1.3,
              label="val EPE (px)")
-    ax2.set_xlabel("step (thousands)", fontsize=8)
-    ax2.set_ylabel("val EPE (px)", fontsize=8, color=C_EPE)
-    ax2.tick_params(labelsize=7)
+    ax2.set_xlabel("step (thousands)", fontsize=10)
+    ax2.set_ylabel("val EPE (px)", fontsize=10, color=C_EPE)
+    ax2.tick_params(labelsize=9)
     ax2b = ax2.twinx()
     ax2b.plot(v["step"] / 1000, v["val_bad1"], color=C_BAD1, lw=1.1,
               ls=":", label="val bad-1 (%)")
-    ax2b.set_ylabel("val bad-1 (%)", fontsize=8, color=C_BAD1)
-    ax2b.tick_params(labelsize=7)
+    ax2b.set_ylabel("val bad-1 (%)", fontsize=10, color=C_BAD1)
+    ax2b.tick_params(labelsize=9)
     best = v.loc[(v["step"] - BEST_STEP).abs().idxmin()]
     ax2.scatter([best["step"] / 1000], [best["val_epe"]], marker="*",
                 s=90, color="#000", zorder=5)
     ax2.annotate(f"best: {best['val_epe']:.3f} px @ {BEST_STEP // 1000}k",
                  (best["step"] / 1000, best["val_epe"]),
                  textcoords="offset points", xytext=(-8, 9),
-                 fontsize=7, ha="right")
+                 fontsize=9, ha="right")
     ax2.set_title("(b) held-out validation (400 pairs, native axis)",
-                  fontsize=8.5)
+                  fontsize=10)
 
     for a in (ax1, ax2):
         a.spines[["top"]].set_visible(False)

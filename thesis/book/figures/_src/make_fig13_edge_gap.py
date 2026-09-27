@@ -16,14 +16,14 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-ROOT = Path("/home/abrar/Research/stero_research_claude")
+ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(ROOT / "review_paper/figures/_data"))
 from method_data import METHODS  # noqa: E402
 
 OUT = ROOT / "thesis/book/figures"
 INK = "#1a1a1a"
 
-plt.rcParams.update({"font.family": "DejaVu Serif"})
+plt.rcParams.update({"font.family": "serif", "font.serif": ["Times New Roman", "Times", "TeX Gyre Termes", "DejaVu Serif"]})
 
 KEEP = [
     ("FoundationStereo", "FoundationStereo"), ("DEFOM-Stereo", "DEFOM-Stereo"),

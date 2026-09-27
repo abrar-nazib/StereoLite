@@ -13,9 +13,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-OUT = Path("/home/abrar/Research/stero_research_claude/thesis/book/figures")
+OUT = Path(__file__).resolve().parents[4] / "thesis/book/figures"
 BLUE, VERM, GREY = "#0072B2", "#D55E00", "#999999"
-plt.rcParams.update({"font.family": "DejaVu Serif"})
+plt.rcParams.update({"font.family": "serif", "font.serif": ["Times New Roman", "Times", "TeX Gyre Termes", "DejaVu Serif"]})
 
 
 def main():

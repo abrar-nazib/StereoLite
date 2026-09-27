@@ -13,11 +13,11 @@ import numpy as np
 from matplotlib.patches import Rectangle
 from PIL import Image
 
-ROOT = Path("/home/abrar/Research/stero_research_claude")
+ROOT = Path(__file__).resolve().parents[4]
 OUT = ROOT / "thesis/book/figures"
 IMG = ROOT / "model/benchmarks/thesis_assets/TEST_A_0001_t13_left.png"
 
-plt.rcParams.update({"font.family": "DejaVu Serif"})
+plt.rcParams.update({"font.family": "serif", "font.serif": ["Times New Roman", "Times", "TeX Gyre Termes", "DejaVu Serif"]})
 
 
 def main():

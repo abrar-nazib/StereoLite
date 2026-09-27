@@ -1,0 +1,107 @@
+% ============ Appendix H: Technical Specifications =======================
+% Source: thesis/book/appendices/app_a.tex (ported whole). The internal
+% variant slug (gev4_opt_narrow_plane) is allowed here (only here), per
+% the original file's convention.
+\chapter{Technical Specifications}
+\label{app:specs}
+
+\section{Model Configuration}
+The trained architecture is the \texttt{gev4\_opt\_narrow\_plane}
+variant of the StereoLite family; Table~\ref{tab:arch_config} lists the
+full configuration.
+
+\begin{table}[!htbp]
+\centering
+\caption{Complete architecture configuration of the trained checkpoint.}
+\label{tab:arch_config}
+\small
+\begin{tabular}{ll}
+\toprule
+Hyperparameter & Value\\
+\midrule
+Backbone & YOLO26s layers 0--6, pretrained\\
+Context base / output channels & 24 / 32\\
+Tile hidden channels & 32\\
+Refinement-head hidden channels & 48\\
+Initialization groups / disparities & 8 / 24 (at 1/16)\\
+GEV band & $\pm 16$ around tile $d$ (33 bins)\\
+GEV geometry / 3-D hidden channels & 16 / 16\\
+Local correlation half-range & 2 (five offsets)\\
+Refinements at 1/16, 1/8, 1/4 & 2, 3, 3\\
+Plane rendering & on (gated slant supervision, weight 0.3)\\
+Trainable parameters & 2.9631~M\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Per-Scene Zero-Shot Results}
+\begin{table}[H]
+\centering
+\caption{Per-scene zero-shot results on Middlebury 2014.}
+\label{tab:mb14_perscene_full}
+\small
+\begin{tabular}{lcccc}
+\toprule
+Scene & EPE (px) & bad-1 (\%) & bad-2 (\%) & D1-all (\%)\\
+\midrule
+Adirondack & 0.59 & 11.4 & 4.0 & 2.38\\
+Backpack & 0.92 & 13.1 & 8.5 & 6.35\\
+Bicycle1 & 1.64 & 24.4 & 16.3 & 12.55\\
+Cable & 0.92 & 16.0 & 8.4 & 5.83\\
+Classroom1 & 1.08 & 21.5 & 12.2 & 7.56\\
+Couch & 1.86 & 25.4 & 14.5 & 8.79\\
+Flowers & 3.10 & 39.5 & 33.1 & 30.30\\
+Jadeplant & 9.25 & 57.2 & 44.1 & 34.85\\
+Mask & 3.14 & 37.4 & 28.4 & 24.68\\
+Motorcycle & 1.04 & 14.4 & 8.2 & 6.33\\
+Piano & 0.92 & 20.2 & 10.8 & 7.25\\
+Pipes & 2.26 & 30.0 & 21.7 & 17.90\\
+Playroom & 1.51 & 31.3 & 17.8 & 12.62\\
+Playtable & 0.85 & 21.3 & 8.0 & 4.36\\
+Recycle & 0.59 & 12.1 & 4.3 & 2.90\\
+Shelves & 0.94 & 25.2 & 11.0 & 6.34\\
+Shopvac & 1.93 & 22.9 & 12.2 & 7.71\\
+Sticks & 0.95 & 18.8 & 8.3 & 5.77\\
+Storage & 0.83 & 10.8 & 5.6 & 4.17\\
+Sword1 & 0.94 & 16.5 & 9.0 & 6.46\\
+Sword2 & 1.42 & 17.9 & 12.1 & 9.55\\
+Umbrella & 1.15 & 28.8 & 12.6 & 9.08\\
+Vintage & 1.61 & 33.7 & 21.7 & 15.96\\
+\midrule
+Mean & 1.71 & 23.9 & 14.5 & 10.86\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Software and Hardware Environment}
+The model is implemented in PyTorch 2.11 with CUDA 12.8 on Python 3.10.
+Training runs on a single cloud A100 with 80 gigabytes of memory,
+ablations and evaluations on a cloud T4, and the local latency benchmark
+on an RTX 3050 laptop GPU with roughly 4 gigabytes of memory. Real-camera
+pairs come from a calibrated binocular rig that streams a 2560 by 720
+side-by-side image. The intended deployment target is the Jetson Orin Nano
+class of device.
+
+\section{Reproduction Pointers}
+\begin{sloppypar}
+We can reproduce the reported synthetic-benchmark numbers from the
+project repository at \url{https://github.com/abrar-nazib/StereoLite}.
+The production model is trained by the driver
+\texttt{train\_full\_sceneflow\_a100.py}, the SceneFlow test number by
+\texttt{eval\_full\_testset.py}, the zero-shot Middlebury 2014 result by
+\texttt{eval\_gev4\_middlebury2014.py}, and the rectification-robustness
+sweep of the second objective by
+\texttt{eval\_rectification\_robustness.py}. Each driver records its
+configuration and metrics to a metadata file alongside the checkpoint.
+The 997-pair real-rig agreement study uses an in-house capture set that
+we will release with a later, expanded version of that dataset.
+\end{sloppypar}
+
+% SOURCES: appendices/app_a.tex (whole file).
+% DROPPED: nothing.
+% MOVED-AWAY: nothing. Note: mainmatter2/ch4.tex line 87 still says
+%   "Table \ref{tab:arch_config} of Appendix A" in prose, which is a
+%   stale pointer left over from the old lettering (Appendix A is now
+%   Addressing Knowledge Profile, not Technical Specifications). That
+%   line belongs to the ch4 owner and is flagged here for the B4 QA
+%   pass rather than edited directly.

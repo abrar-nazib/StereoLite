@@ -18,6 +18,7 @@ BLUE_F, BLUE_S = "#dae8fc", "#6c8ebf"
 YEL_F, YEL_S = "#fff2cc", "#d6b656"
 SUP = "#c1121f"
 EDGE = "#333333"
+FONT = "Times New Roman"
 
 
 class D:
@@ -35,6 +36,8 @@ class D:
 
     def node(self, x, y, w, h, value="", style="") -> str:
         i = self._id()
+        if "fontFamily=" not in style:
+            style = style + f"fontFamily={FONT};"
         self.cells.append(
             f'<mxCell id="{i}" value="{escape(value, {chr(34): "&quot;"})}" '
             f'style="{style}" vertex="1" parent="1">'
@@ -45,7 +48,8 @@ class D:
     def box(self, x, y, w, h, value="", fill=GREY_F, stroke=GREY_S,
             fs=11, rounded=1, dashed=False, align="center"):
         st = (f"rounded={rounded};whiteSpace=wrap;html=1;fillColor={fill};"
-              f"strokeColor={stroke};fontSize={fs};align={align};")
+              f"strokeColor={stroke};fontSize={fs};align={align};"
+              f"fontFamily={FONT};")
         if dashed:
             st += "dashed=1;"
         return self.node(x, y, w, h, value, st)
@@ -56,7 +60,8 @@ class D:
             f"shape=cube;whiteSpace=wrap;html=1;boundedLbl=1;"
             f"backgroundOutline=1;darkOpacity=0.05;darkOpacity2=0.1;"
             f"fillColor={fill};strokeColor={stroke};"
-            f"verticalLabelPosition=bottom;verticalAlign=top;fontSize={fs};")
+            f"verticalLabelPosition=bottom;verticalAlign=top;fontSize={fs};"
+            f"fontFamily={FONT};")
 
     def bars(self, x, y_mid, heights, fill, stroke, w=14, gap=9):
         ids = []
@@ -64,7 +69,7 @@ class D:
             ids.append(self.node(
                 x + i * (w + gap), y_mid - h / 2, w, h, "",
                 f"rounded=1;arcSize=30;html=1;fillColor={fill};"
-                f"strokeColor={stroke};"))
+                f"strokeColor={stroke};fontFamily={FONT};"))
         return ids
 
     def text(self, x, y, w, h, value, fs=11, bold=False, color="#000000",
@@ -72,24 +77,25 @@ class D:
         b = "fontStyle=1;" if bold else ""
         return self.node(x, y, w, h, value,
                          f"text;html=1;align={align};verticalAlign=middle;"
-                         f"fontSize={fs};{b}fontColor={color};")
+                         f"fontSize={fs};{b}fontColor={color};"
+                         f"fontFamily={FONT};")
 
     def ellipse(self, x, y, w, h, value="", fill="#ffffff", fs=14):
         return self.node(x, y, w, h, value,
                          f"ellipse;html=1;fontSize={fs};fillColor={fill};"
-                         f"strokeColor={EDGE};")
+                         f"strokeColor={EDGE};fontFamily={FONT};")
 
     def dot(self, x, y, r=5):
         return self.node(x - r, y - r, 2 * r, 2 * r, "",
                          f"ellipse;html=1;fillColor={SUP};"
-                         f"strokeColor=#8a0000;")
+                         f"strokeColor=#8a0000;fontFamily={FONT};")
 
     def edge(self, src, dst, points=(), value="", dashed=False,
              color=EDGE, exit_=None, entry=None, width=1.5,
              orthogonal=True, arrow=True):
         i = self._id()
         st = (f"html=1;jettySize=auto;strokeColor={color};"
-              f"strokeWidth={width};fontSize=10;")
+              f"strokeWidth={width};fontSize=11;fontFamily={FONT};")
         if orthogonal:
             st = "edgeStyle=orthogonalEdgeStyle;rounded=0;" + st
         if not arrow:
@@ -114,7 +120,7 @@ class D:
         """Free line between coordinates (for geometry schematics)."""
         i = self._id()
         st = (f"html=1;strokeColor={color};strokeWidth={width};"
-              f"endArrow={arrow};")
+              f"endArrow={arrow};fontFamily={FONT};")
         if dashed:
             st += "dashed=1;"
         self.cells.append(
